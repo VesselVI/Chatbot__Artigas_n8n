@@ -1,0 +1,1086 @@
+{
+  "name": "01 - Entry Router",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chatwoot-bot",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "n01wh",
+      "name": "Chatwoot Webhook",
+      "webhookId": "cw-bot-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst body = raw.body || raw;\n\n// Agent bot / webhook shapes\nconst event = body.event || body.message?.event || '';\nconst msg = body.message || body;\n\n// Drop non-message events\nif (event && !String(event).includes('message_created') && event !== 'message_updated') {\n  // allow bare message payloads without event\n  if (!msg.content && !msg.content_type && !body.content) return [];\n}\n\nconst message = (body.content !== undefined && body.conversation) ? body : msg;\nconst conversation = message.conversation || body.conversation || {};\nconst account = message.account || body.account || {};\nconst sender = message.sender || conversation.meta?.sender || {};\n\nconst messageType = message.message_type;\n// 0=incoming, 1=outgoing, 2=activity — also string forms\nconst isIncoming = messageType === 0 || messageType === 'incoming' || messageType === 'Incoming';\nconst isPrivate = message.private === true;\nconst senderType = (sender.type || '').toLowerCase();\n\nif (isPrivate) return [];\nif (messageType === 1 || messageType === 'outgoing' || messageType === 'Outgoing') return [];\nif (senderType === 'user' || senderType === 'agent_bot') return [];\n// If clearly not incoming and has message_type, drop\nif (messageType !== undefined && messageType !== null && !isIncoming && messageType !== 'incoming') return [];\n\nif (conversation.assignee_id) return []; // human handoff — skip bot reply\n\nlet phone = sender.phone_number || conversation.meta?.sender?.phone_number || conversation.contact_inbox?.source_id || '';\nphone = String(phone).replace(/\\s+/g, '').replace(/^\\+/, '');\nif (phone.startsWith('549')) phone = '54' + phone.slice(3);\n\nlet texto = message.content || '';\nlet boton_id = '';\nconst ca = message.content_attributes || {};\nconst submitted = ca.submitted_values || ca.items || [];\nif (Array.isArray(submitted) && submitted.length) {\n  const v = submitted[0];\n  boton_id = String(v.value ?? v.id ?? '');\n  if (!texto) texto = String(v.title ?? v.value ?? '');\n}\n// Some Chatwoot WhatsApp payloads put selection in content_attributes.submitted_values differently\nif (!boton_id && ca.submitted_values && typeof ca.submitted_values === 'object' && !Array.isArray(ca.submitted_values)) {\n  boton_id = String(ca.submitted_values.value || '');\n}\n\nconst contentType = message.content_type || 'text';\nconst tipo = boton_id ? 'interactive' : (contentType === 'text' || contentType === 'input_select' ? (boton_id ? 'interactive' : 'text') : 'text');\n\nif (!phone && !conversation.id) return [];\n\nreturn [{\n  json: {\n    telefono: phone || String(conversation.id),\n    tipo: boton_id ? 'interactive' : 'text',\n    texto: texto || '',\n    boton_id: boton_id || '',\n    conversation_id: conversation.id || body.conversation_id,\n    account_id: account.id || body.account_id,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "n01norm",
+      "name": "Normalize Message"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT IGNORE INTO conversation_state (phone, state, context) VALUES ('{{ $json.telefono }}', 'idle', JSON_OBJECT());",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        440,
+        0
+      ],
+      "id": "n01ens",
+      "name": "Ensure conversation_state",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT phone, state, context FROM conversation_state WHERE phone = '{{ $('Normalize Message').item.json.telefono }}' LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        660,
+        0
+      ],
+      "id": "n01get",
+      "name": "Get State",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const n = $('Normalize Message').first().json;\nconst row = $input.first().json;\nlet ctx = row.context ?? {};\nif (typeof ctx === 'string') {\n  try { ctx = JSON.parse(ctx); } catch (e) { ctx = {}; }\n}\nreturn [{\n  json: {\n    telefono: n.telefono,\n    tipo: n.tipo,\n    texto: n.texto,\n    boton_id: n.boton_id,\n    conversation_id: n.conversation_id,\n    account_id: n.account_id,\n    estado: row.state || 'idle',\n    datos_json: ctx,\n    context: ctx,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "id": "n01merge",
+      "name": "Merge Context"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst estado = item.estado || 'idle';\nconst boton = String(item.boton_id || '').trim();\nconst texto = String(item.texto || '').trim();\nconst textoLower = texto.toLowerCase();\n\nconst cancelKw = boton === 'cancelar_turno_pedido' || boton === 'cancelar_turno' || /^(cancelar|salir|menu|menú)$/i.test(textoLower);\nconst isAwaiting = /^awaiting_/.test(estado);\nconst yes = boton === 'cancel_si' || /^(si|sí)$/i.test(textoLower) || /sí,? cancelar/i.test(textoLower) || /si,? cancelar/i.test(textoLower);\nconst no = boton === 'cancel_no' || /^no$/i.test(textoLower) || /no,? continuar/i.test(textoLower);\n\nlet route = 'welcome';\n\nif (estado === 'confirmando_cancelacion') {\n  if (yes) route = 'cancel_yes';\n  else if (no) route = 'cancel_no';\n  else route = 'cancel_ask';\n} else if (cancelKw && isAwaiting) {\n  route = 'cancel_ask';\n} else if (boton === 'repetir_pregunta' && isAwaiting) {\n  route = 'booking';\n} else if (boton === 'horarios_clinica') {\n  route = 'horarios';\n} else if (boton === 'volver_menu') {\n  route = 'welcome';\n} else if (boton === 'quiero_turno' || boton === 'confirmar_turno' || isAwaiting) {\n  route = 'booking';\n} else if (estado === 'menu_shown' && texto && !boton) {\n  route = 'faq';\n} else {\n  route = 'welcome';\n}\n\nreturn [{ json: { ...item, route } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "id": "n01route",
+      "name": "Decide Route"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-welcome",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "welcome",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "welcome"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-faq",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "faq",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "faq"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-book",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "booking",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "booking"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-hor",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "horarios",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "horarios"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-ca",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cancel_ask",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancel_ask"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-cy",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cancel_yes",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancel_yes"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-cn",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cancel_no",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancel_no"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "fallback"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1320,
+        0
+      ],
+      "id": "n01sw",
+      "name": "Route Switch"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "wf02welcm",
+          "mode": "list",
+          "cachedResultName": "02 - Welcome Menu"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "telefono": "={{ $('Merge Context').item.json.telefono }}",
+            "conversation_id": "={{ $('Merge Context').item.json.conversation_id }}",
+            "account_id": "={{ $('Merge Context').item.json.account_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "account_id",
+              "displayName": "account_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1600,
+        -300
+      ],
+      "id": "n01w02",
+      "name": "Call Welcome 02"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "wf04faqia",
+          "mode": "list",
+          "cachedResultName": "04 - FAQ IA"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "telefono": "={{ $('Merge Context').item.json.telefono }}",
+            "texto": "={{ $('Merge Context').item.json.texto }}",
+            "conversation_id": "={{ $('Merge Context').item.json.conversation_id }}",
+            "account_id": "={{ $('Merge Context').item.json.account_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "texto",
+              "displayName": "texto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "account_id",
+              "displayName": "account_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1600,
+        -140
+      ],
+      "id": "n01w04",
+      "name": "Call FAQ 04"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "wf03book",
+          "mode": "list",
+          "cachedResultName": "03 - Booking Flow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "telefono": "={{ $('Merge Context').item.json.telefono }}",
+            "texto": "={{ $('Merge Context').item.json.texto }}",
+            "boton_id": "={{ $('Merge Context').item.json.boton_id }}",
+            "estado": "={{ $('Merge Context').item.json.estado }}",
+            "datos_json": "={{ $('Merge Context').item.json.datos_json }}",
+            "conversation_id": "={{ $('Merge Context').item.json.conversation_id }}",
+            "account_id": "={{ $('Merge Context').item.json.account_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "texto",
+              "displayName": "texto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "boton_id",
+              "displayName": "boton_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "datos_json",
+              "displayName": "datos_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "account_id",
+              "displayName": "account_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1600,
+        20
+      ],
+      "id": "n01w03",
+      "name": "Call Booking 03"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT address, clinic_hours FROM clinic_settings WHERE id = 1 LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1600,
+        180
+      ],
+      "id": "n01hs",
+      "name": "Load clinic hours",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Merge Context').first().json;\nconst s = $input.first().json;\nconst content = `🕘 *Nuestros horarios:*\\n- ${s.clinic_hours || ''}\\nEstamos ubicados en 📍 ${s.address || ''}`;\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: {\n        items: [\n          { title: 'Sacar un turno', value: 'quiero_turno' },\n          { title: 'Volver al menú', value: 'volver_menu' }\n        ]\n      }\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        180
+      ],
+      "id": "n01hb",
+      "name": "Build horarios msg"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2040,
+        180
+      ],
+      "id": "n01hh",
+      "name": "Send horarios",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Credential 'Chatwoot API' = Header Auth (name: api_access_token)."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state\nSET context = JSON_SET(\n  COALESCE(context, JSON_OBJECT()),\n  '$.estado_previo',\n  IF(state = 'confirmando_cancelacion',\n     COALESCE(JSON_UNQUOTE(JSON_EXTRACT(context, '$.estado_previo')), 'awaiting_nombre'),\n     state)\n),\nstate = 'confirmando_cancelacion'\nWHERE phone = '{{ $('Merge Context').item.json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1600,
+        340
+      ],
+      "id": "n01cas",
+      "name": "Set confirmando_cancelacion",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Merge Context').first().json;\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: '¿Seguro que querés cancelar el turno?',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: {\n        items: [\n          { title: 'Sí, cancelar', value: 'cancel_si' },\n          { title: 'No, continuar', value: 'cancel_no' }\n        ]\n      }\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        340
+      ],
+      "id": "n01cab",
+      "name": "Build cancel confirm"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2040,
+        340
+      ],
+      "id": "n01cah",
+      "name": "Send cancel confirm",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Credential 'Chatwoot API' = Header Auth (name: api_access_token)."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state SET state = 'idle', context = JSON_OBJECT() WHERE phone = '{{ $('Merge Context').item.json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1600,
+        500
+      ],
+      "id": "n01cys",
+      "name": "Clear state cancel yes",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "wf02welcm",
+          "mode": "list",
+          "cachedResultName": "02 - Welcome Menu"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "telefono": "={{ $('Merge Context').item.json.telefono }}",
+            "conversation_id": "={{ $('Merge Context').item.json.conversation_id }}",
+            "account_id": "={{ $('Merge Context').item.json.account_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "account_id",
+              "displayName": "account_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1820,
+        500
+      ],
+      "id": "n01cyw",
+      "name": "Welcome after cancel"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state\nSET state = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(context, '$.estado_previo')), 'awaiting_nombre')\nWHERE phone = '{{ $('Merge Context').item.json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1600,
+        660
+      ],
+      "id": "n01cns",
+      "name": "Restore estado_previo",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "wf03book",
+          "mode": "list",
+          "cachedResultName": "03 - Booking Flow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "telefono": "={{ $('Merge Context').item.json.telefono }}",
+            "texto": "",
+            "boton_id": "repetir_pregunta",
+            "estado": "={{ $json.state }}",
+            "datos_json": "={{ $json.context }}",
+            "conversation_id": "={{ $('Merge Context').item.json.conversation_id }}",
+            "account_id": "={{ $('Merge Context').item.json.account_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "texto",
+              "displayName": "texto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "boton_id",
+              "displayName": "boton_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "datos_json",
+              "displayName": "datos_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "account_id",
+              "displayName": "account_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1820,
+        660
+      ],
+      "id": "n01cnw",
+      "name": "Re-ask after cancel no"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT phone, state, context FROM conversation_state WHERE phone = '{{ $('Merge Context').item.json.telefono }}' LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1710,
+        660
+      ],
+      "id": "n01cng",
+      "name": "Get restored state",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chatwoot Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Message": {
+      "main": [
+        [
+          {
+            "node": "Ensure conversation_state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure conversation_state": {
+      "main": [
+        [
+          {
+            "node": "Get State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get State": {
+      "main": [
+        [
+          {
+            "node": "Merge Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Context": {
+      "main": [
+        [
+          {
+            "node": "Decide Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide Route": {
+      "main": [
+        [
+          {
+            "node": "Route Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Switch": {
+      "main": [
+        [
+          {
+            "node": "Call Welcome 02",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call FAQ 04",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Booking 03",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Load clinic hours",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set confirmando_cancelacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear state cancel yes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Restore estado_previo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Welcome 02",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load clinic hours": {
+      "main": [
+        [
+          {
+            "node": "Build horarios msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build horarios msg": {
+      "main": [
+        [
+          {
+            "node": "Send horarios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set confirmando_cancelacion": {
+      "main": [
+        [
+          {
+            "node": "Build cancel confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build cancel confirm": {
+      "main": [
+        [
+          {
+            "node": "Send cancel confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear state cancel yes": {
+      "main": [
+        [
+          {
+            "node": "Welcome after cancel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore estado_previo": {
+      "main": [
+        [
+          {
+            "node": "Get restored state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get restored state": {
+      "main": [
+        [
+          {
+            "node": "Re-ask after cancel no",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "wf01entry",
+  "tags": [],
+  "pinData": {}
+}

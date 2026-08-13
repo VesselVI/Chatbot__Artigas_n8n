@@ -1,0 +1,9 @@
+.env
+*.pem
+*.key
+__pycache__/
+.venv/
+venv/
+.DS_Store
+n8n_data/
+mysql_data/

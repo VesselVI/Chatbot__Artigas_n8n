@@ -1,0 +1,296 @@
+{
+  "name": "04 - FAQ IA",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "telefono"
+            },
+            {
+              "name": "texto"
+            },
+            {
+              "name": "conversation_id"
+            },
+            {
+              "name": "account_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "n04trig",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT address, clinic_hours, obras_sociales, welcome_text FROM clinic_settings WHERE id = 1 LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        200,
+        -80
+      ],
+      "id": "n04set",
+      "name": "Load clinic_settings",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, name FROM doctors WHERE active = 1 ORDER BY sort_order, name;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        200,
+        80
+      ],
+      "id": "n04doc",
+      "name": "Load doctors",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT d.name AS doctor_name, da.day, da.start_time, da.end_time\nFROM doctor_availability da\nJOIN doctors d ON d.id = da.doctor_id\nWHERE da.week_start = DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)\n  AND da.is_unavailable = 0\n  AND d.active = 1\nORDER BY d.sort_order, da.day;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        200,
+        240
+      ],
+      "id": "n04av",
+      "name": "Load week availability",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const trig = $('When Executed by Another Workflow').first().json;\nconst settings = $('Load clinic_settings').first().json;\nconst doctors = $('Load doctors').all().map(i => i.json).filter(d => d.name);\nconst avail = $('Load week availability').all().map(i => i.json).filter(a => a.doctor_name);\nconst dayNames = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];\n\nfunction fmtTime(t) {\n  if (!t) return '';\n  const s = String(t);\n  return s.length >= 5 ? s.slice(0, 5) : s;\n}\n\nconst byDoc = {};\nfor (const a of avail) {\n  if (!byDoc[a.doctor_name]) byDoc[a.doctor_name] = [];\n  const day = Number(a.day);\n  byDoc[a.doctor_name].push(`${dayNames[day] || day} ${fmtTime(a.start_time)}-${fmtTime(a.end_time)}`);\n}\n\nlet obras = settings.obras_sociales;\nif (typeof obras === 'string') {\n  try { obras = JSON.parse(obras); } catch (e) { obras = [obras]; }\n}\nif (!Array.isArray(obras)) obras = [];\n\nconst medicosLines = doctors.map(d => {\n  const hours = byDoc[d.name];\n  if (hours && hours.length) return ` - ${d.name}: ${hours.join(', ')}.`;\n  return ` - ${d.name}: (sin horarios cargados esta semana).`;\n}).join('\\n');\n\nconst system = `Sos la asistente del Centro Oftalmologico Artigas. Respondé SOLO usando la siguiente información. Si la pregunta no se puede responder con esto, decí que no contas con esa informacion pero lo vas a averiguar para hacerle saber.\n\nUbicación (donde queda):\n - ${settings.address || 'Avenida Nicolas Avellaneda 347'}.\nHorarios (a que hora abre y cierra la clinica):\n - ${settings.clinic_hours || ''}.\n\nMédicos y horarios (semana actual):\n${medicosLines || ' - (sin médicos activos)'}\n\nObras sociales aceptadas:\n${obras.map(o => ` - ${o}.`).join('\\n')}\n\n## Reglas de ORO:\n - No vas a contestar nada que no este relacionado los medicos, los horarios de los medicos, Ubicacion, Horario de la clinica u obras sociales aceptadas.\n - Vas a mantener un tono agradable y amistoso, sin perder el profesionalismo.\n - Solo vas a poner \"hola!\" en el primer mensaje que te llegue en el día.`;\n\nreturn [{\n  json: {\n    telefono: trig.telefono,\n    texto: trig.texto,\n    conversation_id: trig.conversation_id,\n    account_id: trig.account_id,\n    system_prompt: system\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        40
+      ],
+      "id": "n04merge",
+      "name": "Build system prompt"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.texto }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "={{ $('Build system prompt').item.json.system_prompt }}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        720,
+        40
+      ],
+      "id": "n04llm",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.0,
+      "position": [
+        720,
+        240
+      ],
+      "id": "n04gem",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "GEMINI_CRED",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const trig = $('Build system prompt').first().json;\nconst text = $input.first().json.text || $input.first().json.response || String($input.first().json);\nreturn [{\n  json: {\n    conversation_id: trig.conversation_id,\n    account_id: trig.account_id,\n    cw_body: {\n      content: text,\n      message_type: 'outgoing',\n      private: false\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        40
+      ],
+      "id": "n04build",
+      "name": "Build Chatwoot reply"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        40
+      ],
+      "id": "n04http",
+      "name": "Send Chatwoot FAQ",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Credential 'Chatwoot API' = Header Auth, header name api_access_token. Or set CHATWOOT_HOST/DOMAIN in n8n env."
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Load clinic_settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load clinic_settings": {
+      "main": [
+        [
+          {
+            "node": "Load doctors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load doctors": {
+      "main": [
+        [
+          {
+            "node": "Load week availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load week availability": {
+      "main": [
+        [
+          {
+            "node": "Build system prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build system prompt": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Build Chatwoot reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Chatwoot reply": {
+      "main": [
+        [
+          {
+            "node": "Send Chatwoot FAQ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "wf04faqia",
+  "tags": []
+}

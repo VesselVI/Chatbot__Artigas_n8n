@@ -1,0 +1,172 @@
+{
+  "name": "02 - Welcome Menu",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "telefono"
+            },
+            {
+              "name": "conversation_id"
+            },
+            {
+              "name": "account_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "n02trig",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT welcome_text FROM clinic_settings WHERE id = 1 LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "id": "n02set",
+      "name": "Load welcome_text",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const trig = $('When Executed by Another Workflow').first().json;\nconst welcome = ($input.first().json.welcome_text || '¡Hola! Bienvenido/a a la Clínica Oftalmológica Artigas. ¿En qué te puedo ayudar?');\nconst host = $env.CHATWOOT_HOST || $env.DOMAIN;\nreturn [{\n  json: {\n    telefono: trig.telefono,\n    conversation_id: trig.conversation_id,\n    account_id: trig.account_id,\n    cw_body: {\n      content: welcome,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: {\n        items: [\n          { title: 'Horarios de Clinica', value: 'horarios_clinica' },\n          { title: 'Sacar un turno', value: 'quiero_turno' }\n        ]\n      }\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "n02build",
+      "name": "Build welcome message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "id": "n02http",
+      "name": "Send Chatwoot welcome",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Credential 'Chatwoot API' = Header Auth, header name api_access_token. Or set CHATWOOT_HOST/DOMAIN in n8n env."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state SET state = 'menu_shown' WHERE phone = '{{ $('When Executed by Another Workflow').item.json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        880,
+        0
+      ],
+      "id": "n02upd",
+      "name": "Set menu_shown",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Load welcome_text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load welcome_text": {
+      "main": [
+        [
+          {
+            "node": "Build welcome message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build welcome message": {
+      "main": [
+        [
+          {
+            "node": "Send Chatwoot welcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Chatwoot welcome": {
+      "main": [
+        [
+          {
+            "node": "Set menu_shown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "wf02welcm",
+  "tags": []
+}

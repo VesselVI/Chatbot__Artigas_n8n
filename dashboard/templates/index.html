@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clínica Artigas — Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div class="container" style="max-width: 760px; margin-top: 32px; margin-bottom: 48px;">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Clínica Artigas</h4>
+      <form method="POST" action="/logout" class="m-0">
+        <button type="submit" class="btn btn-sm btn-outline-secondary">Salir</button>
+      </form>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-medium">Médico</label>
+      <select id="doctor_id" class="form-select">
+        {% for d in doctors %}
+        <option value="{{ d.id }}">{{ d.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <ul class="nav nav-tabs" id="dashboardTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="availability-tab" data-bs-toggle="tab"
+          data-bs-target="#availability-pane" type="button" role="tab">
+          Horarios
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="solicitudes-tab" data-bs-toggle="tab"
+          data-bs-target="#solicitudes-pane" type="button" role="tab">
+          Solicitudes
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="clinic-tab" data-bs-toggle="tab"
+          data-bs-target="#clinic-pane" type="button" role="tab">
+          Clínica
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content border border-top-0 rounded-bottom bg-white p-4 shadow-sm" id="dashboardTabsContent">
+
+      <!-- HORARIOS -->
+      <div class="tab-pane fade show active" id="availability-pane" role="tabpanel">
+        <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="prev-week">Semana anterior</button>
+          <span class="fw-medium" id="week-label">Semana del —</span>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="next-week">Semana siguiente</button>
+        </div>
+
+        <div id="availability-alert"></div>
+
+        <label class="form-label fw-medium">Seleccioná día(s)</label>
+        <div class="list-group mb-4" id="day-list">
+          {% for i in days_of_week %}
+          <label class="list-group-item d-flex justify-content-between align-items-center">
+            <span>
+              <input class="form-check-input me-2 day-check" type="checkbox" name="days" value="{{ i }}">
+              {{ day_names[i] }}
+            </span>
+            <span id="schedule-{{ i }}" class="badge text-bg-light border text-muted fst-italic">Sin configurar</span>
+          </label>
+          {% endfor %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Hora inicio</label>
+          <select name="start_time" id="start_time" class="form-select">
+            <option value="">-- seleccionar --</option>
+            {% for t in all_times %}
+            <option value="{{ t }}">{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Hora fin</label>
+          <select name="end_time" id="end_time" class="form-select">
+            <option value="">-- seleccioná hora inicio primero --</option>
+          </select>
+        </div>
+
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-primary" id="save-hours">Guardar horarios</button>
+          <button type="button" class="btn btn-outline-danger" id="mark-unavailable">Marcar no disponible</button>
+        </div>
+        <p class="text-muted small mt-3 mb-0">
+          Para corregir un día, seleccionálo de nuevo, elegí el horario (o no disponible) y guardá. Se sobrescribe.
+        </p>
+      </div>
+
+      <!-- SOLICITUDES -->
+      <div class="tab-pane fade" id="solicitudes-pane" role="tabpanel">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="text-muted small" id="solicitudes-status">Cargando...</span>
+          <button class="btn btn-sm btn-outline-secondary" id="refresh-btn" type="button">Actualizar</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-striped table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Médico</th>
+                <th>Horario pref.</th>
+                <th>Paciente</th>
+                <th>Teléfono</th>
+                <th>Obra social</th>
+              </tr>
+            </thead>
+            <tbody id="solicitudes-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CLINICA -->
+      <div class="tab-pane fade" id="clinic-pane" role="tabpanel">
+        <div id="clinic-alert"></div>
+        <div class="mb-3">
+          <label class="form-label">Dirección</label>
+          <input type="text" class="form-control" id="clinic-address">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Horario de la clínica</label>
+          <input type="text" class="form-control" id="clinic-hours">
+          <div class="form-text">Se usa cuando el paciente elige “Cualquier doctor”.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Texto de bienvenida</label>
+          <textarea class="form-control" id="welcome-text" rows="2"></textarea>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Obras sociales (una por línea)</label>
+          <textarea class="form-control" id="obras-sociales" rows="8"></textarea>
+        </div>
+        <button type="button" class="btn btn-primary w-100" id="save-clinic">Guardar datos de clínica</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const allTimes = {{ all_times_json | safe }};
+    let weekStart = new Date('{{ week_start }}T00:00:00');
+
+    function toISODate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function mondayOf(d) {
+      const x = new Date(d);
+      const day = (x.getDay() + 6) % 7;
+      x.setDate(x.getDate() - day);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    }
+
+    weekStart = mondayOf(weekStart);
+
+    function formatLabel(d) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `Semana del ${dd}/${mm}/${yyyy}`;
+    }
+
+    function showAlert(containerId, type, message) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+          ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>`;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str ?? '';
+      return div.innerHTML;
+    }
+
+    function selectedDays() {
+      return Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
+    }
+
+    document.getElementById('start_time').addEventListener('change', function () {
+      const startValue = this.value;
+      const endSelect = document.getElementById('end_time');
+      endSelect.innerHTML = '';
+      if (!startValue) {
+        endSelect.innerHTML = '<option value="">-- seleccioná hora inicio primero --</option>';
+        return;
+      }
+      const startIndex = allTimes.indexOf(startValue);
+      const validEndTimes = allTimes.slice(startIndex + 1);
+      endSelect.innerHTML = '<option value="">-- seleccionar --</option>' +
+        validEndTimes.map(t => `<option value="${t}">${t}</option>`).join('');
+    });
+
+    async function loadAvailability() {
+      const doctorId = document.getElementById('doctor_id').value;
+      document.getElementById('week-label').textContent = formatLabel(weekStart);
+      try {
+        const res = await fetch(`/api/availability?doctor_id=${encodeURIComponent(doctorId)}&week_start=${toISODate(weekStart)}`);
+        if (!res.ok) throw new Error('fail');
+        const data = await res.json();
+        (data.availability || []).forEach(entry => {
+          const badge = document.getElementById('schedule-' + entry.day);
+          if (!badge) return;
+          if (!entry.configured) {
+            badge.textContent = 'Sin configurar';
+            badge.className = 'badge text-bg-light border text-muted fst-italic';
+          } else if (entry.is_unavailable) {
+            badge.textContent = 'No disponible';
+            badge.className = 'badge text-bg-danger';
+          } else {
+            badge.textContent = `${entry.start_time}–${entry.end_time}`;
+            badge.className = 'badge text-bg-light border text-dark';
+          }
+        });
+      } catch (err) {
+        console.error(err);
+        for (let i = 0; i < 7; i++) {
+          const badge = document.getElementById('schedule-' + i);
+          if (badge) {
+            badge.textContent = 'Error';
+            badge.className = 'badge text-bg-light border text-danger';
+          }
+        }
+      }
+    }
+
+    document.getElementById('prev-week').addEventListener('click', () => {
+      weekStart.setDate(weekStart.getDate() - 7);
+      loadAvailability();
+    });
+    document.getElementById('next-week').addEventListener('click', () => {
+      weekStart.setDate(weekStart.getDate() + 7);
+      loadAvailability();
+    });
+    document.getElementById('doctor_id').addEventListener('change', loadAvailability);
+
+    document.getElementById('save-hours').addEventListener('click', async () => {
+      const days = selectedDays();
+      if (!days.length) {
+        showAlert('availability-alert', 'danger', 'Seleccioná al menos un día.');
+        return;
+      }
+      const start = document.getElementById('start_time').value;
+      const end = document.getElementById('end_time').value;
+      if (!start || !end) {
+        showAlert('availability-alert', 'danger', 'Completá hora inicio y fin.');
+        return;
+      }
+      const btn = document.getElementById('save-hours');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            doctor_id: Number(document.getElementById('doctor_id').value),
+            week_start: toISODate(weekStart),
+            days,
+            start_time: start,
+            end_time: end
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        showAlert('availability-alert', 'success', data.message || 'Guardado.');
+        document.querySelectorAll('.day-check').forEach(cb => { cb.checked = false; });
+        await loadAvailability();
+      } catch (err) {
+        showAlert('availability-alert', 'danger', err.message || 'No se pudo guardar.');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('mark-unavailable').addEventListener('click', async () => {
+      const days = selectedDays();
+      if (!days.length) {
+        showAlert('availability-alert', 'danger', 'Seleccioná al menos un día.');
+        return;
+      }
+      const btn = document.getElementById('mark-unavailable');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/availability/unavailable', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            doctor_id: Number(document.getElementById('doctor_id').value),
+            week_start: toISODate(weekStart),
+            days
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        showAlert('availability-alert', 'success', data.message || 'Guardado.');
+        document.querySelectorAll('.day-check').forEach(cb => { cb.checked = false; });
+        await loadAvailability();
+      } catch (err) {
+        showAlert('availability-alert', 'danger', err.message || 'No se pudo guardar.');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    async function loadSolicitudes() {
+      const statusEl = document.getElementById('solicitudes-status');
+      const tbody = document.getElementById('solicitudes-tbody');
+      statusEl.textContent = 'Cargando...';
+      try {
+        const res = await fetch('/api/solicitudes');
+        if (!res.ok) throw new Error('fail');
+        const data = await res.json();
+        const rows = data.solicitudes || [];
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sin solicitudes</td></tr>';
+        } else {
+          tbody.innerHTML = rows.map(b => `
+            <tr>
+              <td>${escapeHtml(b.created_at)}</td>
+              <td>${escapeHtml(b.medico)}</td>
+              <td>${escapeHtml(b.horario_preferido)}</td>
+              <td>${escapeHtml(b.nombre)}</td>
+              <td>${escapeHtml(b.telefono_contacto || b.phone)}</td>
+              <td>${escapeHtml(b.obra_social)}</td>
+            </tr>
+          `).join('');
+        }
+        statusEl.textContent = 'Actualizado ' + new Date().toLocaleTimeString();
+      } catch (err) {
+        statusEl.textContent = 'No se pudieron cargar.';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error</td></tr>';
+      }
+    }
+
+    document.getElementById('refresh-btn').addEventListener('click', loadSolicitudes);
+    let solicitudesLoaded = false;
+    document.getElementById('solicitudes-tab').addEventListener('shown.bs.tab', () => {
+      if (!solicitudesLoaded) {
+        solicitudesLoaded = true;
+        loadSolicitudes();
+      }
+    });
+
+    async function loadClinic() {
+      const res = await fetch('/api/clinic-settings');
+      if (!res.ok) return;
+      const data = await res.json();
+      document.getElementById('clinic-address').value = data.address || '';
+      document.getElementById('clinic-hours').value = data.clinic_hours || '';
+      document.getElementById('welcome-text').value = data.welcome_text || '';
+      const obras = Array.isArray(data.obras_sociales) ? data.obras_sociales.join('\n') : '';
+      document.getElementById('obras-sociales').value = obras;
+    }
+
+    document.getElementById('clinic-tab').addEventListener('shown.bs.tab', loadClinic);
+
+    document.getElementById('save-clinic').addEventListener('click', async () => {
+      const obras = document.getElementById('obras-sociales').value
+        .split('\n').map(s => s.trim()).filter(Boolean);
+      try {
+        const res = await fetch('/api/clinic-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: document.getElementById('clinic-address').value,
+            clinic_hours: document.getElementById('clinic-hours').value,
+            welcome_text: document.getElementById('welcome-text').value,
+            obras_sociales: obras
+          })
+        });
+        if (!res.ok) throw new Error('fail');
+        showAlert('clinic-alert', 'success', 'Datos de clínica guardados.');
+      } catch (err) {
+        showAlert('clinic-alert', 'danger', 'No se pudo guardar.');
+      }
+    });
+
+    loadAvailability();
+  </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{$DOMAIN} {
+  redir https://dash.{$DOMAIN} permanent
+}
+
+n8n.{$DOMAIN} {
+  reverse_proxy n8n:5678
+}
+
+dash.{$DOMAIN} {
+  reverse_proxy dashboard:8000
+}
+
+chat.{$DOMAIN} {
+  reverse_proxy chatwoot-rails:3000
+}

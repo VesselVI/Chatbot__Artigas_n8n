@@ -1,0 +1,2651 @@
+{
+  "name": "03 - Booking Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "telefono"
+            },
+            {
+              "name": "texto"
+            },
+            {
+              "name": "boton_id"
+            },
+            {
+              "name": "estado"
+            },
+            {
+              "name": "datos_json"
+            },
+            {
+              "name": "conversation_id"
+            },
+            {
+              "name": "account_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "n03trig",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst j = $input.first().json;\nconst estado = j.estado || 'idle';\nconst boton = String(j.boton_id || '').trim();\nconst isRepetir = boton === 'repetir_pregunta';\nconst ctx = parseCtx(j.datos_json);\nlet step = estado;\nif (/^(idle|menu_shown)$/.test(estado)) step = 'Empezar';\nreturn [{\n  json: {\n    telefono: j.telefono,\n    texto: String(j.texto || '').trim(),\n    boton_id: boton,\n    estado,\n    datos_json: ctx,\n    conversation_id: j.conversation_id,\n    account_id: j.account_id,\n    is_repetir: isRepetir,\n    step\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "n03prep",
+      "name": "Prepare Input"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw-Empezar",
+                    "leftValue": "={{ $json.step }}",
+                    "rightValue": "Empezar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Empezar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw-awaiting_nombre",
+                    "leftValue": "={{ $json.step }}",
+                    "rightValue": "awaiting_nombre",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_nombre"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw-awaiting_dni",
+                    "leftValue": "={{ $json.step }}",
+                    "rightValue": "awaiting_dni",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_dni"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw-awaiting_obra_social",
+                    "leftValue": "={{ $json.step }}",
+                    "rightValue": "awaiting_obra_social",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_obra_social"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw-awaiting_obra_social_otra",
+                    "leftValue": "={{ $json.step }}",
+                    "rightValue": "awaiting_obra_social_otra",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_obra_social_otra"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw-awaiting_telefono",
+                    "leftValue": "={{ $json.step }}",
+                    "rightValue": "awaiting_telefono",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_telefono"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw-awaiting_medico",
+                    "leftValue": "={{ $json.step }}",
+                    "rightValue": "awaiting_medico",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_medico"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw-awaiting_dia_hora",
+                    "leftValue": "={{ $json.step }}",
+                    "rightValue": "awaiting_dia_hora",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_dia_hora"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw-awaiting_confirmacion",
+                    "leftValue": "={{ $json.step }}",
+                    "rightValue": "awaiting_confirmacion",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_confirmacion"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "n03sw",
+      "name": "State Switch"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state SET state = 'awaiting_nombre', context = JSON_OBJECT() WHERE phone = '{{ $json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        700,
+        -900
+      ],
+      "id": "n03st0",
+      "name": "Start awaiting_nombre",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nreturn [cwSelect('Para sacar el turno necesito algunos datos.\\n¿Cuál es tu nombre completo?', navItems(), m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        -900
+      ],
+      "id": "n03ask0",
+      "name": "Ask nombre"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1140,
+        -900
+      ],
+      "id": "n03h0",
+      "name": "Send ask nombre",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rep1",
+              "leftValue": "={{ $json.is_repetir }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        -720
+      ],
+      "id": "n03if1",
+      "name": "Nombre: repetir?"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nreturn [cwSelect('¿Cuál es tu nombre completo?', navItems(), m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        -800
+      ],
+      "id": "n03ask1r",
+      "name": "Re-ask nombre"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1140,
+        -800
+      ],
+      "id": "n03h1r",
+      "name": "Send re-ask nombre",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state\nSET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.nombre', '{{ $json.texto.replace(/'/g, \"''\") }}'),\n    state = 'awaiting_dni'\nWHERE phone = '{{ $json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        920,
+        -640
+      ],
+      "id": "n03sv1",
+      "name": "Save nombre",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nreturn [cwSelect('¿Cuál es tu DNI?', navItems(), m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        -640
+      ],
+      "id": "n03ask1",
+      "name": "Ask DNI"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        -640
+      ],
+      "id": "n03h1",
+      "name": "Send ask DNI",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rep2",
+              "leftValue": "={{ $json.is_repetir }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        -480
+      ],
+      "id": "n03if2",
+      "name": "DNI: repetir?"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nreturn [cwSelect('¿Cuál es tu DNI?', navItems(), m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        -560
+      ],
+      "id": "n03ask2r",
+      "name": "Re-ask DNI"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1140,
+        -560
+      ],
+      "id": "n03h2r",
+      "name": "Send re-ask DNI",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state\nSET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.dni', '{{ $json.texto.replace(/'/g, \"''\") }}'),\n    state = 'awaiting_obra_social'\nWHERE phone = '{{ $json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        920,
+        -400
+      ],
+      "id": "n03sv2",
+      "name": "Save DNI",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT obras_sociales FROM clinic_settings WHERE id = 1 LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1140,
+        -400
+      ],
+      "id": "n03obras",
+      "name": "Load obras_sociales",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nlet obras = $input.first().json.obras_sociales;\nif (typeof obras === 'string') { try { obras = JSON.parse(obras); } catch(e) { obras = []; } }\nif (!Array.isArray(obras)) obras = [];\nconst items = obras.map(o => ({ title: String(o).slice(0, 24), value: String(o) }));\nitems.push({ title: 'Otra / particular', value: 'obra_otra' });\nitems.push(...navItems());\nreturn [cwSelect('¿Cuál es tu obra social?', items, m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        -400
+      ],
+      "id": "n03ask2",
+      "name": "Ask obra list"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        -400
+      ],
+      "id": "n03h2",
+      "name": "Send obra list",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $input.first().json;\nif (m.is_repetir) {\n  return [{ json: { ...m, obra_action: 'repetir' } }];\n}\nconst boton = m.boton_id;\nconst texto = m.texto;\nif (boton === 'obra_otra') {\n  return [{ json: { ...m, obra_action: 'otra' } }];\n}\nconst value = boton || texto;\nif (!value) {\n  return [{ json: { ...m, obra_action: 'repetir' } }];\n}\nreturn [{ json: { ...m, obra_action: 'save', obra_value: value } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        -220
+      ],
+      "id": "n03obra",
+      "name": "Handle obra social"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "oa-r",
+                    "leftValue": "={{ $json.obra_action }}",
+                    "rightValue": "repetir",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "repetir"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "oa-o",
+                    "leftValue": "={{ $json.obra_action }}",
+                    "rightValue": "otra",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "otra"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "oa-s",
+                    "leftValue": "={{ $json.obra_action }}",
+                    "rightValue": "save",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "save"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        920,
+        -220
+      ],
+      "id": "n03osw",
+      "name": "Obra action"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT obras_sociales FROM clinic_settings WHERE id = 1 LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1140,
+        -300
+      ],
+      "id": "n03obras2",
+      "name": "Reload obras repetir",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nlet obras = $input.first().json.obras_sociales;\nif (typeof obras === 'string') { try { obras = JSON.parse(obras); } catch(e) { obras = []; } }\nif (!Array.isArray(obras)) obras = [];\nconst items = obras.map(o => ({ title: String(o).slice(0, 24), value: String(o) }));\nitems.push({ title: 'Otra / particular', value: 'obra_otra' });\nitems.push(...navItems());\nreturn [cwSelect('¿Cuál es tu obra social?', items, m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        -300
+      ],
+      "id": "n03askor",
+      "name": "Re-ask obra list"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        -300
+      ],
+      "id": "n03hor",
+      "name": "Send obra repetir",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state SET state = 'awaiting_obra_social_otra' WHERE phone = '{{ $('Prepare Input').item.json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1140,
+        -220
+      ],
+      "id": "n03oso",
+      "name": "Set awaiting_obra_otra",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nreturn [cwSelect('Escribí el nombre de tu obra social o \"particular\".', navItems(), m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        -220
+      ],
+      "id": "n03askoo",
+      "name": "Ask obra otra"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        -220
+      ],
+      "id": "n03hoo",
+      "name": "Send obra otra",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state\nSET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.obra_social', '{{ $json.obra_value.replace(/'/g, \"''\") }}'),\n    state = 'awaiting_telefono'\nWHERE phone = '{{ $json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1140,
+        -140
+      ],
+      "id": "n03oss",
+      "name": "Save obra listed",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nreturn [cwSelect('¿Cuál es tu número de teléfono de contacto?', navItems(), m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        -140
+      ],
+      "id": "n03asktel",
+      "name": "Ask telefono"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        -140
+      ],
+      "id": "n03htel",
+      "name": "Send ask telefono",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rep3",
+              "leftValue": "={{ $json.is_repetir }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        0
+      ],
+      "id": "n03if3",
+      "name": "Obra otra: repetir?"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nreturn [cwSelect('Escribí el nombre de tu obra social o \"particular\".', navItems(), m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        -80
+      ],
+      "id": "n03ask3r",
+      "name": "Re-ask obra otra"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1140,
+        -80
+      ],
+      "id": "n03h3r",
+      "name": "Send re-ask obra otra",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state\nSET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.obra_social', '{{ $json.texto.replace(/'/g, \"''\") }}'),\n    state = 'awaiting_telefono'\nWHERE phone = '{{ $json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        920,
+        80
+      ],
+      "id": "n03sv3",
+      "name": "Save obra otra",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nreturn [cwSelect('¿Cuál es tu número de teléfono de contacto?', navItems(), m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        80
+      ],
+      "id": "n03ask3",
+      "name": "Ask telefono after otra"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        80
+      ],
+      "id": "n03h3",
+      "name": "Send telefono after otra",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rep4",
+              "leftValue": "={{ $json.is_repetir }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        220
+      ],
+      "id": "n03if4",
+      "name": "Tel: repetir?"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nreturn [cwSelect('¿Cuál es tu número de teléfono de contacto?', navItems(), m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        140
+      ],
+      "id": "n03ask4r",
+      "name": "Re-ask telefono"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1140,
+        140
+      ],
+      "id": "n03h4r",
+      "name": "Send re-ask telefono",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state\nSET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.telefono_contacto', '{{ $json.texto.replace(/'/g, \"''\") }}'),\n    state = 'awaiting_medico'\nWHERE phone = '{{ $json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        920,
+        300
+      ],
+      "id": "n03sv4",
+      "name": "Save telefono",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, name FROM doctors WHERE active = 1 ORDER BY sort_order, name;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1140,
+        300
+      ],
+      "id": "n03docs",
+      "name": "Load doctors list",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Cualquier doctor', value: 'medico_cualquiera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nitems.push(...navItems());\nreturn [cwSelect('¿Con qué médico preferís atenderte?', items, m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        300
+      ],
+      "id": "n03ask4",
+      "name": "Ask medico list"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        300
+      ],
+      "id": "n03h4",
+      "name": "Send medico list",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $input.first().json;\nif (m.is_repetir || (!m.boton_id && !m.texto)) {\n  return [{ json: { ...m, med_action: 'repetir' } }];\n}\nconst boton = m.boton_id;\nlet medico_name = '';\nlet doctor_id = null;\nlet cualquiera = false;\nif (boton === 'medico_cualquiera' || /cualquier/i.test(m.texto)) {\n  cualquiera = true;\n  medico_name = 'Cualquier doctor';\n} else if (boton.startsWith('medico_')) {\n  doctor_id = boton.replace('medico_', '');\n  medico_name = m.texto || boton;\n} else {\n  medico_name = boton || m.texto;\n}\nreturn [{ json: { ...m, med_action: 'save', medico_name, doctor_id, cualquiera } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        460
+      ],
+      "id": "n03med",
+      "name": "Handle medico"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ma-r",
+                    "leftValue": "={{ $json.med_action }}",
+                    "rightValue": "repetir",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "repetir"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ma-s",
+                    "leftValue": "={{ $json.med_action }}",
+                    "rightValue": "save",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "save"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        920,
+        460
+      ],
+      "id": "n03msw",
+      "name": "Medico action"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, name FROM doctors WHERE active = 1 ORDER BY sort_order, name;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1140,
+        380
+      ],
+      "id": "n03docs2",
+      "name": "Reload doctors repetir",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Cualquier doctor', value: 'medico_cualquiera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nitems.push(...navItems());\nreturn [cwSelect('¿Con qué médico preferís atenderte?', items, m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        380
+      ],
+      "id": "n03askmr",
+      "name": "Re-ask medico"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        380
+      ],
+      "id": "n03hmr",
+      "name": "Send medico repetir",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst m = $input.first().json;\nconst cualquiera = !!m.cualquiera;\nconst id = m.doctor_id ? Number(m.doctor_id) : 0;\nconst phone = String(m.telefono).replace(/'/g, \"''\");\nlet sql;\nif (cualquiera) {\n  sql = `UPDATE conversation_state SET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.medico', 'Cualquier doctor', '$.medico_cualquiera', true, '$.doctor_id', null), state = 'awaiting_dia_hora' WHERE phone = '${phone}';`;\n} else if (id) {\n  sql = `UPDATE conversation_state SET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.medico', (SELECT name FROM doctors WHERE id = ${id}), '$.medico_cualquiera', false, '$.doctor_id', ${id}), state = 'awaiting_dia_hora' WHERE phone = '${phone}';`;\n} else {\n  const esc = String(m.medico_name || '').replace(/'/g, \"''\");\n  sql = `UPDATE conversation_state SET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.medico', '${esc}', '$.medico_cualquiera', false), state = 'awaiting_dia_hora' WHERE phone = '${phone}';`;\n}\nreturn [{ json: { ...m, doctor_id: id || null, cualquiera, sql_update: sql } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        540
+      ],
+      "id": "n03msaveprep",
+      "name": "Prep save medico"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql_update }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1360,
+        540
+      ],
+      "id": "n03msv",
+      "name": "Save medico state",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  (SELECT clinic_hours FROM clinic_settings WHERE id = 1) AS clinic_hours,\n  (\n    SELECT GROUP_CONCAT(\n      CONCAT(\n        ELT(da.day+1, 'Lun','Mar','Mié','Jue','Vie','Sáb','Dom'),\n        ' ',\n        DATE_FORMAT(da.start_time, '%H:%i'),\n        '-',\n        DATE_FORMAT(da.end_time, '%H:%i')\n      )\n      ORDER BY da.day SEPARATOR ', '\n    )\n    FROM doctor_availability da\n    WHERE da.doctor_id = {{ Number($('Prep save medico').item.json.doctor_id) || 0 }}\n      AND da.week_start = DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)\n      AND da.is_unavailable = 0\n  ) AS doctor_hours,\n  (SELECT name FROM doctors WHERE id = {{ Number($('Prep save medico').item.json.doctor_id) || 0 }}) AS doctor_name,\n  (SELECT JSON_UNQUOTE(JSON_EXTRACT(context, '$.medico')) FROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}') AS medico_saved;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1580,
+        540
+      ],
+      "id": "n03mhrs",
+      "name": "Load hours for prompt",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prep save medico').first().json;\nconst h = $input.first().json;\nif (m.cualquiera) {\n  return [cwSelect(`¿Qué horario preferís? Recordá que la clínica atiende ${h.clinic_hours || ''}.`, navItems(), m)];\n}\nconst docName = h.doctor_name || h.medico_saved || 'el doctor';\nconst hours = h.doctor_hours || 'consultar en recepción';\nreturn [cwSelect(`¿Qué horario preferís? Recordá que ${docName} atiende: ${hours}.`, navItems(), m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        540
+      ],
+      "id": "n03ask5",
+      "name": "Ask dia_hora"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2020,
+        540
+      ],
+      "id": "n03h5",
+      "name": "Send ask dia_hora",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rep6",
+              "leftValue": "={{ $json.is_repetir }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        720
+      ],
+      "id": "n03if6",
+      "name": "DiaHora: repetir?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  JSON_UNQUOTE(JSON_EXTRACT(context, '$.medico')) AS medico,\n  JSON_EXTRACT(context, '$.medico_cualquiera') AS medico_cualquiera,\n  JSON_UNQUOTE(JSON_EXTRACT(context, '$.doctor_id')) AS doctor_id,\n  (SELECT clinic_hours FROM clinic_settings WHERE id = 1) AS clinic_hours,\n  (\n    SELECT GROUP_CONCAT(\n      CONCAT(\n        ELT(da.day+1, 'Lun','Mar','Mié','Jue','Vie','Sáb','Dom'),\n        ' ',\n        DATE_FORMAT(da.start_time, '%H:%i'),\n        '-',\n        DATE_FORMAT(da.end_time, '%H:%i')\n      )\n      ORDER BY da.day SEPARATOR ', '\n    )\n    FROM doctor_availability da\n    WHERE da.doctor_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(\n      (SELECT context FROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}'),\n      '$.doctor_id')) AS UNSIGNED)\n      AND da.week_start = DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)\n      AND da.is_unavailable = 0\n  ) AS doctor_hours\nFROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}' LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        920,
+        640
+      ],
+      "id": "n03dhr",
+      "name": "Load ctx for re-ask horario",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst h = $input.first().json;\nconst cualquiera = h.medico_cualquiera === true || h.medico_cualquiera === 'true' || h.medico === 'Cualquier doctor';\nif (cualquiera) {\n  return [cwSelect(`¿Qué horario preferís? Recordá que la clínica atiende ${h.clinic_hours || ''}.`, navItems(), m)];\n}\nreturn [cwSelect(`¿Qué horario preferís? Recordá que ${h.medico || 'el doctor'} atiende: ${h.doctor_hours || 'consultar en recepción'}.`, navItems(), m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        640
+      ],
+      "id": "n03ask6r",
+      "name": "Re-ask dia_hora"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        640
+      ],
+      "id": "n03h6r",
+      "name": "Send re-ask dia_hora",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state\nSET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.dia_hora', '{{ $json.texto.replace(/'/g, \"''\") }}'),\n    state = 'awaiting_confirmacion'\nWHERE phone = '{{ $json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        920,
+        800
+      ],
+      "id": "n03sv6",
+      "name": "Save dia_hora",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT context FROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}' LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1140,
+        800
+      ],
+      "id": "n03ctxc",
+      "name": "Load ctx confirm",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nlet raw = $input.first().json.context;\nconst datos = parseCtx(raw);\nconst text = `Solicitud de turno:\\n👤 ${datos.nombre || '-'}\\n🪪 ${datos.dni || '-'}\\n🏥 ${datos.obra_social || '-'}\\n📞 ${datos.telefono_contacto || '-'}\\n🩺 ${datos.medico || '-'}\\n📅 ${datos.dia_hora || '-'}\\n\\n¿Confirmás el turno?`;\nreturn [cwSelect(text, [\n  { title: 'Confirmar', value: 'confirmar_turno' },\n  { title: 'Cancelar turno', value: 'cancelar_turno_pedido' },\n  { title: 'Repetir pregunta', value: 'repetir_pregunta' }\n], m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        800
+      ],
+      "id": "n03ask6",
+      "name": "Build confirmation"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        800
+      ],
+      "id": "n03h6",
+      "name": "Send confirmation",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "conf",
+              "leftValue": "={{ $json.boton_id }}",
+              "rightValue": "confirmar_turno",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        980
+      ],
+      "id": "n03if7",
+      "name": "Confirm branch"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "repr",
+              "leftValue": "={{ $json.is_repetir }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        920,
+        1100
+      ],
+      "id": "n03if7b",
+      "name": "Confirm: repetir?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT context FROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}' LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1140,
+        1040
+      ],
+      "id": "n03ctxr",
+      "name": "Load ctx re-confirm",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst datos = parseCtx($input.first().json.context);\nconst text = `Solicitud de turno:\\n👤 ${datos.nombre || '-'}\\n🪪 ${datos.dni || '-'}\\n🏥 ${datos.obra_social || '-'}\\n📞 ${datos.telefono_contacto || '-'}\\n🩺 ${datos.medico || '-'}\\n📅 ${datos.dia_hora || '-'}\\n\\n¿Confirmás el turno?`;\nreturn [cwSelect(text, [\n  { title: 'Confirmar', value: 'confirmar_turno' },\n  { title: 'Cancelar turno', value: 'cancelar_turno_pedido' },\n  { title: 'Repetir pregunta', value: 'repetir_pregunta' }\n], m)];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        1040
+      ],
+      "id": "n03ask7r",
+      "name": "Re-show confirmation"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        1040
+      ],
+      "id": "n03h7r",
+      "name": "Send re-confirm",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT context FROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}' LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        920,
+        900
+      ],
+      "id": "n03ctxf",
+      "name": "Load ctx final",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst datos = parseCtx($input.first().json.context);\nconst esc = (s) => String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\nconst phone = esc(m.telefono);\nconst sql = `INSERT INTO turno_solicitudes (phone, nombre, dni, obra_social, telefono_contacto, medico, horario_preferido, status, conversation_id)\nVALUES ('${phone}', '${esc(datos.nombre)}', '${esc(datos.dni)}', '${esc(datos.obra_social)}', '${esc(datos.telefono_contacto)}', '${esc(datos.medico)}', '${esc(datos.dia_hora)}', 'pending', '${esc(m.conversation_id)}');`;\nconst ficha = `🗒️ Nueva solicitud de turno\nNombre: ${datos.nombre || '-'}\nDNI: ${datos.dni || '-'}\nObra social: ${datos.obra_social || '-'}\nTeléfono: ${datos.telefono_contacto || '-'}\nMédico: ${datos.medico || '-'}\nDía/hora: ${datos.dia_hora || '-'}`;\nreturn [{\n  json: {\n    telefono: m.telefono,\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    sql_insert: sql,\n    datos,\n    ficha,\n    cw_private: {\n      content: ficha,\n      message_type: 'outgoing',\n      private: true\n    },\n    cw_body: {\n      content: ficha + '\\n\\n¡Listo! Recibimos tu solicitud. La secretaria te va a confirmar el turno.',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: {\n        items: [{ title: 'Volver al menú', value: 'volver_menu' }]\n      }\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        900
+      ],
+      "id": "n03final",
+      "name": "Build insert + notes"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql_insert }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1360,
+        860
+      ],
+      "id": "n03ins",
+      "name": "Insert turno_solicitudes",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst j = $('Build insert + notes').first().json;\nreturn [{ json: { conversation_id: j.conversation_id, account_id: j.account_id, cw_body: j.cw_private } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        860
+      ],
+      "id": "n03priv",
+      "name": "Prep private note"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        860
+      ],
+      "id": "n03hpriv",
+      "name": "Send private note",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst j = $('Build insert + notes').first().json;\nreturn [{ json: { conversation_id: j.conversation_id, account_id: j.account_id, cw_body: j.cw_body } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        860
+      ],
+      "id": "n03pat",
+      "name": "Prep patient confirm"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        860
+      ],
+      "id": "n03hpat",
+      "name": "Send patient confirm",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state SET state = 'idle', context = JSON_OBJECT() WHERE phone = '{{ $('Prepare Input').item.json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        2460,
+        860
+      ],
+      "id": "n03rst",
+      "name": "Reset state after confirm",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Prepare Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Input": {
+      "main": [
+        [
+          {
+            "node": "State Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "State Switch": {
+      "main": [
+        [
+          {
+            "node": "Start awaiting_nombre",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nombre: repetir?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DNI: repetir?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle obra social",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Obra otra: repetir?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tel: repetir?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle medico",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DiaHora: repetir?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Confirm branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start awaiting_nombre": {
+      "main": [
+        [
+          {
+            "node": "Ask nombre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask nombre": {
+      "main": [
+        [
+          {
+            "node": "Send ask nombre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nombre: repetir?": {
+      "main": [
+        [
+          {
+            "node": "Re-ask nombre",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save nombre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-ask nombre": {
+      "main": [
+        [
+          {
+            "node": "Send re-ask nombre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save nombre": {
+      "main": [
+        [
+          {
+            "node": "Ask DNI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask DNI": {
+      "main": [
+        [
+          {
+            "node": "Send ask DNI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DNI: repetir?": {
+      "main": [
+        [
+          {
+            "node": "Re-ask DNI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save DNI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-ask DNI": {
+      "main": [
+        [
+          {
+            "node": "Send re-ask DNI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save DNI": {
+      "main": [
+        [
+          {
+            "node": "Load obras_sociales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load obras_sociales": {
+      "main": [
+        [
+          {
+            "node": "Ask obra list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask obra list": {
+      "main": [
+        [
+          {
+            "node": "Send obra list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle obra social": {
+      "main": [
+        [
+          {
+            "node": "Obra action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obra action": {
+      "main": [
+        [
+          {
+            "node": "Reload obras repetir",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set awaiting_obra_otra",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save obra listed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reload obras repetir": {
+      "main": [
+        [
+          {
+            "node": "Re-ask obra list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-ask obra list": {
+      "main": [
+        [
+          {
+            "node": "Send obra repetir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set awaiting_obra_otra": {
+      "main": [
+        [
+          {
+            "node": "Ask obra otra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask obra otra": {
+      "main": [
+        [
+          {
+            "node": "Send obra otra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save obra listed": {
+      "main": [
+        [
+          {
+            "node": "Ask telefono",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask telefono": {
+      "main": [
+        [
+          {
+            "node": "Send ask telefono",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obra otra: repetir?": {
+      "main": [
+        [
+          {
+            "node": "Re-ask obra otra",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save obra otra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-ask obra otra": {
+      "main": [
+        [
+          {
+            "node": "Send re-ask obra otra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save obra otra": {
+      "main": [
+        [
+          {
+            "node": "Ask telefono after otra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask telefono after otra": {
+      "main": [
+        [
+          {
+            "node": "Send telefono after otra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tel: repetir?": {
+      "main": [
+        [
+          {
+            "node": "Re-ask telefono",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save telefono",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-ask telefono": {
+      "main": [
+        [
+          {
+            "node": "Send re-ask telefono",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save telefono": {
+      "main": [
+        [
+          {
+            "node": "Load doctors list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load doctors list": {
+      "main": [
+        [
+          {
+            "node": "Ask medico list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask medico list": {
+      "main": [
+        [
+          {
+            "node": "Send medico list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle medico": {
+      "main": [
+        [
+          {
+            "node": "Medico action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Medico action": {
+      "main": [
+        [
+          {
+            "node": "Reload doctors repetir",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prep save medico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reload doctors repetir": {
+      "main": [
+        [
+          {
+            "node": "Re-ask medico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-ask medico": {
+      "main": [
+        [
+          {
+            "node": "Send medico repetir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep save medico": {
+      "main": [
+        [
+          {
+            "node": "Save medico state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save medico state": {
+      "main": [
+        [
+          {
+            "node": "Load hours for prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load hours for prompt": {
+      "main": [
+        [
+          {
+            "node": "Ask dia_hora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask dia_hora": {
+      "main": [
+        [
+          {
+            "node": "Send ask dia_hora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DiaHora: repetir?": {
+      "main": [
+        [
+          {
+            "node": "Load ctx for re-ask horario",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save dia_hora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load ctx for re-ask horario": {
+      "main": [
+        [
+          {
+            "node": "Re-ask dia_hora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-ask dia_hora": {
+      "main": [
+        [
+          {
+            "node": "Send re-ask dia_hora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save dia_hora": {
+      "main": [
+        [
+          {
+            "node": "Load ctx confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load ctx confirm": {
+      "main": [
+        [
+          {
+            "node": "Build confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build confirmation": {
+      "main": [
+        [
+          {
+            "node": "Send confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm branch": {
+      "main": [
+        [
+          {
+            "node": "Load ctx final",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Confirm: repetir?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm: repetir?": {
+      "main": [
+        [
+          {
+            "node": "Load ctx re-confirm",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Load ctx re-confirm": {
+      "main": [
+        [
+          {
+            "node": "Re-show confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-show confirmation": {
+      "main": [
+        [
+          {
+            "node": "Send re-confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load ctx final": {
+      "main": [
+        [
+          {
+            "node": "Build insert + notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build insert + notes": {
+      "main": [
+        [
+          {
+            "node": "Insert turno_solicitudes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert turno_solicitudes": {
+      "main": [
+        [
+          {
+            "node": "Prep private note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep private note": {
+      "main": [
+        [
+          {
+            "node": "Send private note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send private note": {
+      "main": [
+        [
+          {
+            "node": "Prep patient confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep patient confirm": {
+      "main": [
+        [
+          {
+            "node": "Send patient confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send patient confirm": {
+      "main": [
+        [
+          {
+            "node": "Reset state after confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "wf03book",
+  "tags": [],
+  "pinData": {}
+}
