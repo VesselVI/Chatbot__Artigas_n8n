@@ -5,30 +5,29 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "chatwoot-bot",
-        "responseMode": "onReceived",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        0,
-        0
+        -1392,
+        432
       ],
-      "id": "n01wh",
+      "id": "4ac4b2da-937c-4653-9ff0-8b6cb3c2b898",
       "name": "Chatwoot Webhook",
       "webhookId": "cw-bot-webhook"
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json;\nconst body = raw.body || raw;\n\n// Agent bot / webhook shapes\nconst event = body.event || body.message?.event || '';\nconst msg = body.message || body;\n\n// Drop non-message events\nif (event && !String(event).includes('message_created') && event !== 'message_updated') {\n  // allow bare message payloads without event\n  if (!msg.content && !msg.content_type && !body.content) return [];\n}\n\nconst message = (body.content !== undefined && body.conversation) ? body : msg;\nconst conversation = message.conversation || body.conversation || {};\nconst account = message.account || body.account || {};\nconst sender = message.sender || conversation.meta?.sender || {};\n\nconst messageType = message.message_type;\n// 0=incoming, 1=outgoing, 2=activity — also string forms\nconst isIncoming = messageType === 0 || messageType === 'incoming' || messageType === 'Incoming';\nconst isPrivate = message.private === true;\nconst senderType = (sender.type || '').toLowerCase();\n\nif (isPrivate) return [];\nif (messageType === 1 || messageType === 'outgoing' || messageType === 'Outgoing') return [];\nif (senderType === 'user' || senderType === 'agent_bot') return [];\n// If clearly not incoming and has message_type, drop\nif (messageType !== undefined && messageType !== null && !isIncoming && messageType !== 'incoming') return [];\n\nif (conversation.assignee_id) return []; // human handoff — skip bot reply\n\nlet phone = sender.phone_number || conversation.meta?.sender?.phone_number || conversation.contact_inbox?.source_id || '';\nphone = String(phone).replace(/\\s+/g, '').replace(/^\\+/, '');\nif (phone.startsWith('549')) phone = '54' + phone.slice(3);\n\nlet texto = message.content || '';\nlet boton_id = '';\nconst ca = message.content_attributes || {};\nconst submitted = ca.submitted_values || ca.items || [];\nif (Array.isArray(submitted) && submitted.length) {\n  const v = submitted[0];\n  boton_id = String(v.value ?? v.id ?? '');\n  if (!texto) texto = String(v.title ?? v.value ?? '');\n}\n// Some Chatwoot WhatsApp payloads put selection in content_attributes.submitted_values differently\nif (!boton_id && ca.submitted_values && typeof ca.submitted_values === 'object' && !Array.isArray(ca.submitted_values)) {\n  boton_id = String(ca.submitted_values.value || '');\n}\n\nconst contentType = message.content_type || 'text';\nconst tipo = boton_id ? 'interactive' : (contentType === 'text' || contentType === 'input_select' ? (boton_id ? 'interactive' : 'text') : 'text');\n\nif (!phone && !conversation.id && !conversation.display_id) return [];\n\nconst conversationId = conversation.display_id || conversation.id || body.conversation_id;\nconst accountId = conversation.account_id || account.id || body.account?.id || body.account_id;\n\nreturn [{\n  json: {\n    telefono: phone || String(conversationId),\n    tipo: boton_id ? 'interactive' : 'text',\n    texto: texto || '',\n    boton_id: boton_id || '',\n    conversation_id: conversationId,\n    account_id: accountId,\n  }\n}];"
+        "jsCode": "const raw = $input.first().json;\nconst body = raw.body || raw;\n\nconst event = body.event || body.message?.event || '';\nconst msg = body.message || body;\n\nif (event && !String(event).includes('message_created') && event !== 'message_updated') {\n  if (!msg.content && !msg.content_type && !body.content) return [];\n}\n\nconst message = (body.content !== undefined && body.conversation) ? body : msg;\nconst conversation = message.conversation || body.conversation || {};\nconst account = message.account || body.account || {};\nconst sender = message.sender || conversation.meta?.sender || {};\n\nconst messageType = message.message_type;\nconst isIncoming = messageType === 0 || messageType === 'incoming' || messageType === 'Incoming';\nconst isPrivate = message.private === true;\nconst senderType = (sender.type || '').toLowerCase();\n\nif (isPrivate) return [];\nif (messageType === 1 || messageType === 'outgoing' || messageType === 'Outgoing') return [];\nif (senderType === 'user' || senderType === 'agent_bot') return [];\nif (messageType !== undefined && messageType !== null && !isIncoming && messageType !== 'incoming') return [];\n\nif (conversation.assignee_id) return [];\n\nlet phone = sender.phone_number || conversation.meta?.sender?.phone_number || conversation.contact_inbox?.source_id || '';\nphone = String(phone).replace(/\\s+/g, '').replace(/^\\+/, '');\nif (phone.startsWith('549')) phone = '54' + phone.slice(3);\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nlet texto = String(message.content || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nlet boton_id = '';\nconst ca = message.content_attributes || {};\nconst submitted = ca.submitted_values || ca.items || [];\nif (Array.isArray(submitted) && submitted.length) {\n  const v = submitted[0];\n  boton_id = String(v.value || v.id || '');\n  if (!texto) texto = String(v.title ?? v.value ?? '');\n}\nif (!boton_id && ca.submitted_values && typeof ca.submitted_values === 'object' && !Array.isArray(ca.submitted_values)) {\n  boton_id = String(ca.submitted_values.value || '');\n}\n\nconst titleMap = {\n  'horarios de clinica': 'horarios_clinica',\n  'horarios clinica': 'horarios_clinica',\n  'sacar un turno': 'quiero_turno',\n  'volver al menu': 'volver_menu',\n  'repetir pregunta': 'repetir_pregunta',\n  'repetir': 'repetir_pregunta',\n  'cancelar turno': 'cancelar_turno_pedido',\n  'si, cancelar': 'cancel_si',\n  'si cancelar': 'cancel_si',\n  'no, continuar': 'cancel_no',\n  'no continuar': 'cancel_no',\n  'cualquier doctor': 'medico_cualquiera',\n  'otra / particular': 'obra_otra',\n  'otra': 'obra_otra',\n  'confirmar': 'confirmar_turno',\n};\n\nif (Array.isArray(submitted) && submitted.length && !boton_id) {\n  const t = fold(submitted[0].title || '');\n  if (titleMap[t]) boton_id = titleMap[t];\n}\n\nif (!boton_id) {\n  const candidates = [last, texto, ...lines];\n  for (const c of candidates) {\n    const mapped = titleMap[fold(c)];\n    if (mapped) { boton_id = mapped; break; }\n  }\n}\n\nif (!phone && !conversation.id && !conversation.display_id) return [];\n\nconst conversationId = conversation.display_id || conversation.id || body.conversation_id; // Chatwoot API path uses display_id\nconst accountId = conversation.account_id || account.id || body.account?.id || body.account_id;\n\nreturn [{\n  json: {\n    telefono: phone || String(conversationId),\n    tipo: boton_id ? 'interactive' : 'text',\n    texto: texto || '',\n    boton_id: boton_id || '',\n    conversation_id: conversationId,\n    account_id: accountId,\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        220,
-        0
+        -1168,
+        432
       ],
-      "id": "n01norm",
+      "id": "16137806-20ec-4824-a111-4d45518fbabd",
       "name": "Normalize Message"
     },
     {
@@ -40,18 +39,18 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        440,
-        0
+        -944,
+        432
       ],
-      "id": "n01ens",
+      "id": "82505efa-d948-4c7b-939e-129ad5abec46",
       "name": "Ensure conversation_state",
+      "alwaysOutputData": true,
       "credentials": {
         "mySql": {
-          "id": "MYSQL_CRED",
+          "id": "ADbEKvwG8sz2lY2H",
           "name": "MySQL account"
         }
-      },
-      "alwaysOutputData": true
+      }
     },
     {
       "parameters": {
@@ -62,14 +61,14 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        660,
-        0
+        -720,
+        432
       ],
-      "id": "n01get",
+      "id": "3746a72f-9d73-4aaf-8adf-a4a25fb2be47",
       "name": "Get State",
       "credentials": {
         "mySql": {
-          "id": "MYSQL_CRED",
+          "id": "ADbEKvwG8sz2lY2H",
           "name": "MySQL account"
         }
       }
@@ -81,23 +80,23 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
-        0
+        -496,
+        432
       ],
-      "id": "n01merge",
+      "id": "ced9eac1-5b62-42e8-852e-dccfe6340290",
       "name": "Merge Context"
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nconst estado = item.estado || 'idle';\nconst boton = String(item.boton_id || '').trim();\nconst texto = String(item.texto || '').trim();\nconst textoLower = texto.toLowerCase();\n\nconst cancelKw = boton === 'cancelar_turno_pedido' || boton === 'cancelar_turno' || /^(cancelar|salir|menu|menú)$/i.test(textoLower);\nconst isAwaiting = /^awaiting_/.test(estado);\nconst yes = boton === 'cancel_si' || /^(si|sí)$/i.test(textoLower) || /sí,? cancelar/i.test(textoLower) || /si,? cancelar/i.test(textoLower);\nconst no = boton === 'cancel_no' || /^no$/i.test(textoLower) || /no,? continuar/i.test(textoLower);\n\nlet route = 'welcome';\n\nif (estado === 'confirmando_cancelacion') {\n  if (yes) route = 'cancel_yes';\n  else if (no) route = 'cancel_no';\n  else route = 'cancel_ask';\n} else if (cancelKw && isAwaiting) {\n  route = 'cancel_ask';\n} else if (boton === 'repetir_pregunta' && isAwaiting) {\n  route = 'booking';\n} else if (boton === 'horarios_clinica') {\n  route = 'horarios';\n} else if (boton === 'volver_menu') {\n  route = 'welcome';\n} else if (boton === 'quiero_turno' || boton === 'confirmar_turno' || isAwaiting) {\n  route = 'booking';\n} else if (estado === 'menu_shown' && texto && !boton) {\n  route = 'faq';\n} else {\n  route = 'welcome';\n}\n\nreturn [{ json: { ...item, route } }];"
+        "jsCode": "const item = $input.first().json;\nconst estado = item.estado || 'idle';\nconst boton = String(item.boton_id || '').trim();\nconst texto = String(item.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst lastLower = last.toLowerCase();\nconst textoLower = lastLower;\nconst onMenu = estado === 'idle' || estado === 'menu_shown';\n\nconst cancelKw = boton === 'cancelar_turno_pedido' || boton === 'cancelar_turno'\n  || /^(cancelar|salir|menu|menú)$/i.test(lastLower)\n  || /^cancelar turno$/i.test(lastLower);\nconst isAwaiting = /^awaiting_/.test(estado);\nconst yes = boton === 'cancel_si' || /^(si|sí)$/i.test(lastLower) || /sí,? cancelar/i.test(lastLower) || /si,? cancelar/i.test(lastLower);\nconst no = boton === 'cancel_no' || /^no$/i.test(lastLower) || /no,? continuar/i.test(lastLower);\nconst isRepetir = boton === 'repetir_pregunta' || /^(repetir|repetir pregunta)$/i.test(lastLower) || lines.some(l => /^(repetir|repetir pregunta)$/i.test(l));\nconst isHorarios = boton === 'horarios_clinica'\n  || (onMenu && (lastLower === '1' || /^(horarios|horarios de( la)? cl[ií]nica)$/i.test(lastLower)));\nconst isTurno = boton === 'quiero_turno' || boton === 'confirmar_turno'\n  || (onMenu && (lastLower === '2' || /\\b(turno|turnos|cita)\\b/i.test(lastLower)));\n\nlet route = 'welcome';\n\nif (estado === 'confirmando_cancelacion') {\n  if (yes) route = 'cancel_yes';\n  else if (no) route = 'cancel_no';\n  else route = 'cancel_ask';\n} else if (cancelKw && isAwaiting) {\n  route = 'cancel_ask';\n} else if (isRepetir && isAwaiting) {\n  route = 'booking';\n} else if (isHorarios) {\n  route = 'horarios';\n} else if (boton === 'volver_menu') {\n  route = 'welcome';\n} else if (isTurno || isAwaiting) {\n  route = 'booking';\n} else if (estado === 'menu_shown' && texto && !boton) {\n  route = 'faq';\n} else {\n  route = 'welcome';\n}\n\nreturn [{ json: { ...item, texto, last_line: last, route } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1100,
-        0
+        -272,
+        432
       ],
-      "id": "n01route",
+      "id": "6657866d-2aa5-410c-a7f3-b2ba42d3bbf9",
       "name": "Decide Route"
     },
     {
@@ -289,18 +288,19 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        1320,
-        0
+        -48,
+        336
       ],
-      "id": "n01sw",
+      "id": "e0d56e4e-b1cf-48e3-9f6f-403f6d0fd516",
       "name": "Route Switch"
     },
     {
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "wf02welcm",
+          "value": "Af8qJ6FZn9HANoDP",
           "mode": "list",
+          "cachedResultUrl": "/workflow/Af8qJ6FZn9HANoDP",
           "cachedResultName": "02 - Welcome Menu"
         },
         "workflowInputs": {
@@ -340,7 +340,7 @@
               "type": "string"
             }
           ],
-          "attemptToConvertTypes": false,
+          "attemptToConvertTypes": true,
           "convertFieldsToString": true
         },
         "options": {}
@@ -348,18 +348,19 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        1600,
-        -300
+        176,
+        -144
       ],
-      "id": "n01w02",
+      "id": "74e4eb47-e338-46ef-8202-626c2cefaa7d",
       "name": "Call Welcome 02"
     },
     {
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "wf04faqia",
+          "value": "Gx8ldPoMEgvgrWLn",
           "mode": "list",
+          "cachedResultUrl": "/workflow/Gx8ldPoMEgvgrWLn",
           "cachedResultName": "04 - FAQ IA"
         },
         "workflowInputs": {
@@ -409,7 +410,7 @@
               "type": "string"
             }
           ],
-          "attemptToConvertTypes": false,
+          "attemptToConvertTypes": true,
           "convertFieldsToString": true
         },
         "options": {}
@@ -417,18 +418,19 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        1600,
-        -140
+        176,
+        48
       ],
-      "id": "n01w04",
+      "id": "987dabdf-84b9-4654-bc16-00d706f19c39",
       "name": "Call FAQ 04"
     },
     {
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "wf03book",
+          "value": "eLh0RJYC8GWa5lsP",
           "mode": "list",
+          "cachedResultUrl": "/workflow/eLh0RJYC8GWa5lsP",
           "cachedResultName": "03 - Booking Flow"
         },
         "workflowInputs": {
@@ -508,7 +510,7 @@
               "type": "string"
             }
           ],
-          "attemptToConvertTypes": false,
+          "attemptToConvertTypes": true,
           "convertFieldsToString": true
         },
         "options": {}
@@ -516,10 +518,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        1600,
-        20
+        176,
+        240
       ],
-      "id": "n01w03",
+      "id": "398e1222-3d8d-4541-a80d-c85bc7052831",
       "name": "Call Booking 03"
     },
     {
@@ -531,29 +533,29 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        1600,
-        180
+        176,
+        432
       ],
-      "id": "n01hs",
+      "id": "d5811470-df75-4a94-87aa-89aaa01f4215",
       "name": "Load clinic hours",
       "credentials": {
         "mySql": {
-          "id": "MYSQL_CRED",
+          "id": "ADbEKvwG8sz2lY2H",
           "name": "MySQL account"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const m = $('Merge Context').first().json;\nconst s = $input.first().json;\nconst content = `🕘 *Nuestros horarios:*\\n- ${s.clinic_hours || ''}\\nEstamos ubicados en 📍 ${s.address || ''}`;\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: {\n        items: [\n          { title: 'Sacar un turno', value: 'quiero_turno' },\n          { title: 'Volver al menú', value: 'volver_menu' }\n        ]\n      }\n    }\n  }\n}];"
+        "jsCode": "const m = $('Merge Context').first().json;\nconst s = $input.first().json;\nconst content = `🕘 *Nuestros horarios:*\n- ${s.clinic_hours || ''}\nEstamos ubicados en 📍 ${s.address || ''}\n\nPodés escribir:\n2) Sacar un turno\no \"menú\" para volver.`;\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    }\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1820,
-        180
+        400,
+        432
       ],
-      "id": "n01hb",
+      "id": "3ee7206b-5a0e-43a3-bf54-d5486febe393",
       "name": "Build horarios msg"
     },
     {
@@ -570,18 +572,18 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2040,
-        180
+        624,
+        432
       ],
-      "id": "n01hh",
+      "id": "ffedbc15-ce0e-4f24-b650-ca1977554fa6",
       "name": "Send horarios",
+      "notesInFlow": true,
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CHATWOOT_CRED",
+          "id": "GqVsiFUjDt4aJl4f",
           "name": "Chatwoot API"
         }
       },
-      "notesInFlow": true,
       "notes": "Credential 'Chatwoot API' = Header Auth (name: api_access_token)."
     },
     {
@@ -593,14 +595,14 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        1600,
-        340
+        176,
+        624
       ],
-      "id": "n01cas",
+      "id": "27d74db3-e530-49b6-b446-699ec903fb61",
       "name": "Set confirmando_cancelacion",
       "credentials": {
         "mySql": {
-          "id": "MYSQL_CRED",
+          "id": "ADbEKvwG8sz2lY2H",
           "name": "MySQL account"
         }
       }
@@ -612,10 +614,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1820,
-        340
+        400,
+        624
       ],
-      "id": "n01cab",
+      "id": "b1de6c6d-33f7-4ac5-8700-10a3288391cc",
       "name": "Build cancel confirm"
     },
     {
@@ -632,18 +634,18 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2040,
-        340
+        624,
+        624
       ],
-      "id": "n01cah",
+      "id": "449b12c5-4888-4d85-8ba5-230dcfc1b44d",
       "name": "Send cancel confirm",
+      "notesInFlow": true,
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CHATWOOT_CRED",
+          "id": "GqVsiFUjDt4aJl4f",
           "name": "Chatwoot API"
         }
       },
-      "notesInFlow": true,
       "notes": "Credential 'Chatwoot API' = Header Auth (name: api_access_token)."
     },
     {
@@ -655,14 +657,14 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        1600,
-        500
+        176,
+        816
       ],
-      "id": "n01cys",
+      "id": "d1f18ca6-757c-48bf-934b-effdcaeee860",
       "name": "Clear state cancel yes",
       "credentials": {
         "mySql": {
-          "id": "MYSQL_CRED",
+          "id": "ADbEKvwG8sz2lY2H",
           "name": "MySQL account"
         }
       }
@@ -671,8 +673,9 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "wf02welcm",
+          "value": "Af8qJ6FZn9HANoDP",
           "mode": "list",
+          "cachedResultUrl": "/workflow/Af8qJ6FZn9HANoDP",
           "cachedResultName": "02 - Welcome Menu"
         },
         "workflowInputs": {
@@ -712,7 +715,7 @@
               "type": "string"
             }
           ],
-          "attemptToConvertTypes": false,
+          "attemptToConvertTypes": true,
           "convertFieldsToString": true
         },
         "options": {}
@@ -720,10 +723,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        1820,
-        500
+        400,
+        816
       ],
-      "id": "n01cyw",
+      "id": "e4da5376-5c79-4fd9-951b-4453833c74c6",
       "name": "Welcome after cancel"
     },
     {
@@ -735,14 +738,14 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        1600,
-        660
+        176,
+        1008
       ],
-      "id": "n01cns",
+      "id": "6ceb1ab0-5b68-4b74-9b26-9f66300f42f3",
       "name": "Restore estado_previo",
       "credentials": {
         "mySql": {
-          "id": "MYSQL_CRED",
+          "id": "ADbEKvwG8sz2lY2H",
           "name": "MySQL account"
         }
       }
@@ -751,15 +754,15 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "wf03book",
+          "value": "eLh0RJYC8GWa5lsP",
           "mode": "list",
+          "cachedResultUrl": "/workflow/eLh0RJYC8GWa5lsP",
           "cachedResultName": "03 - Booking Flow"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
             "telefono": "={{ $('Merge Context').item.json.telefono }}",
-            "texto": "",
             "boton_id": "repetir_pregunta",
             "estado": "={{ $json.state }}",
             "datos_json": "={{ $json.context }}",
@@ -832,7 +835,7 @@
               "type": "string"
             }
           ],
-          "attemptToConvertTypes": false,
+          "attemptToConvertTypes": true,
           "convertFieldsToString": true
         },
         "options": {}
@@ -840,10 +843,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        1820,
-        660
+        624,
+        1008
       ],
-      "id": "n01cnw",
+      "id": "63f35c4f-74f7-4075-ad94-43f4ae5d8b55",
       "name": "Re-ask after cancel no"
     },
     {
@@ -855,19 +858,20 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        1710,
-        660
+        400,
+        1008
       ],
-      "id": "n01cng",
+      "id": "ed028911-a45f-46cd-aa3d-f0f23732c58c",
       "name": "Get restored state",
       "credentials": {
         "mySql": {
-          "id": "MYSQL_CRED",
+          "id": "ADbEKvwG8sz2lY2H",
           "name": "MySQL account"
         }
       }
     }
   ],
+  "pinData": {},
   "connections": {
     "Chatwoot Webhook": {
       "main": [
@@ -1073,14 +1077,18 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
   },
+  "versionId": "659ed6dc-5913-46d9-8944-772ef528921b",
   "meta": {
-    "templateCredsSetupCompleted": false
+    "templateCredsSetupCompleted": true,
+    "instanceId": "93c3cb4635c69a031fa1214bf884cfb87a4cd8a0ecc85e055a10dc007292b2b8"
   },
-  "id": "wf01entry",
-  "tags": [],
-  "pinData": {}
+  "nodeGroups": [],
+  "id": "ZHGumTEv4ljTYY1i",
+  "tags": []
 }

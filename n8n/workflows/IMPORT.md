@@ -83,7 +83,10 @@ Replace `DOMAIN` with your real domain (same host as `N8N_HOST` / `WEBHOOK_URL`)
 - **Cancelar turno** / keywords `cancelar|salir|menu|menú` → confirm → sí clears + welcome / no restores + re-asks
 - **Repetir pregunta** re-sends the current step
 - Confirm: `INSERT turno_solicitudes` + Chatwoot **private** note + patient message with `volver_menu`
-- FAQ (free text on `menu_shown`) loads `clinic_settings` + doctors + current-week availability into Gemini
+- FAQ (free text on `menu_shown` that is not a turno/horarios intent) loads `clinic_settings` + doctors + current-week availability into Gemini
+- WhatsApp allows **max 3 reply buttons**. Obra social and doctor lists are sent as text (`Escribí una opción`) plus Cancelar/Repetir buttons. More than 3 `input_select` items are dropped by Meta and the flow looks stuck.
+- Confirmation and horarios replies are **plain text** (Meta test numbers often drop buttons). Type `confirmar` / `sí` / `cancelar` / `repetir`. The confirm step must not end without an HTTP send.
+- Chatwoot inbound often sends the button **title** (and WhatsApp may quote the previous message). The router uses the **last line** and maps titles.
 
 ## Column mapping (legacy → current)
 
