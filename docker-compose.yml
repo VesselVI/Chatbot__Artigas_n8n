@@ -71,7 +71,9 @@ services:
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
       N8N_SECURE_COOKIE: "true"
       DOMAIN: ${DOMAIN}
-      CHATWOOT_HOST: ${DOMAIN}
+      CHATWOOT_HOST: ${CHATWOOT_HOST:-${DOMAIN}}
+      N8N_BLOCK_ENV_ACCESS_IN_EXPRESSIONS: "false"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n/workflows:/workflows:ro
@@ -87,8 +89,13 @@ services:
       POSTGRES_DB: chatwoot
       POSTGRES_USER: chatwoot
       POSTGRES_PASSWORD: ${CHATWOOT_POSTGRES_PASSWORD}
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
     volumes:
       - chatwoot_pg:/var/lib/postgresql/data
+      - ./scripts/chatwoot-postgres-init.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U chatwoot -d chatwoot"]
       interval: 10s

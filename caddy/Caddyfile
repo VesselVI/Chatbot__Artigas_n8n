@@ -11,5 +11,8 @@ dash.{$DOMAIN} {
 }
 
 chat.{$DOMAIN} {
-  reverse_proxy chatwoot-rails:3000
+  reverse_proxy chatwoot-rails:3000 {
+    # Chatwoot auth uses api_access_token (underscores). Some clients send api-access-token.
+    header_up api_access_token {http.request.header.api-access-token}
+  }
 }

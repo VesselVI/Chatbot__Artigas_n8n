@@ -24,21 +24,27 @@ In n8n: **Workflows → Import from File** for each JSON. Leave them **inactive*
 
 ### 3. Chatwoot API (Header Auth)
 
+Chatwoot returns *"Necesitas iniciar sesión"* when this header never arrives.
+
 - Type: **Header Auth** (`httpHeaderAuth`)
 - Credential name: **Chatwoot API**
-- Header name: `api_access_token`
-- Header value: Chatwoot user/agent bot access token (Profile → Access Token, or Agent Bot token)
+- Header **name:** `api-access-token` (hyphens, not underscores)
+- Header **value:** Chatwoot **Profile settings → Access Token** (not the Meta/WhatsApp token, not `Bearer …`)
 
-Attach to every **HTTP Request** node that posts messages.
+Caddy also copies `api-access-token` → `api_access_token` for Rails.
 
-Optional: if you prefer not to use Header Auth, leave the credential empty and set a header `api_access_token` = `{{ $env.CHATWOOT_API_TOKEN }}` on each HTTP node (add that env var to the n8n service).
+Attach this credential to every Chatwoot **HTTP Request** node.
 
 ## n8n environment
 
-On the `n8n` service, set at least one of:
+`CHATWOOT_HOST` / `DOMAIN` must be the **root** domain (`tiden.tech`), not `chat.tiden.tech`.
 
-- `CHATWOOT_HOST=example.com` (used as `https://chat.{{CHATWOOT_HOST}}/...`)
-- or `DOMAIN=example.com` (fallback in workflow expressions)
+n8n blocks `$env` unless compose sets:
+
+- `N8N_BLOCK_ENV_ACCESS_IN_EXPRESSIONS=false`
+- `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`
+
+Then recreate: `docker compose up -d n8n`
 
 Example URL built by workflows:
 
