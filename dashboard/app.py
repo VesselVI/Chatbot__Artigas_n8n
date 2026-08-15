@@ -13,11 +13,10 @@ from starlette.middleware.sessions import SessionMiddleware
 DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 DAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
-ALL_TIMES = [
-    f"{h:02d}:{m:02d}"
-    for h in range(7, 22)
-    for m in (0, 30)
-]
+SHIFT_HOURS = {
+    "manana": ("09:00", "12:00"),
+    "noche": ("16:00", "19:00"),
+}
 
 
 def env(name: str, default: str = "") -> str:
@@ -137,8 +136,6 @@ async def index(request: Request):
             "doctors": doctors,
             "days_of_week": list(range(7)),
             "day_names": DAY_NAMES,
-            "all_times": ALL_TIMES,
-            "all_times_json": json.dumps(ALL_TIMES),
             "week_start": monday_of(date.today()).isoformat(),
         },
     )
@@ -171,9 +168,10 @@ async def api_get_availability(
         cur = conn.cursor(dictionary=True)
         cur.execute(
             """
-            SELECT day, is_unavailable, start_time, end_time
+            SELECT day, shift, is_unavailable, start_time, end_time
             FROM doctor_availability
             WHERE doctor_id = %s AND week_start = %s
+            ORDER BY day, start_time
             """,
             (doctor_id, ws),
         )
@@ -181,32 +179,39 @@ async def api_get_availability(
     finally:
         conn.close()
 
-    by_day = {int(r["day"]): r for r in rows}
+    by_day: dict[int, list] = {d: [] for d in range(7)}
+    for r in rows:
+        by_day[int(r["day"])].append(r)
+
     result = []
     for d in range(7):
-        row = by_day.get(d)
-        if not row:
-            result.append(
-                {
-                    "day": d,
-                    "day_name": DAY_NAMES[d],
-                    "is_unavailable": False,
-                    "configured": False,
-                    "start_time": None,
-                    "end_time": None,
-                }
-            )
-        else:
-            result.append(
-                {
-                    "day": d,
-                    "day_name": DAY_NAMES[d],
-                    "is_unavailable": bool(row["is_unavailable"]),
-                    "configured": True,
-                    "start_time": format_time(row["start_time"]),
-                    "end_time": format_time(row["end_time"]),
-                }
-            )
+        day_rows = by_day[d]
+        manana = None
+        noche = None
+        unavailable = False
+        for r in day_rows:
+            if r["is_unavailable"]:
+                unavailable = True
+                continue
+            slot = {
+                "shift": r["shift"],
+                "start_time": format_time(r["start_time"]),
+                "end_time": format_time(r["end_time"]),
+            }
+            if r["shift"] == "noche":
+                noche = slot
+            else:
+                manana = slot
+        result.append(
+            {
+                "day": d,
+                "day_name": DAY_NAMES[d],
+                "is_unavailable": unavailable and not manana and not noche,
+                "configured": bool(day_rows),
+                "manana": manana,
+                "noche": noche,
+            }
+        )
     return {
         "week_start": ws.isoformat(),
         "week_label": ws.strftime("%d/%m/%Y"),
@@ -221,16 +226,14 @@ async def api_save_availability(request: Request):
     doctor_id = int(body["doctor_id"])
     ws = parse_week_start(body.get("week_start"))
     days = [int(d) for d in body.get("days", [])]
-    start_time = body.get("start_time")
-    end_time = body.get("end_time")
+    want_manana = bool(body.get("manana"))
+    want_noche = bool(body.get("noche"))
 
     if not days:
         return JSONResponse({"error": "Seleccioná al menos un día."}, status_code=400)
-    if not start_time or not end_time:
-        return JSONResponse({"error": "Completá hora inicio y fin."}, status_code=400)
-    if start_time >= end_time:
+    if not want_manana and not want_noche:
         return JSONResponse(
-            {"error": "La hora de fin debe ser posterior al inicio."},
+            {"error": "Seleccioná turno mañana y/o turno noche."},
             status_code=400,
         )
 
@@ -240,16 +243,31 @@ async def api_save_availability(request: Request):
         for d in days:
             cur.execute(
                 """
-                INSERT INTO doctor_availability
-                  (doctor_id, week_start, day, is_unavailable, start_time, end_time)
-                VALUES (%s, %s, %s, 0, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                  is_unavailable = 0,
-                  start_time = VALUES(start_time),
-                  end_time = VALUES(end_time)
+                DELETE FROM doctor_availability
+                WHERE doctor_id = %s AND week_start = %s AND day = %s
                 """,
-                (doctor_id, ws, d, start_time, end_time),
+                (doctor_id, ws, d),
             )
+            if want_manana:
+                start, end = SHIFT_HOURS["manana"]
+                cur.execute(
+                    """
+                    INSERT INTO doctor_availability
+                      (doctor_id, week_start, day, shift, is_unavailable, start_time, end_time)
+                    VALUES (%s, %s, %s, 'manana', 0, %s, %s)
+                    """,
+                    (doctor_id, ws, d, start, end),
+                )
+            if want_noche:
+                start, end = SHIFT_HOURS["noche"]
+                cur.execute(
+                    """
+                    INSERT INTO doctor_availability
+                      (doctor_id, week_start, day, shift, is_unavailable, start_time, end_time)
+                    VALUES (%s, %s, %s, 'noche', 0, %s, %s)
+                    """,
+                    (doctor_id, ws, d, start, end),
+                )
         conn.commit()
     finally:
         conn.close()
@@ -274,13 +292,16 @@ async def api_mark_unavailable(request: Request):
         for d in days:
             cur.execute(
                 """
+                DELETE FROM doctor_availability
+                WHERE doctor_id = %s AND week_start = %s AND day = %s
+                """,
+                (doctor_id, ws, d),
+            )
+            cur.execute(
+                """
                 INSERT INTO doctor_availability
-                  (doctor_id, week_start, day, is_unavailable, start_time, end_time)
-                VALUES (%s, %s, %s, 1, NULL, NULL)
-                ON DUPLICATE KEY UPDATE
-                  is_unavailable = 1,
-                  start_time = NULL,
-                  end_time = NULL
+                  (doctor_id, week_start, day, shift, is_unavailable, start_time, end_time)
+                VALUES (%s, %s, %s, 'manana', 1, NULL, NULL)
                 """,
                 (doctor_id, ws, d),
             )

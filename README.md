@@ -56,9 +56,9 @@ Firewall: allow only `22`, `80`, `443`.
 
 ## Dashboard (secretaries)
 
-- **Horarios**: pick doctor → navigate weeks → select days → start/end → **Guardar horarios**, or **Marcar no disponible**. Saving again overwrites.
+- **Horarios**: pick doctor → navigate weeks → select days → **turno mañana** (09:00–12:00) and/or **turno noche** (16:00–19:00) → **Guardar horarios**, or **Marcar no disponible**. Saving again overwrites.
 - **Solicitudes**: confirmed booking requests from the bot.
-- **Clínica**: address, clinic hours (for “Cualquier doctor”), welcome text, obras sociales list.
+- **Clínica**: address, clinic hours (for “Mi médico de cabecera”), welcome text, obras sociales list.
 
 ## n8n workflows
 
@@ -72,12 +72,12 @@ https://n8n.YOUR_DOMAIN/webhook/chatwoot-bot
 
 ### Booking UX
 
-1. Nombre → DNI → obra social (list + Otra) → teléfono  
-2. Médico list: **Cualquier doctor** first, then doctors  
+1. Nombre → DNI → obra social (list + Otra) → médico (WhatsApp number saved automatically)  
+2. Médico list: **Mi médico de cabecera** first, then doctors (WhatsApp interactive list)  
 3. Horario free text with that doctor’s **current week** hours (or clinic hours)  
 4. Confirm → Chatwoot private note + row in `turno_solicitudes`  
 5. Cancel anytime (button/keywords) with “¿Seguro?” confirmation  
-6. **Repetir pregunta** on each step  
+6. **Repetir pregunta** on each step (except the doctor list)  
 
 Human handoff: if a Chatwoot agent is assigned, the bot stops replying.
 
@@ -99,6 +99,6 @@ Also snapshot Chatwoot/n8n Docker volumes periodically.
 
 ## Local notes
 
-- First MySQL start runs [mysql/init.sql](mysql/init.sql) (schema + seed doctors / obras).
+- First MySQL start runs [mysql/init.sql](mysql/init.sql) (schema + seed doctors / obras). Existing VPS DBs need [mysql/migrate_shifts.sql](mysql/migrate_shifts.sql) before the dashboard can save mañana/noche rows.
 - Caddy issues Let’s Encrypt certs automatically once DNS points to the VPS.
 - Memory limits in `docker-compose.yml` keep Chatwoot + n8n within ~8 GB with swap.

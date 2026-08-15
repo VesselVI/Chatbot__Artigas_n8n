@@ -21,10 +21,11 @@ CREATE TABLE IF NOT EXISTS doctor_availability (
   doctor_id INT NOT NULL,
   week_start DATE NOT NULL,
   day TINYINT NOT NULL COMMENT '0=Mon .. 6=Sun',
+  shift ENUM('manana','noche') NOT NULL DEFAULT 'manana',
   is_unavailable TINYINT(1) NOT NULL DEFAULT 0,
   start_time TIME NULL,
   end_time TIME NULL,
-  PRIMARY KEY (doctor_id, week_start, day),
+  PRIMARY KEY (doctor_id, week_start, day, shift),
   CONSTRAINT fk_avail_doctor FOREIGN KEY (doctor_id) REFERENCES doctors(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

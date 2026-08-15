@@ -79,14 +79,26 @@ Replace `DOMAIN` with your real domain (same host as `N8N_HOST` / `WEBHOOK_URL`)
 ## Behaviour checklist
 
 - Bot **skips** replies when `conversation.assignee_id` is set (human handoff)
-- Booking states: `idle/menu_shown` → nombre → DNI → obra social (list + Otra) → teléfono → médico (Cualquier doctor first) → día/hora → confirmación
+- Booking states: `idle/menu_shown` → nombre → DNI → obra social (list + Otra) → médico (**Mi médico de cabecera** first, WhatsApp list) → día/hora → confirmación. Phone is the WhatsApp number from Normalize (no phone question).
 - **Cancelar turno** / keywords `cancelar|salir|menu|menú` → confirm → sí clears + welcome / no restores + re-asks
 - **Repetir pregunta** re-sends the current step
 - Confirm: `INSERT turno_solicitudes` + Chatwoot **private** note + patient message with `volver_menu`
-- FAQ (free text on `menu_shown` that is not a turno/horarios intent) loads `clinic_settings` + doctors + current-week availability into Gemini
-- WhatsApp allows **max 3 reply buttons**. Obra social and doctor lists are sent as text (`Escribí una opción`) plus Cancelar/Repetir buttons. More than 3 `input_select` items are dropped by Meta and the flow looks stuck.
+- FAQ (free text on `menu_shown` that is not a turno/horarios/`menú`/greeting intent) loads `clinic_settings` + doctors + current-week availability into Gemini. Typed `menú` / `menu` / `hola` return to the welcome menu. `turni` and similar typos still start booking.
+- WhatsApp allows **max 3 reply buttons**. Obra social stays as text (`Escribí una opción`) plus Cancelar/Repetir. The doctor picker sends **all** rows as Chatwoot `input_select` (more than 3 items → Meta **list**). WhatsApp lists allow at most 10 rows; n8n cannot set the list button label (Chatwoot I18n / locale controls that).
 - Confirmation and horarios replies are **plain text** (Meta test numbers often drop buttons). Type `confirmar` / `sí` / `cancelar` / `repetir`. The confirm step must not end without an HTTP send.
-- Chatwoot inbound often sends the button **title** (and WhatsApp may quote the previous message). The router uses the **last line** and maps titles.
+- Chatwoot inbound often sends the button **title** (and WhatsApp may quote the previous message). The router uses the **last line** for Horarios/Turno and only scans earlier lines for nav titles (Repetir/Cancelar/menú), so a quoted welcome cannot steal the tap. Doctor replies must match `medico_*` ids (typed names are ignored and the list is sent again).
+
+## Updating live n8n (do not full-reimport 01)
+
+Re-importing **01** breaks Execute Workflow links. After changing booking:
+
+1. Re-import **03 - Booking Flow** (re-attach MySQL + Chatwoot credentials and Execute Workflow links).
+2. Paste only these **01** Code nodes from the repo: **Normalize Message** (`titleMap`) and **Merge Context** (`PREV_STEP`).
+3. On the VPS, run `mysql/migrate_shifts.sql` **before** using the new dashboard save (adds `shift` and classifies existing rows).
+
+```bash
+docker compose exec -T mysql mysql -uartigas -p"$MYSQL_PASSWORD" artigas_bot < mysql/migrate_shifts.sql
+```
 
 ## Column mapping (legacy → current)
 
