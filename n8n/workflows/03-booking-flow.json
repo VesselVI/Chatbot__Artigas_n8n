@@ -1220,12 +1220,13 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $input.first().json;\nconst boton = String(m.boton_id || '').trim();\nif (m.is_repetir || boton === 'repetir_pregunta' || (!boton && !String(m.texto || '').trim())) {\n  return [{ json: { ...m, med_action: 'repetir' } }];\n}\nlet medico_name = '';\nlet doctor_id = null;\nlet cualquiera = false;\nif (boton === 'medico_cabecera' || boton === 'medico_cualquiera') {\n  cualquiera = true;\n  medico_name = 'Mi médico de cabecera';\n} else if (/^medico_\\d+$/.test(boton)) {\n  doctor_id = boton.replace('medico_', '');\n  medico_name = m.texto || boton;\n} else {\n  return [{ json: { ...m, med_action: 'repetir' } }];\n}\nreturn [{ json: { ...m, med_action: 'save', medico_name, doctor_id, cualquiera } }];\n"
+        "jsCode": "\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst m = $('Prepare Input').first().json;\nconst boton = String(m.boton_id || '').trim();\nconst texto = String(m.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nif (m.is_repetir || boton === 'repetir_pregunta') {\n  return [{ json: { ...m, med_action: 'repetir' } }];\n}\n\nlet docs = [];\ntry {\n  const items = $input.all().map(i => i.json);\n  if (items.length === 1 && items[0].doctors_json != null) {\n    let raw = items[0].doctors_json;\n    if (typeof raw === 'string') raw = JSON.parse(raw);\n    docs = Array.isArray(raw) ? raw : [];\n  } else {\n    docs = items.filter(d => d && d.id && d.name);\n  }\n} catch (e) {\n  docs = [];\n}\n\nconst cabeceraTokens = new Set([\n  'medico_cabecera',\n  'medico_cualquiera',\n  fold('Mi médico de cabecera'),\n  fold('Cualquier doctor'),\n  'cabecera',\n]);\nif (cabeceraTokens.has(boton) || cabeceraTokens.has(fold(boton)) || cabeceraTokens.has(fold(last))) {\n  return [{ json: { ...m, med_action: 'save', medico_name: 'Mi médico de cabecera', doctor_id: null, cualquiera: true } }];\n}\n\nfunction findDoc(token) {\n  const raw = String(token || '').trim();\n  if (!raw) return null;\n  if (/^medico_\\d+$/.test(raw)) {\n    const id = Number(raw.replace('medico_', ''));\n    return docs.find(d => Number(d.id) === id) || { id, name: '' };\n  }\n  const f = fold(raw);\n  return docs.find(d => {\n    const n = fold(d.name);\n    const t = fold(String(d.name).slice(0, 24));\n    return f === n || f === t;\n  }) || null;\n}\n\nfunction isPromptLine(line) {\n  const f = fold(line);\n  return /medico preferis|que medico|escribi una opcion/.test(f);\n}\n\nlet hit = findDoc(boton) || findDoc(last);\nif (!hit) {\n  for (const line of [...lines].reverse()) {\n    if (isPromptLine(line)) continue;\n    hit = findDoc(line);\n    if (hit) break;\n  }\n}\n\nif (hit) {\n  return [{ json: { ...m, med_action: 'save', medico_name: hit.name || last, doctor_id: hit.id, cualquiera: false } }];\n}\nreturn [{ json: { ...m, med_action: 'repetir' } }];\n",
+        "mode": "runOnceForAllItems"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2784,
+        2928,
         6224
       ],
       "id": "43873a83-49d4-4ff0-8c44-a669146a8426",
@@ -1397,7 +1398,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT\n  (SELECT clinic_hours FROM clinic_settings WHERE id = 1) AS clinic_hours,\n  (\n    SELECT GROUP_CONCAT(\n      CONCAT(\n        ELT(da.day+1, 'Lun','Mar','Mié','Jue','Vie','Sáb','Dom'),\n        ' ',\n        DATE_FORMAT(da.start_time, '%H:%i'),\n        '-',\n        DATE_FORMAT(da.end_time, '%H:%i')\n      )\n      ORDER BY da.day, da.start_time SEPARATOR ', '\n    )\n    FROM doctor_availability da\n    WHERE da.doctor_id = {{ Number($('Prep save medico').item.json.doctor_id) || 0 }}\n      AND da.week_start = DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)\n      AND da.is_unavailable = 0\n  ) AS doctor_hours,\n  (SELECT name FROM doctors WHERE id = {{ Number($('Prep save medico').item.json.doctor_id) || 0 }}) AS doctor_name,\n  (SELECT JSON_UNQUOTE(JSON_EXTRACT(context, '$.medico')) FROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}') AS medico_saved;",
+        "query": "SELECT\n  (SELECT clinic_hours FROM clinic_settings WHERE id = 1) AS clinic_hours,\n  (\n    SELECT GROUP_CONCAT(\n      CONCAT(\n        ELT(g.day+1, 'Lun','Mar','Mié','Jue','Vie','Sáb','Dom'),\n        ' ',\n        g.slots\n      )\n      ORDER BY g.day SEPARATOR ', '\n    )\n    FROM (\n      SELECT\n        da.day,\n        GROUP_CONCAT(\n          CONCAT(DATE_FORMAT(da.start_time, '%H:%i'), '-', DATE_FORMAT(da.end_time, '%H:%i'))\n          ORDER BY da.start_time SEPARATOR ' y '\n        ) AS slots\n      FROM doctor_availability da\n      WHERE da.doctor_id = {{ Number($('Prep save medico').item.json.doctor_id) || 0 }}\n        AND da.week_start = DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)\n        AND da.is_unavailable = 0\n      GROUP BY da.day\n    ) g\n  ) AS doctor_hours,\n  (SELECT name FROM doctors WHERE id = {{ Number($('Prep save medico').item.json.doctor_id) || 0 }}) AS doctor_name,\n  (SELECT JSON_UNQUOTE(JSON_EXTRACT(context, '$.medico')) FROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}') AS medico_saved;",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -1418,7 +1419,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prep save medico').first().json;\nconst h = $input.first().json;\nif (m.cualquiera) {\n  return [cwSelect(`¿Qué horario preferís? Recordá que la clínica atiende ${h.clinic_hours || ''}.`, navItems(), m)];\n}\nconst docName = h.doctor_name || h.medico_saved || 'el doctor';\nconst hours = h.doctor_hours || 'consultar en recepción';\nreturn [cwSelect(`¿Qué horario preferís? Recordá que ${docName} atiende: ${hours}.`, navItems(), m)];\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prep save medico').first().json;\nconst h = $input.first().json;\nif (m.cualquiera) {\n  return [cwSelect(`¿Qué horario preferís? Recordá que la clínica atiende ${h.clinic_hours || ''}.`, navItems(), m)];\n}\nconst docName = h.doctor_name || h.medico_saved || 'el doctor';\nconst hours = h.doctor_hours || 'consultar en recepción';\nreturn [cwSelect(`¿Qué horario preferís? Recordá que ${docName} atiende:\\n${hours}`, navItems(), m)];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1491,7 +1492,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT\n  JSON_UNQUOTE(JSON_EXTRACT(context, '$.medico')) AS medico,\n  JSON_EXTRACT(context, '$.medico_cualquiera') AS medico_cualquiera,\n  JSON_UNQUOTE(JSON_EXTRACT(context, '$.doctor_id')) AS doctor_id,\n  (SELECT clinic_hours FROM clinic_settings WHERE id = 1) AS clinic_hours,\n  (\n    SELECT GROUP_CONCAT(\n      CONCAT(\n        ELT(da.day+1, 'Lun','Mar','Mié','Jue','Vie','Sáb','Dom'),\n        ' ',\n        DATE_FORMAT(da.start_time, '%H:%i'),\n        '-',\n        DATE_FORMAT(da.end_time, '%H:%i')\n      )\n      ORDER BY da.day, da.start_time SEPARATOR ', '\n    )\n    FROM doctor_availability da\n    WHERE da.doctor_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(\n      (SELECT context FROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}'),\n      '$.doctor_id')) AS UNSIGNED)\n      AND da.week_start = DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)\n      AND da.is_unavailable = 0\n  ) AS doctor_hours\nFROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}' LIMIT 1;",
+        "query": "SELECT\n  JSON_UNQUOTE(JSON_EXTRACT(context, '$.medico')) AS medico,\n  JSON_EXTRACT(context, '$.medico_cualquiera') AS medico_cualquiera,\n  JSON_UNQUOTE(JSON_EXTRACT(context, '$.doctor_id')) AS doctor_id,\n  (SELECT clinic_hours FROM clinic_settings WHERE id = 1) AS clinic_hours,\n  (\n    SELECT GROUP_CONCAT(\n      CONCAT(\n        ELT(g.day+1, 'Lun','Mar','Mié','Jue','Vie','Sáb','Dom'),\n        ' ',\n        g.slots\n      )\n      ORDER BY g.day SEPARATOR ', '\n    )\n    FROM (\n      SELECT\n        da.day,\n        GROUP_CONCAT(\n          CONCAT(DATE_FORMAT(da.start_time, '%H:%i'), '-', DATE_FORMAT(da.end_time, '%H:%i'))\n          ORDER BY da.start_time SEPARATOR ' y '\n        ) AS slots\n      FROM doctor_availability da\n      WHERE da.doctor_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(\n      (SELECT context FROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}'),\n      '$.doctor_id')) AS UNSIGNED)\n        AND da.week_start = DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)\n        AND da.is_unavailable = 0\n      GROUP BY da.day\n    ) g\n  ) AS doctor_hours\nFROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}' LIMIT 1;",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -1512,7 +1513,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst h = $input.first().json;\nconst cualquiera = h.medico_cualquiera === true || h.medico_cualquiera === 'true' || h.medico === 'Cualquier doctor' || h.medico === 'Mi médico de cabecera';\nif (cualquiera) {\n  return [cwSelect(`¿Qué horario preferís? Recordá que la clínica atiende ${h.clinic_hours || ''}.`, navItems(), m)];\n}\nreturn [cwSelect(`¿Qué horario preferís? Recordá que ${h.medico || 'el doctor'} atiende: ${h.doctor_hours || 'consultar en recepción'}.`, navItems(), m)];\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst h = $input.first().json;\nconst cualquiera = h.medico_cualquiera === true || h.medico_cualquiera === 'true' || h.medico === 'Cualquier doctor' || h.medico === 'Mi médico de cabecera';\nif (cualquiera) {\n  return [cwSelect(`¿Qué horario preferís? Recordá que la clínica atiende ${h.clinic_hours || ''}.`, navItems(), m)];\n}\nreturn [cwSelect(`¿Qué horario preferís? Recordá que ${h.medico || 'el doctor'} atiende:\\n${h.doctor_hours || 'consultar en recepción'}`, navItems(), m)];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1950,6 +1951,28 @@
       ],
       "id": "9e1d5c22-8a47-4f03-b6c1-3a9e0d7f5b18",
       "name": "After sync"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(JSON_ARRAYAGG(JSON_OBJECT('id', id, 'name', name)), JSON_ARRAY()) AS doctors_json FROM doctors WHERE active = 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        2688,
+        6224
+      ],
+      "id": "b7f30d39-d0d2-4df8-bdc4-e81d4389fae1",
+      "name": "Load doctors match",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -2044,7 +2067,7 @@
         ],
         [
           {
-            "node": "Handle medico",
+            "node": "Load doctors match",
             "type": "main",
             "index": 0
           }
@@ -2712,6 +2735,17 @@
         [
           {
             "node": "Reset state after confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load doctors match": {
+      "main": [
+        [
+          {
+            "node": "Handle medico",
             "type": "main",
             "index": 0
           }
