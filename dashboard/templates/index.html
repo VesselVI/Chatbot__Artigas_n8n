@@ -64,7 +64,7 @@
           <label class="list-group-item d-flex justify-content-between align-items-center">
             <span>
               <input class="form-check-input me-2 day-check" type="checkbox" name="days" value="{{ i }}">
-              {{ day_names[i] }}
+              {{ day_names[i] }} <span id="day-date-{{ i }}" class="text-muted"></span>
             </span>
             <span id="schedule-{{ i }}" class="badge text-bg-light border text-muted fst-italic">Sin configurar</span>
           </label>
@@ -73,13 +73,39 @@
 
         <div class="mb-4">
           <label class="form-label fw-medium">Turnos</label>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="shift_manana" checked>
-            <label class="form-check-label" for="shift_manana">Turno mañana (9 a 12)</label>
+
+          <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-3">
+              <input class="form-check-input shift-enable" type="checkbox" id="shift_manana" data-shift="manana" checked>
+              <label class="form-check-label fw-medium" for="shift_manana">Turno mañana</label>
+            </div>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small mb-1" for="manana_start">Inicio</label>
+                <select id="manana_start" class="form-select shift-start" data-shift="manana"></select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small mb-1" for="manana_end">Fin</label>
+                <select id="manana_end" class="form-select shift-end" data-shift="manana"></select>
+              </div>
+            </div>
           </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="shift_noche" checked>
-            <label class="form-check-label" for="shift_noche">Turno noche (16 a 19)</label>
+
+          <div class="border rounded p-3">
+            <div class="form-check mb-3">
+              <input class="form-check-input shift-enable" type="checkbox" id="shift_noche" data-shift="noche" checked>
+              <label class="form-check-label fw-medium" for="shift_noche">Turno noche</label>
+            </div>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small mb-1" for="noche_start">Inicio</label>
+                <select id="noche_start" class="form-select shift-start" data-shift="noche"></select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small mb-1" for="noche_end">Fin</label>
+                <select id="noche_end" class="form-select shift-end" data-shift="noche"></select>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -88,7 +114,7 @@
           <button type="button" class="btn btn-outline-danger" id="mark-unavailable">Marcar no disponible</button>
         </div>
         <p class="text-muted small mt-3 mb-0">
-          Para corregir un día, seleccionálo de nuevo, marcá turno mañana y/o noche (o no disponible) y guardá. Se sobrescribe.
+          Para corregir un día, seleccionálo de nuevo, marcá turno mañana y/o noche, elegí inicio y fin (o no disponible) y guardá. Se sobrescribe.
         </p>
       </div>
 
@@ -143,6 +169,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    const allTimes = {{ all_times_json | safe }};
+    const shiftDefaults = { manana: ['09:00', '12:00'], noche: ['16:00', '19:00'] };
     let weekStart = new Date('{{ week_start }}T00:00:00');
 
     function toISODate(d) {
@@ -169,6 +197,22 @@
       return `Semana del ${dd}/${mm}/${yyyy}`;
     }
 
+    function formatDayDate(d) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      return `${dd}/${mm}`;
+    }
+
+    function updateDayDates() {
+      for (let i = 0; i < 7; i++) {
+        const el = document.getElementById('day-date-' + i);
+        if (!el) continue;
+        const d = new Date(weekStart);
+        d.setDate(weekStart.getDate() + i);
+        el.textContent = formatDayDate(d);
+      }
+    }
+
     function showAlert(containerId, type, message) {
       const container = document.getElementById(containerId);
       container.innerHTML = `
@@ -187,6 +231,49 @@
     function selectedDays() {
       return Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
     }
+
+    function fillStartSelect(select, preferred) {
+      select.innerHTML = '<option value="">-- seleccionar --</option>' +
+        allTimes.slice(0, -1).map(t => `<option value="${t}">${t}</option>`).join('');
+      if (preferred && allTimes.includes(preferred)) select.value = preferred;
+    }
+
+    function syncEndOptions(shift, preferredEnd) {
+      const startSelect = document.getElementById(shift + '_start');
+      const endSelect = document.getElementById(shift + '_end');
+      const startValue = startSelect.value;
+      const keep = preferredEnd || endSelect.value;
+      endSelect.innerHTML = '';
+      if (!startValue) {
+        endSelect.innerHTML = '<option value="">-- seleccioná hora inicio primero --</option>';
+        return;
+      }
+      const later = allTimes.slice(allTimes.indexOf(startValue) + 1);
+      endSelect.innerHTML = '<option value="">-- seleccionar --</option>' +
+        later.map(t => `<option value="${t}">${t}</option>`).join('');
+      if (keep && later.includes(keep)) endSelect.value = keep;
+    }
+
+    function setShiftEnabled(shift, enabled) {
+      document.getElementById(shift + '_start').disabled = !enabled;
+      document.getElementById(shift + '_end').disabled = !enabled;
+    }
+
+    function initShiftSelects() {
+      ['manana', 'noche'].forEach(shift => {
+        const [start, end] = shiftDefaults[shift];
+        fillStartSelect(document.getElementById(shift + '_start'), start);
+        syncEndOptions(shift, end);
+        setShiftEnabled(shift, document.getElementById('shift_' + shift).checked);
+      });
+    }
+
+    document.querySelectorAll('.shift-start').forEach(el => {
+      el.addEventListener('change', () => syncEndOptions(el.dataset.shift));
+    });
+    document.querySelectorAll('.shift-enable').forEach(el => {
+      el.addEventListener('change', () => setShiftEnabled(el.dataset.shift, el.checked));
+    });
 
     function shiftBadge(entry) {
       if (!entry.configured) {
@@ -207,6 +294,7 @@
     async function loadAvailability() {
       const doctorId = document.getElementById('doctor_id').value;
       document.getElementById('week-label').textContent = formatLabel(weekStart);
+      updateDayDates();
       try {
         const res = await fetch(`/api/availability?doctor_id=${encodeURIComponent(doctorId)}&week_start=${toISODate(weekStart)}`);
         if (!res.ok) throw new Error('fail');
@@ -252,6 +340,18 @@
         showAlert('availability-alert', 'danger', 'Seleccioná turno mañana y/o turno noche.');
         return;
       }
+      const mananaStart = document.getElementById('manana_start').value;
+      const mananaEnd = document.getElementById('manana_end').value;
+      const nocheStart = document.getElementById('noche_start').value;
+      const nocheEnd = document.getElementById('noche_end').value;
+      if (manana && (!mananaStart || !mananaEnd)) {
+        showAlert('availability-alert', 'danger', 'Completá inicio y fin del turno mañana.');
+        return;
+      }
+      if (noche && (!nocheStart || !nocheEnd)) {
+        showAlert('availability-alert', 'danger', 'Completá inicio y fin del turno noche.');
+        return;
+      }
       const btn = document.getElementById('save-hours');
       btn.disabled = true;
       try {
@@ -263,7 +363,11 @@
             week_start: toISODate(weekStart),
             days,
             manana,
-            noche
+            noche,
+            manana_start: mananaStart,
+            manana_end: mananaEnd,
+            noche_start: nocheStart,
+            noche_end: nocheEnd
           })
         });
         const data = await res.json();
@@ -381,6 +485,7 @@
       }
     });
 
+    initShiftSelects();
     loadAvailability();
   </script>
 </body>

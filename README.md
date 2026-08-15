@@ -56,7 +56,7 @@ Firewall: allow only `22`, `80`, `443`.
 
 ## Dashboard (secretaries)
 
-- **Horarios**: pick doctor → navigate weeks → select days → **turno mañana** (09:00–12:00) and/or **turno noche** (16:00–19:00) → **Guardar horarios**, or **Marcar no disponible**. Saving again overwrites.
+- **Horarios**: pick doctor → navigate weeks → select days → **turno mañana** and/or **turno noche** with start/end (30 min steps) → **Guardar horarios**, or **Marcar no disponible**. Saving again overwrites.
 - **Solicitudes**: confirmed booking requests from the bot.
 - **Clínica**: address, clinic hours (for “Mi médico de cabecera”), welcome text, obras sociales list.
 

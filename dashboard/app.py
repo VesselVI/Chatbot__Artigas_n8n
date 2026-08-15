@@ -13,10 +13,11 @@ from starlette.middleware.sessions import SessionMiddleware
 DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 DAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
-SHIFT_HOURS = {
-    "manana": ("09:00", "12:00"),
-    "noche": ("16:00", "19:00"),
-}
+ALL_TIMES = [
+    f"{h:02d}:{m:02d}"
+    for h in range(7, 22)
+    for m in (0, 30)
+] + ["22:00"]
 
 
 def env(name: str, default: str = "") -> str:
@@ -42,6 +43,32 @@ def parse_week_start(value: str | None) -> date:
     if value:
         return date.fromisoformat(value)
     return monday_of(date.today())
+
+
+def parse_hhmm(value: Any) -> str | None:
+    s = str(value or "").strip()
+    if s in ALL_TIMES:
+        return s
+    return None
+
+
+def shift_range(body: dict, key: str) -> tuple[str, str] | None:
+    enabled = body.get(key)
+    if isinstance(enabled, dict):
+        if not enabled:
+            return None
+        start = parse_hhmm(enabled.get("start_time") or enabled.get("start"))
+        end = parse_hhmm(enabled.get("end_time") or enabled.get("end"))
+    else:
+        if not enabled:
+            return None
+        start = parse_hhmm(body.get(f"{key}_start") or body.get(f"{key}_start_time"))
+        end = parse_hhmm(body.get(f"{key}_end") or body.get(f"{key}_end_time"))
+    if not start or not end:
+        return None
+    if start >= end:
+        return None
+    return start, end
 
 
 def format_time(t: Any) -> str:
@@ -136,6 +163,8 @@ async def index(request: Request):
             "doctors": doctors,
             "days_of_week": list(range(7)),
             "day_names": DAY_NAMES,
+            "all_times": ALL_TIMES,
+            "all_times_json": json.dumps(ALL_TIMES),
             "week_start": monday_of(date.today()).isoformat(),
         },
     )
@@ -228,12 +257,24 @@ async def api_save_availability(request: Request):
     days = [int(d) for d in body.get("days", [])]
     want_manana = bool(body.get("manana"))
     want_noche = bool(body.get("noche"))
+    manana = shift_range(body, "manana")
+    noche = shift_range(body, "noche")
 
     if not days:
         return JSONResponse({"error": "Seleccioná al menos un día."}, status_code=400)
     if not want_manana and not want_noche:
         return JSONResponse(
             {"error": "Seleccioná turno mañana y/o turno noche."},
+            status_code=400,
+        )
+    if want_manana and not manana:
+        return JSONResponse(
+            {"error": "Completá inicio y fin del turno mañana. El fin debe ser después del inicio."},
+            status_code=400,
+        )
+    if want_noche and not noche:
+        return JSONResponse(
+            {"error": "Completá inicio y fin del turno noche. El fin debe ser después del inicio."},
             status_code=400,
         )
 
@@ -248,8 +289,8 @@ async def api_save_availability(request: Request):
                 """,
                 (doctor_id, ws, d),
             )
-            if want_manana:
-                start, end = SHIFT_HOURS["manana"]
+            if want_manana and manana:
+                start, end = manana
                 cur.execute(
                     """
                     INSERT INTO doctor_availability
@@ -258,8 +299,8 @@ async def api_save_availability(request: Request):
                     """,
                     (doctor_id, ws, d, start, end),
                 )
-            if want_noche:
-                start, end = SHIFT_HOURS["noche"]
+            if want_noche and noche:
+                start, end = noche
                 cur.execute(
                     """
                     INSERT INTO doctor_availability
