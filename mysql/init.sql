@@ -75,7 +75,7 @@ INSERT INTO clinic_settings (id, address, clinic_hours, obras_sociales, welcome_
 INSERT INTO doctors (name, active, sort_order) VALUES
   ('Adrian Artigas', 1, 1),
   ('Esteban Artigas', 1, 2),
-  ('Alejandro Artigas', 1, 3),
+  ('Maria Eugenia Sibay', 1, 3),
   ('Eduardo Artigas', 1, 4),
   ('Enrique Hector Artigas', 1, 5),
   ('Paulina Artigas', 1, 6);
