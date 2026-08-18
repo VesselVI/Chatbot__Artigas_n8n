@@ -111,6 +111,17 @@ def health():
     return {"ok": True}
 
 
+@app.get("/privacidad", response_class=HTMLResponse)
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_policy(request: Request):
+    """Public page for Meta App Dashboard Privacy Policy URL (no login)."""
+    return templates.TemplateResponse(
+        "privacidad.html",
+        {"request": request},
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     if request.session.get("user"):
