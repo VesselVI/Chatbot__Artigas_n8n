@@ -72,6 +72,8 @@ services:
       N8N_SECURE_COOKIE: "true"
       DOMAIN: ${DOMAIN}
       CHATWOOT_HOST: ${CHATWOOT_HOST:-${DOMAIN}}
+      CHATWOOT_TEAM_ID: ${CHATWOOT_TEAM_ID:-}
+      CHATWOOT_TEAM_NAME: ${CHATWOOT_TEAM_NAME:-Secretaría}
       N8N_BLOCK_ENV_ACCESS_IN_EXPRESSIONS: "false"
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:

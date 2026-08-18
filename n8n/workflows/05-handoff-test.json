@@ -1,0 +1,281 @@
+{
+  "name": "05 - Handoff Test (Secretaría assign)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        320
+      ],
+      "id": "ht-manual",
+      "name": "Manual Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Edit before Test workflow: real Chatwoot display_id + account id.\nconst account_id = 2;\nconst conversation_id = 0; // conversation display_id from Chatwoot URL\nconst handoff_reason = 'estudio/precio';\nconst handoff_quote = 'Quiero saber el precio de un estudio';\n\nif (!conversation_id) {\n  throw new Error('Set conversation_id to the Chatwoot display_id before testing.');\n}\n\nreturn [{\n  json: {\n    telefono: '543816224165',\n    account_id,\n    conversation_id,\n    route: 'hablar_secretaria',\n    handoff_reason,\n    handoff_quote,\n    last_line: handoff_quote,\n    texto: handoff_quote,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        320
+      ],
+      "id": "ht-decide",
+      "name": "Decide Route",
+      "notesInFlow": true,
+      "notes": "Same node name as 01. Edit account_id + conversation_id at top of jsCode."
+    },
+    {
+      "parameters": {
+        "jsCode": "const n = $('Decide Route').first().json;\nreturn [{\n  json: {\n    ...n,\n    context: {},\n    handoff_reason: n.handoff_reason,\n    handoff_quote: n.handoff_quote,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        320
+      ],
+      "id": "ht-merge",
+      "name": "Merge Context",
+      "notesInFlow": true,
+      "notes": "Stub for 01 Prep handoff private note ($('Merge Context'))."
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: '*Te derivamos con una secretaria. En breve te van a escribir.*',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        320
+      ],
+      "id": "ht-build-confirm",
+      "name": "Build handoff confirm"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        320
+      ],
+      "id": "ht-send-confirm",
+      "name": "Send handoff confirm",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Chatwoot API"
+        }
+      },
+      "notes": "Header Auth: api-access-token = Chatwoot Profile token."
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nconst ctx = ($('Merge Context').first().json.context) || {};\nconst reason = m.handoff_reason || ctx.handoff_reason || 'estudio/precio';\nconst quote = m.handoff_quote || ctx.handoff_quote || m.last_line || m.texto || '';\nconst teamId = Number($env.CHATWOOT_TEAM_ID);\nconst teamName = String($env.CHATWOOT_TEAM_NAME || 'Secretaría').trim();\nconst teamMention = teamId && !Number.isNaN(teamId)\n  ? `[@${teamName}](mention://team/${teamId}/${encodeURIComponent(teamName)})`\n  : '';\nconst header = teamMention ? `${teamMention} Derivación a Secretaría` : 'Derivación a Secretaría';\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: header + '\\nMotivo: ' + reason + '\\nMensaje del paciente: ' + quote,\n      message_type: 'outgoing',\n      private: true,\n      content_type: 'text'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        320
+      ],
+      "id": "ht-prep-note",
+      "name": "Prep handoff private note"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        320
+      ],
+      "id": "ht-send-note",
+      "name": "Send handoff private note",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Chatwoot API"
+        }
+      },
+      "notes": "private: true — visible in Chatwoot only."
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nconst teamId = Number($env.CHATWOOT_TEAM_ID);\nif (!teamId || Number.isNaN(teamId)) {\n  throw new Error('CHATWOOT_TEAM_ID is missing or invalid on n8n. Set it in .env and recreate n8n.');\n}\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      team_id: teamId\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        320
+      ],
+      "id": "ht-prep-assign",
+      "name": "Prep team assign",
+      "notesInFlow": true,
+      "notes": "POST body: { team_id: CHATWOOT_TEAM_ID }"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/assignments' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1520,
+        320
+      ],
+      "id": "ht-assign-team",
+      "name": "Assign Secretaría team",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Chatwoot API"
+        }
+      },
+      "notes": "POST .../assignments (not /messages). Success → Equipo asignado: Secretaría."
+    },
+    {
+      "parameters": {
+        "content": "## Handoff test\n\n1. Set `CHATWOOT_TEAM_ID` in VPS `.env` → `docker compose up -d n8n`\n2. Open **Decide Route** → edit `conversation_id` (display_id from Chatwoot URL)\n3. Attach **Chatwoot API** credential on all HTTP nodes\n4. **Test workflow** on an **unassigned** conversation\n5. Expect: WhatsApp confirm + private note + **Equipo: Secretaría**\n\nCopy working nodes into live **01** on the `hablar_secretaria` branch.",
+        "height": 280,
+        "width": 520
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        40
+      ],
+      "id": "ht-note",
+      "name": "Sticky Note"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Decide Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide Route": {
+      "main": [
+        [
+          {
+            "node": "Merge Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Context": {
+      "main": [
+        [
+          {
+            "node": "Build handoff confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build handoff confirm": {
+      "main": [
+        [
+          {
+            "node": "Send handoff confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send handoff confirm": {
+      "main": [
+        [
+          {
+            "node": "Prep handoff private note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep handoff private note": {
+      "main": [
+        [
+          {
+            "node": "Send handoff private note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send handoff private note": {
+      "main": [
+        [
+          {
+            "node": "Prep team assign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep team assign": {
+      "main": [
+        [
+          {
+            "node": "Assign Secretaría team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

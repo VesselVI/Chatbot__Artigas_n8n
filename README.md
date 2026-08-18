@@ -57,7 +57,7 @@ Firewall: allow only `22`, `80`, `443`.
 ## Dashboard (secretaries)
 
 - **Horarios**: pick doctor → navigate weeks → select days → **turno mañana** and/or **turno noche** with start/end (30 min steps) → **Guardar horarios**, or **Marcar no disponible**. Saving again overwrites.
-- **Solicitudes**: confirmed booking requests from the bot.
+- **Solicitudes**: requests from the bot, grouped by the day they were made. Labels: `turno` (new booking), `cancelar` (cancel request), `estudio` (estudio/precio handoff). Includes DNI and the hour of the request.
 - **Clínica**: address, clinic hours (for “Mi médico de cabecera”), welcome text, obras sociales list.
 
 ## n8n workflows
@@ -99,6 +99,6 @@ Also snapshot Chatwoot/n8n Docker volumes periodically.
 
 ## Local notes
 
-- First MySQL start runs [mysql/init.sql](mysql/init.sql) (schema + seed doctors / obras). Existing VPS DBs need [mysql/migrate_shifts.sql](mysql/migrate_shifts.sql) before the dashboard can save mañana/noche rows.
+- First MySQL start runs [mysql/init.sql](mysql/init.sql) (schema + seed doctors / obras). Existing VPS DBs need [mysql/migrate_shifts.sql](mysql/migrate_shifts.sql) before the dashboard can save mañana/noche rows, and [mysql/migrate_solicitudes_tipo.sql](mysql/migrate_solicitudes_tipo.sql) for solicitud labels (`turno` / `cancelar` / `estudio`).
 - Caddy issues Let’s Encrypt certs automatically once DNS points to the VPS.
 - Memory limits in `docker-compose.yml` keep Chatwoot + n8n within ~8 GB with swap.

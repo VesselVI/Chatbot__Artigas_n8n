@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json;\nconst body = raw.body || raw;\n\nconst event = body.event || body.message?.event || '';\nconst msg = body.message || body;\n\nif (event && !String(event).includes('message_created') && event !== 'message_updated') {\n  if (!msg.content && !msg.content_type && !body.content) return [];\n}\n\nconst message = (body.content !== undefined && body.conversation) ? body : msg;\nconst conversation = message.conversation || body.conversation || {};\nconst account = message.account || body.account || {};\nconst sender = message.sender || conversation.meta?.sender || {};\n\nconst messageType = message.message_type;\nconst isIncoming = messageType === 0 || messageType === 'incoming' || messageType === 'Incoming';\nconst isPrivate = message.private === true;\nconst senderType = (sender.type || '').toLowerCase();\n\nif (isPrivate) return [];\nif (messageType === 1 || messageType === 'outgoing' || messageType === 'Outgoing') return [];\nif (senderType === 'user' || senderType === 'agent_bot') return [];\nif (messageType !== undefined && messageType !== null && !isIncoming && messageType !== 'incoming') return [];\n\nif (conversation.assignee_id) return [];\n\nlet phone = sender.phone_number || conversation.meta?.sender?.phone_number || conversation.contact_inbox?.source_id || '';\nphone = String(phone).replace(/\\s+/g, '').replace(/^\\+/, '');\nif (phone.startsWith('549')) phone = '54' + phone.slice(3);\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nlet texto = String(message.content || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nlet boton_id = '';\nconst ca = message.content_attributes || {};\nconst submitted = ca.submitted_values || ca.items || [];\nif (Array.isArray(submitted) && submitted.length) {\n  const v = submitted[0];\n  boton_id = String(v.value || v.id || '');\n  if (!texto) texto = String(v.title ?? v.value ?? '');\n}\nif (!boton_id && ca.submitted_values && typeof ca.submitted_values === 'object' && !Array.isArray(ca.submitted_values)) {\n  boton_id = String(ca.submitted_values.value || '');\n}\n\nconst quoteBits = [];\nconst replyId = ca.in_reply_to || ca.in_reply_to_id || message.in_reply_to || '';\nconst convMsgs = conversation.messages || body.conversation?.messages || [];\nif (replyId && Array.isArray(convMsgs)) {\n  const quoted = convMsgs.find(m => String(m.id) === String(replyId) || String(m.source_id || '') === String(ca.in_reply_to_external_id || ''));\n  if (quoted && quoted.content) quoteBits.push(String(quoted.content));\n}\nfor (const k of ['in_reply_to_content', 'quoted_content', 'quoted_message']) {\n  const v = ca[k];\n  if (typeof v === 'string' && v.trim()) quoteBits.push(v);\n  else if (v && typeof v === 'object' && v.content) quoteBits.push(String(v.content));\n}\nif (quoteBits.length) texto = quoteBits.join('\\n') + '\\n' + texto;\nif (replyId) texto += '\\n__cw_in_reply_to__:' + replyId;\n\nconst titleMap = {\n  'horarios de clinica': 'horarios_clinica',\n  'horarios clinica': 'horarios_clinica',\n  'sacar un turno': 'quiero_turno',\n  'volver al menu': 'volver_menu',\n  'volver': 'volver_menu',\n  'menu': 'volver_menu',\n  'repetir pregunta': 'repetir_pregunta',\n  'repetir': 'repetir_pregunta',\n  'cancelar turno': 'cancelar_turno_pedido',\n  'si, cancelar': 'cancel_si',\n  'si cancelar': 'cancel_si',\n  'no, continuar': 'cancel_no',\n  'no continuar': 'cancel_no',\n  'cualquier doctor': 'medico_cualquiera',\n  'mi medico de cabecera': 'medico_cabecera',\n  'otra / particular': 'obra_otra',\n  'otra': 'obra_otra',\n  'otras': 'obra_otra',\n  'particular': 'obra_particular',\n  'sin obra': 'obra_particular',\n  'sin obras': 'obra_particular',\n  'sin obra social': 'obra_particular',\n  'sin obras sociales': 'obra_particular',\n  'particular/sin obra social': 'obra_particular',\n  'particular / sin obra social': 'obra_particular',\n  'particular sin obra': 'obra_particular',\n  'particular sin obra social': 'obra_particular',\n  'no tengo obra': 'obra_particular',\n  'no tengo obra social': 'obra_particular',\n  'no tengo obras sociales': 'obra_particular',\n  'como particular': 'obra_particular',\n  'soy particular': 'obra_particular',\n  'voy particular': 'obra_particular',\n  'voy como particular': 'obra_particular',\n  'pago particular': 'obra_particular',\n  'paciente particular': 'obra_particular',\n  'consulta particular': 'obra_particular',\n  'obra particular': 'obra_particular',\n  'sin cobertura': 'obra_particular',\n  'no tengo cobertura': 'obra_particular',\n  'ninguna obra': 'obra_particular',\n  'ninguna obra social': 'obra_particular',\n  'no tengo': 'obra_particular',\n  'confirmar': 'confirmar_turno',\n};\n\nif (Array.isArray(submitted) && submitted.length && !boton_id) {\n  const t = fold(submitted[0].title || '');\n  if (titleMap[t]) boton_id = titleMap[t];\n}\n\nif (!boton_id) {\n  boton_id = titleMap[fold(last)] || '';\n}\nif (!boton_id) {\n  const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido', 'cancel_si', 'cancel_no', 'volver_menu', 'confirmar_turno']);\n  for (const c of lines) {\n    const mapped = titleMap[fold(c)];\n    if (mapped && navIds.has(mapped)) { boton_id = mapped; break; }\n  }\n}\n\nif (!phone && !conversation.id && !conversation.display_id) return [];\n\nconst conversationId = conversation.display_id || conversation.id || body.conversation_id; // Chatwoot API path uses display_id\nconst accountId = conversation.account_id || account.id || body.account?.id || body.account_id;\n\nreturn [{\n  json: {\n    telefono: phone || String(conversationId),\n    tipo: boton_id ? 'interactive' : 'text',\n    texto: texto || '',\n    boton_id: boton_id || '',\n    conversation_id: conversationId,\n    account_id: accountId,\n  }\n}];"
+        "jsCode": "const raw = $input.first().json;\nconst body = raw.body || raw;\n\nconst event = body.event || body.message?.event || '';\nconst msg = body.message || body;\nconst attEarly = msg.attachments || body.attachments || [];\nconst attEarlyList = Array.isArray(attEarly) ? attEarly : [];\n\nif (event && !String(event).includes('message_created') && event !== 'message_updated') {\n  if (!msg.content && !msg.content_type && !body.content && attEarlyList.length === 0) return [];\n}\n\nconst message = (body.content !== undefined && body.conversation) ? body : msg;\nconst conversation = message.conversation || body.conversation || {};\nconst account = message.account || body.account || {};\nconst sender = message.sender || conversation.meta?.sender || {};\n\nconst messageType = message.message_type;\nconst isIncoming = messageType === 0 || messageType === 'incoming' || messageType === 'Incoming';\nconst isPrivate = message.private === true;\nconst senderType = (sender.type || '').toLowerCase();\n\nif (isPrivate) return [];\nif (messageType === 1 || messageType === 'outgoing' || messageType === 'Outgoing') return [];\nif (senderType === 'user' || senderType === 'agent_bot') return [];\nif (messageType !== undefined && messageType !== null && !isIncoming && messageType !== 'incoming') return [];\n\nconst assignee = conversation.meta?.assignee;\nconst assigneeType = String(conversation.meta?.assignee_type || assignee?.type || '').toLowerCase();\nconst teamId = conversation.team_id || conversation.cached_team_id || conversation.meta?.team?.id;\nconst isBotAssignee = assigneeType.includes('bot') || assigneeType === 'agentbot';\nconst humanAssigned =\n  (conversation.assignee_id && !isBotAssignee) ||\n  (assignee && String(assignee.type || '').toLowerCase() === 'user');\nif (humanAssigned || teamId) return [];\n\nlet phone = sender.phone_number || conversation.meta?.sender?.phone_number || conversation.contact_inbox?.source_id || '';\nphone = String(phone).replace(/\\s+/g, '').replace(/^\\+/, '');\nif (phone.startsWith('549')) phone = '54' + phone.slice(3);\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst attachments = message.attachments || body.attachments || attEarlyList;\nconst attList = Array.isArray(attachments) ? attachments : [];\nconst MEDIA_FILE = new Set(['image', 'audio', 'video', 'file', 'ig_reel', 'story_mention']);\nfunction attKind(a) {\n  const ft = String(a.file_type || a.fileType || '').toLowerCase();\n  const ct = String(a.content_type || a.contentType || a.mime_type || '').toLowerCase();\n  if (ft === 'image' || ct.startsWith('image/')) return 'imagen';\n  if (ft === 'audio' || ct.startsWith('audio/')) return 'audio';\n  if (ft === 'video' || ft === 'ig_reel' || ct.startsWith('video/')) return 'video';\n  if (ft === 'file' || ct === 'application/pdf' || ct.includes('octet-stream')) return 'archivo';\n  if (MEDIA_FILE.has(ft)) return ft;\n  if (ct) return 'archivo';\n  return '';\n}\nconst mediaKinds = attList.map(attKind).filter(Boolean);\nconst hasMedia = mediaKinds.length > 0;\nconst media_kind = (mediaKinds.includes('imagen') && mediaKinds.includes('audio'))\n  ? 'imagen/audio'\n  : (mediaKinds[0] || '');\n\nlet texto = String(message.content || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nlet boton_id = '';\nconst ca = message.content_attributes || {};\nconst submitted = ca.submitted_values || ca.items || [];\nif (Array.isArray(submitted) && submitted.length) {\n  const v = submitted[0];\n  boton_id = String(v.value || v.id || '');\n  if (!texto) texto = String(v.title ?? v.value ?? '');\n}\nif (!boton_id && ca.submitted_values && typeof ca.submitted_values === 'object' && !Array.isArray(ca.submitted_values)) {\n  boton_id = String(ca.submitted_values.value || '');\n}\n\nconst quoteBits = [];\nconst replyId = ca.in_reply_to || ca.in_reply_to_id || message.in_reply_to || '';\nconst convMsgs = conversation.messages || body.conversation?.messages || [];\nif (replyId && Array.isArray(convMsgs)) {\n  const quoted = convMsgs.find(m => String(m.id) === String(replyId) || String(m.source_id || '') === String(ca.in_reply_to_external_id || ''));\n  if (quoted && quoted.content) quoteBits.push(String(quoted.content));\n}\nfor (const k of ['in_reply_to_content', 'quoted_content', 'quoted_message']) {\n  const v = ca[k];\n  if (typeof v === 'string' && v.trim()) quoteBits.push(v);\n  else if (v && typeof v === 'object' && v.content) quoteBits.push(String(v.content));\n}\nif (quoteBits.length) texto = quoteBits.join('\\n') + '\\n' + texto;\nif (replyId) texto += '\\n__cw_in_reply_to__:' + replyId;\n\nconst titleMap = {\n  'horarios de clinica': 'horarios_clinica',\n  'horarios clinica': 'horarios_clinica',\n  'sacar un turno': 'quiero_turno',\n  'volver al menu': 'volver_menu',\n  'volver': 'volver_menu',\n  'menu': 'volver_menu',\n  'repetir pregunta': 'repetir_pregunta',\n  'repetir': 'repetir_pregunta',\n  'cancelar turno': 'cancelar_turno_pedido',\n  'si, cancelar': 'cancel_si',\n  'si cancelar': 'cancel_si',\n  'no, continuar': 'cancel_no',\n  'no continuar': 'cancel_no',\n  'cualquier doctor': 'medico_cualquiera',\n  'mi medico de cabecera': 'medico_cabecera',\n  'otra / particular': 'obra_otra',\n  'otra': 'obra_otra',\n  'otras': 'obra_otra',\n  'particular': 'obra_particular',\n  'sin obra': 'obra_particular',\n  'sin obras': 'obra_particular',\n  'sin obra social': 'obra_particular',\n  'sin obras sociales': 'obra_particular',\n  'particular/sin obra social': 'obra_particular',\n  'particular / sin obra social': 'obra_particular',\n  'particular sin obra': 'obra_particular',\n  'particular sin obra social': 'obra_particular',\n  'no tengo obra': 'obra_particular',\n  'no tengo obra social': 'obra_particular',\n  'no tengo obras sociales': 'obra_particular',\n  'como particular': 'obra_particular',\n  'soy particular': 'obra_particular',\n  'voy particular': 'obra_particular',\n  'voy como particular': 'obra_particular',\n  'pago particular': 'obra_particular',\n  'paciente particular': 'obra_particular',\n  'consulta particular': 'obra_particular',\n  'obra particular': 'obra_particular',\n  'sin cobertura': 'obra_particular',\n  'no tengo cobertura': 'obra_particular',\n  'ninguna obra': 'obra_particular',\n  'ninguna obra social': 'obra_particular',\n  'no tengo': 'obra_particular',\n  'confirmar': 'confirmar_turno',\n  'continuar consulta': 'continuar_consulta',\n  'hablar secretaria': 'hablar_secretaria',\n  'hablar con secretaria': 'hablar_secretaria',\n  'hacer otra consulta': 'otra_consulta',\n  'otra consulta': 'otra_consulta',\n};\n\nif (Array.isArray(submitted) && submitted.length && !boton_id) {\n  const t = fold(submitted[0].title || '');\n  if (titleMap[t]) boton_id = titleMap[t];\n}\n\nif (!boton_id) {\n  boton_id = titleMap[fold(last)] || '';\n}\nif (!boton_id) {\n  const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido', 'cancel_si', 'cancel_no', 'volver_menu', 'confirmar_turno', 'continuar_consulta', 'hablar_secretaria', 'otra_consulta']);\n  for (const c of lines) {\n    const mapped = titleMap[fold(c)];\n    if (mapped && navIds.has(mapped)) { boton_id = mapped; break; }\n  }\n}\n\nif (!phone && !conversation.id && !conversation.display_id) return [];\n\nconst conversationId = conversation.display_id || conversation.id || body.conversation_id; // Chatwoot API path uses display_id\nconst accountId = conversation.account_id || account.id || body.account?.id || body.account_id;\n\nlet tipo = boton_id ? 'interactive' : 'text';\nif (hasMedia) tipo = 'media';\n\nreturn [{\n  json: {\n    telefono: phone || String(conversationId),\n    tipo,\n    texto: texto || '',\n    boton_id: boton_id || '',\n    conversation_id: conversationId,\n    account_id: accountId,\n    media_kind,\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -75,7 +75,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const n = $('Normalize Message').first().json;\nconst row = $input.first().json;\nlet ctx = row.context ?? {};\nif (typeof ctx === 'string') {\n  try { ctx = JSON.parse(ctx); } catch (e) { ctx = {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nconst PREV_STEP = {\n  awaiting_dni: 'awaiting_nombre',\n  awaiting_obra_social: 'awaiting_dni',\n  awaiting_obra_social_otra: 'awaiting_obra_social',\n  awaiting_telefono: 'awaiting_obra_social',\n  awaiting_medico: 'awaiting_obra_social',\n  awaiting_dia_hora: 'awaiting_medico',\n  awaiting_confirmacion: 'awaiting_dia_hora',\n};\nconst CURRENT_KW = {\n  awaiting_nombre: /nombre completo/,\n  awaiting_dni: /dni/,\n  awaiting_obra_social: /obra social/,\n  awaiting_obra_social_otra: /nombre de tu obra social/,\n  awaiting_telefono: /telefono/,\n  awaiting_medico: /medico preferis|que medico/,\n  awaiting_dia_hora: /horario preferis/,\n  awaiting_confirmacion: /confirmas el turno/,\n};\nfunction quotedStep(texto) {\n  const f = fold(texto);\n  if (/confirmas el turno/.test(f)) return 'awaiting_confirmacion';\n  if (/nombre completo/.test(f)) return 'awaiting_nombre';\n  if (/cual es tu dni|tu dni|\\bdni\\b/.test(f)) return 'awaiting_dni';\n  if (/nombre de tu obra social/.test(f)) return 'awaiting_obra_social_otra';\n  if (/obra social/.test(f)) return 'awaiting_obra_social';\n  if (/numero de telefono/.test(f)) return 'awaiting_telefono';\n  if (/medico preferis|que medico/.test(f)) return 'awaiting_medico';\n  if (/horario preferis/.test(f)) return 'awaiting_dia_hora';\n  return null;\n}\nlet estado = row.state || 'idle';\nconst boton = String(n.boton_id || '').trim();\nconst texto = String(n.texto || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst isRepetir = boton === 'repetir_pregunta'\n  || /^(repetir|repetir pregunta)$/i.test(fold(last))\n  || lines.some(l => /^(repetir|repetir pregunta)$/i.test(fold(l)));\nif (isRepetir && /^awaiting_/.test(estado)) {\n  let q = quotedStep(texto);\n  if (!q) {\n    const kw = CURRENT_KW[estado];\n    if (!kw || !kw.test(fold(texto))) q = PREV_STEP[estado] || null;\n  }\n  if (q) {\n    const order = ['awaiting_nombre','awaiting_dni','awaiting_obra_social','awaiting_obra_social_otra','awaiting_telefono','awaiting_medico','awaiting_dia_hora','awaiting_confirmacion'];\n    const cur = order.indexOf(estado);\n    const tgt = order.indexOf(q);\n    if (tgt >= 0 && (cur < 0 || tgt <= cur)) estado = q;\n  }\n}\nreturn [{\n  json: {\n    telefono: n.telefono,\n    tipo: n.tipo,\n    texto: n.texto,\n    boton_id: n.boton_id,\n    conversation_id: n.conversation_id,\n    account_id: n.account_id,\n    estado,\n    datos_json: ctx,\n    context: ctx,\n  }\n}];"
+        "jsCode": "const n = $('Normalize Message').first().json;\nconst row = $input.first().json;\nlet ctx = row.context ?? {};\nif (typeof ctx === 'string') {\n  try { ctx = JSON.parse(ctx); } catch (e) { ctx = {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nconst PREV_STEP = {\n  awaiting_dni: 'awaiting_nombre',\n  awaiting_obra_social: 'awaiting_dni',\n  awaiting_obra_social_otra: 'awaiting_obra_social',\n  awaiting_telefono: 'awaiting_obra_social',\n  awaiting_medico: 'awaiting_obra_social',\n  awaiting_dia_hora: 'awaiting_medico',\n  awaiting_confirmacion: 'awaiting_dia_hora',\n};\nconst CURRENT_KW = {\n  awaiting_nombre: /nombre completo/,\n  awaiting_dni: /dni/,\n  awaiting_obra_social: /obra social/,\n  awaiting_obra_social_otra: /nombre de tu obra social/,\n  awaiting_telefono: /telefono/,\n  awaiting_medico: /medico preferis|que medico/,\n  awaiting_dia_hora: /horario preferis/,\n  awaiting_confirmacion: /confirmas el turno/,\n};\nfunction quotedStep(texto) {\n  const f = fold(texto);\n  if (/confirmas el turno/.test(f)) return 'awaiting_confirmacion';\n  if (/nombre completo/.test(f)) return 'awaiting_nombre';\n  if (/cual es tu dni|tu dni|\\bdni\\b/.test(f)) return 'awaiting_dni';\n  if (/nombre de tu obra social/.test(f)) return 'awaiting_obra_social_otra';\n  if (/obra social/.test(f)) return 'awaiting_obra_social';\n  if (/numero de telefono/.test(f)) return 'awaiting_telefono';\n  if (/medico preferis|que medico/.test(f)) return 'awaiting_medico';\n  if (/horario preferis/.test(f)) return 'awaiting_dia_hora';\n  return null;\n}\nlet estado = row.state || 'idle';\nconst boton = String(n.boton_id || '').trim();\nconst texto = String(n.texto || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst isRepetir = boton === 'repetir_pregunta'\n  || /^(repetir|repetir pregunta)$/i.test(fold(last))\n  || lines.some(l => /^(repetir|repetir pregunta)$/i.test(fold(l)));\nif (isRepetir && /^awaiting_/.test(estado)) {\n  let q = quotedStep(texto);\n  if (!q) {\n    const kw = CURRENT_KW[estado];\n    if (!kw || !kw.test(fold(texto))) q = PREV_STEP[estado] || null;\n  }\n  if (q) {\n    const order = ['awaiting_nombre','awaiting_dni','awaiting_obra_social','awaiting_obra_social_otra','awaiting_telefono','awaiting_medico','awaiting_dia_hora','awaiting_confirmacion'];\n    const cur = order.indexOf(estado);\n    const tgt = order.indexOf(q);\n    if (tgt >= 0 && (cur < 0 || tgt <= cur)) estado = q;\n  }\n}\nreturn [{\n  json: {\n    telefono: n.telefono,\n    tipo: n.tipo,\n    texto: n.texto,\n    boton_id: n.boton_id,\n    conversation_id: n.conversation_id,\n    account_id: n.account_id,\n    estado,\n    datos_json: ctx,\n    context: ctx,\n    pending_prompt: ctx.pending_prompt || '',\n    handoff_reason: ctx.handoff_reason || '',\n    handoff_quote: ctx.handoff_quote || '',\n    media_kind: n.media_kind || '',\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -88,7 +88,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nlet estado = item.estado || 'idle';\nconst boton = String(item.boton_id || '').trim();\nconst texto = String(item.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst lastLower = last.toLowerCase();\nconst textoLower = lastLower;\nconst onMenu = estado === 'idle' || estado === 'menu_shown';\n\nconst cancelKw = boton === 'cancelar_turno_pedido' || boton === 'cancelar_turno'\n  || /^(cancelar|salir|menu|menú)$/i.test(lastLower)\n  || /^cancelar turno$/i.test(lastLower);\nconst isAwaiting = /^awaiting_/.test(estado);\nconst yes = boton === 'cancel_si' || /^(si|sí)$/i.test(lastLower) || /sí,? cancelar/i.test(lastLower) || /si,? cancelar/i.test(lastLower);\nconst no = boton === 'cancel_no' || /^no$/i.test(lastLower) || /no,? continuar/i.test(lastLower);\nconst isRepetir = boton === 'repetir_pregunta' || /^(repetir|repetir pregunta)$/i.test(lastLower) || lines.some(l => /^(repetir|repetir pregunta)$/i.test(l));\nconst lastFold = lastLower.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst isHorarios = boton === 'horarios_clinica'\n  || (onMenu && (lastFold === '1' || /^(horarios|horarios( de( la)?)? clinica)$/i.test(lastFold)));\nconst isTurno = boton === 'quiero_turno' || boton === 'confirmar_turno'\n  || (onMenu && (lastFold === '2' || /\\bturn[oaie]s?\\b|\\bcitas?\\b|sacar\\s+(un\\s+)?turn/i.test(lastFold)));\nconst isMenuKw = boton === 'volver_menu'\n  || /^(menu|volver|volver al menu)$/i.test(lastFold);\nconst isGreeting = /^(hola+|holis|buenas|buenos|buen[oa]s?( (dias|tardes|noches))?|hi|hey|hello|que tal)$/i.test(lastFold);\n\nlet route = 'welcome';\n\nif (estado === 'confirmando_cancelacion') {\n  if (yes) route = 'cancel_yes';\n  else if (no) route = 'cancel_no';\n  else route = 'cancel_ask';\n} else if (cancelKw && isAwaiting) {\n  route = 'cancel_ask';\n} else if (isRepetir && isAwaiting) {\n  route = 'booking';\n} else if (isHorarios) {\n  route = 'horarios';\n} else if (isMenuKw || isGreeting) {\n  route = 'welcome';\n} else if (isTurno || isAwaiting) {\n  route = 'booking';\n} else if (estado === 'menu_shown' && texto && !boton) {\n  route = 'faq';\n} else {\n  route = 'welcome';\n}\n\nreturn [{ json: { ...item, estado, texto, last_line: last, route } }];"
+        "jsCode": "const item = $input.first().json;\nlet estado = item.estado || 'idle';\nlet boton = String(item.boton_id || '').trim();\nconst texto = String(item.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst lastLower = last.toLowerCase();\nconst onMenu = estado === 'idle' || estado === 'menu_shown';\nconst ctx = item.context && typeof item.context === 'object' ? item.context : {};\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction sqlStr(s) {\n  return String(s || '').replace(/\\0/g, '').replace(/[\\r\\n]+/g, ' ').replace(/'/g, \"''\").slice(0, 400);\n}\nfunction isEstudioIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/(consult|pregunt|\\binfo\\b|informacion).{0,60}(tratamiento|estudio|cirugia)/.test(f)) return true;\n  if (/(tratamiento|estudio|cirugia).{0,60}(consult|pregunt|\\binfo\\b|informacion)/.test(f)) return true;\n  if (/cuanto sale|cuanto cuesta|\\bprecio\\b|\\bvalor\\b|se cobra|\\bcobran\\b|cubre la obra/.test(f)) return true;\n  if (/\\bcampo visual\\b/.test(f)) return true;\n  if (/\\bperimetria(\\s+computarizada)?\\b/.test(f)) return true;\n  if (/\\btopografia\\b/.test(f)) return true;\n  if (/\\bpaquimetria\\b/.test(f)) return true;\n  if (/\\bretinografia(\\s+digital)?\\b/.test(f)) return true;\n  if (/\\boct\\s+(anterior|posterior)\\b/.test(f)) return true;\n  if (/\\bocta\\b/.test(f)) return true;\n  if (/\\boct\\b/.test(f)) return true;\n  if (/\\bangiografia\\b/.test(f)) return true;\n  if (/\\bmicroscopia especular\\b/.test(f)) return true;\n  return false;\n}\nfunction isSecretariaIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/^para poder responder mejor esta consulta/.test(f)) return false;\n  if (/hablar con (una )?secretaria/.test(f)) return true;\n  if (/(pasar|derivar|comunicar|conectar).{0,40}(con )?(una )?(persona|humano|humana|secretaria|alguien|operador)/.test(f)) return true;\n  if (/(quiero|necesito|preciso).{0,40}secretaria/.test(f)) return true;\n  if (/(quiero|necesito|preciso).{0,40}(persona|humano|humana|atencion humana)/.test(f)) return true;\n  if (/\\b(atencion humana|persona real|operador humano)\\b/.test(f)) return true;\n  return false;\n}\nfunction wantsHandoffIntent(t) {\n  return isSecretariaIntent(t) || isEstudioIntent(t);\n}\n\nconst lastFold = lastLower.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst allFold = fold(texto);\nconst handoffProbe = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim() || texto;\nconst pending = String(item.pending_prompt || ctx.pending_prompt || '');\nconst quotedMedia = /no podemos recibir fotos ni audios/.test(allFold);\nconst quotedEstudio = /necesitamos derivarlo con una secretaria/.test(allFold);\nconst fromMediaPrompt = pending === 'media_warn' || quotedMedia;\nconst fromEstudioPrompt = pending === 'estudio_handoff' || quotedEstudio;\n\nif (!boton && (fromMediaPrompt || fromEstudioPrompt)) {\n  if (fromMediaPrompt && lastFold === '1') boton = 'continuar_consulta';\n  else if (fromMediaPrompt && lastFold === '2') boton = 'hablar_secretaria';\n  else if (fromEstudioPrompt && lastFold === '1') boton = 'hablar_secretaria';\n  else if (fromEstudioPrompt && lastFold === '2') boton = 'otra_consulta';\n}\n\nconst cancelKw = boton === 'cancelar_turno_pedido' || boton === 'cancelar_turno'\n  || /^(cancelar|salir|menu|menú)$/i.test(lastLower)\n  || /^cancelar turno$/i.test(lastLower);\nconst isAwaiting = /^awaiting_/.test(estado);\nconst yes = boton === 'cancel_si' || /^(si|sí)$/i.test(lastLower) || /sí,? cancelar/i.test(lastLower) || /si,? cancelar/i.test(lastLower);\nconst no = boton === 'cancel_no' || /^no$/i.test(lastLower) || /no,? continuar/i.test(lastLower);\nconst isRepetir = boton === 'repetir_pregunta' || /^(repetir|repetir pregunta)$/i.test(lastLower) || lines.some(l => /^(repetir|repetir pregunta)$/i.test(l));\nconst numericMenu = onMenu && !fromMediaPrompt && !fromEstudioPrompt;\nconst isHorarios = boton === 'horarios_clinica'\n  || (onMenu && /^(horarios|horarios( de( la)?)? clinica)$/i.test(lastFold))\n  || (numericMenu && lastFold === '1');\nconst isTurno = boton === 'quiero_turno' || boton === 'confirmar_turno'\n  || (numericMenu && lastFold === '2')\n  || (onMenu && /\\bturn[oaie]s?\\b|\\bcitas?\\b|sacar\\s+(un\\s+)?turn/i.test(lastFold));\nconst isMenuKw = boton === 'volver_menu'\n  || /^(menu|volver|volver al menu)$/i.test(lastFold);\nconst isGreeting = /^(hola+|holis|buenas|buenos|buen[oa]s?( (dias|tardes|noches))?|hi|hey|hello|que tal)$/i.test(lastFold);\nconst isHablar = boton === 'hablar_secretaria';\nconst isContinuar = boton === 'continuar_consulta';\nconst isOtra = boton === 'otra_consulta';\nconst isMedia = item.tipo === 'media';\nconst wantsHandoff = wantsHandoffIntent(last) || wantsHandoffIntent(handoffProbe) || wantsHandoffIntent(allFold);\n\nlet route = 'welcome';\nlet handoff_reason = String(item.handoff_reason || ctx.handoff_reason || '');\nlet handoff_quote = String(item.handoff_quote || ctx.handoff_quote || '');\n\nif (estado === 'confirmando_cancelacion') {\n  if (yes) route = 'cancel_yes';\n  else if (no) route = 'cancel_no';\n  else if (isMedia) route = 'media_warn';\n  else route = 'cancel_ask';\n} else if (isMedia) {\n  route = 'media_warn';\n} else if (cancelKw && isAwaiting) {\n  route = 'cancel_ask';\n} else if (isRepetir && isAwaiting) {\n  route = 'booking';\n} else if (isHorarios) {\n  route = 'horarios';\n} else if (isMenuKw || isGreeting) {\n  route = 'welcome';\n} else if (isTurno) {\n  route = 'booking';\n} else if (isHablar) {\n  route = 'hablar_secretaria';\n} else if (isContinuar) {\n  route = isAwaiting ? 'booking' : 'welcome';\n} else if (isOtra) {\n  route = 'welcome';\n} else if (wantsHandoff) {\n  route = 'estudio_handoff';\n} else if (isAwaiting) {\n  route = 'booking';\n} else if (estado === 'menu_shown' && texto && !boton) {\n  route = 'faq';\n} else {\n  route = 'welcome';\n}\n\nif (route === 'media_warn') {\n  handoff_reason = 'imagen/audio';\n  const cap = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  handoff_quote = cap || ('[' + (item.media_kind || 'imagen/audio') + ']');\n} else if (route === 'estudio_handoff') {\n  const est = isEstudioIntent(last) || isEstudioIntent(handoffProbe) || isEstudioIntent(allFold);\n  const sec = isSecretariaIntent(last) || isSecretariaIntent(handoffProbe) || isSecretariaIntent(allFold);\n  handoff_reason = est ? 'estudio/precio' : (sec ? 'solicitud_secretaria' : 'estudio/precio');\n  handoff_quote = handoffProbe || texto;\n} else if (route === 'hablar_secretaria') {\n  if (!handoff_reason) {\n    if (fromMediaPrompt || pending === 'media_warn') handoff_reason = 'imagen/audio';\n    else handoff_reason = 'estudio/precio';\n  }\n  if (!handoff_quote) {\n    handoff_quote = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  }\n}\n\nreturn [{ json: { ...item, estado, texto, last_line: last, boton_id: boton, route, handoff_reason, handoff_quote, handoff_quote_sql: sqlStr(handoff_quote) } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -277,6 +277,81 @@
               },
               "renameOutput": true,
               "outputKey": "cancel_no"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-media",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "media_warn",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "media_warn"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-estudio",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "estudio_handoff",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "estudio_handoff"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-hablar",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "hablar_secretaria",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "hablar_secretaria"
             }
           ]
         },
@@ -869,6 +944,320 @@
           "name": "MySQL account"
         }
       }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state\nSET context = CASE\n  WHEN '{{ $json.route }}' IN ('media_warn', 'estudio_handoff') THEN\n    JSON_SET(\n      COALESCE(context, JSON_OBJECT()),\n      '$.pending_prompt', '{{ $json.route }}',\n      '$.handoff_reason', '{{ $json.handoff_reason }}',\n      '$.handoff_quote', '{{ $json.handoff_quote_sql }}'\n    )\n  ELSE\n    JSON_REMOVE(\n      COALESCE(context, JSON_OBJECT()),\n      '$.pending_prompt',\n      '$.handoff_reason',\n      '$.handoff_quote'\n    )\nEND\nWHERE phone = '{{ $json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -160,
+        432
+      ],
+      "id": "40391662-d252-4e0a-9dc1-a32567698dc8",
+      "name": "Sync pending prompt",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Decide Route').first().json }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        336
+      ],
+      "id": "49c5181d-d19e-4aef-b6af-321f8571c9e2",
+      "name": "Restore route item"
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: 'Por acá no podemos recibir fotos ni audios. Por favor escribí tu consulta en texto.\\nSi preferís, una secretaria puede ayudarte.',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: {\n        items: [\n          { title: 'Continuar consulta', value: 'continuar_consulta' },\n          { title: 'Hablar secretaria', value: 'hablar_secretaria' }\n        ]\n      }\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        1200
+      ],
+      "id": "ebb74443-dbb8-4ade-bf46-cba9712d6b23",
+      "name": "Build media warning"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        1200
+      ],
+      "id": "0075debb-2236-4d7b-b396-c7fdbcec3802",
+      "name": "Send media warning",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GqVsiFUjDt4aJl4f",
+          "name": "Chatwoot API"
+        }
+      },
+      "notes": "Credential 'Chatwoot API' = Header Auth (name: api_access_token)."
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: 'Para poder responder mejor esta consulta necesitamos derivarlo con una secretaria.',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: {\n        items: [\n          { title: 'Hablar secretaria', value: 'hablar_secretaria' },\n          { title: 'Hacer otra consulta', value: 'otra_consulta' }\n        ]\n      }\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        1392
+      ],
+      "id": "4d81d634-f797-4b3c-aa6c-8ce2dd54b423",
+      "name": "Build estudio handoff"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        1392
+      ],
+      "id": "84be2507-49ce-4cd8-88d2-ca2c1c146deb",
+      "name": "Send estudio handoff",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GqVsiFUjDt4aJl4f",
+          "name": "Chatwoot API"
+        }
+      },
+      "notes": "Credential 'Chatwoot API' = Header Auth (name: api_access_token)."
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: '*Te derivamos con una secretaria. En breve te van a escribir.*',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        1584
+      ],
+      "id": "884654da-3029-411c-b9b3-b3af47156096",
+      "name": "Build handoff confirm"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        1584
+      ],
+      "id": "f9b7b99d-58aa-4894-94af-39d804e7e2f0",
+      "name": "Send handoff confirm",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GqVsiFUjDt4aJl4f",
+          "name": "Chatwoot API"
+        }
+      },
+      "notes": "Credential 'Chatwoot API' = Header Auth (name: api_access_token)."
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nconst ctx = ($('Merge Context').first().json.context) || {};\nconst reason = m.handoff_reason || ctx.handoff_reason || 'estudio/precio';\nconst quote = m.handoff_quote || ctx.handoff_quote || m.last_line || m.texto || '';\nconst teamId = Number($env.CHATWOOT_TEAM_ID);\nconst teamName = String($env.CHATWOOT_TEAM_NAME || 'Secretaría').trim();\nconst teamMention = teamId && !Number.isNaN(teamId)\n  ? `[@${teamName}](mention://team/${teamId}/${encodeURIComponent(teamName)})`\n  : '';\nconst header = teamMention ? `${teamMention} Derivación a Secretaría` : 'Derivación a Secretaría';\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: header + '\\nMotivo: ' + reason + '\\nMensaje del paciente: ' + quote,\n      message_type: 'outgoing',\n      private: true,\n      content_type: 'text'\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        1584
+      ],
+      "id": "6040adf1-0c12-4db9-8a3c-5c23a68a5739",
+      "name": "Prep handoff private note"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        1584
+      ],
+      "id": "c0242f2e-838d-4db8-b0fe-46eb3fed9f16",
+      "name": "Send handoff private note",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GqVsiFUjDt4aJl4f",
+          "name": "Chatwoot API"
+        }
+      },
+      "notes": "Private note (private: true). Not sent to WhatsApp."
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      team_id: Number($env.CHATWOOT_TEAM_ID)\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        1584
+      ],
+      "id": "0d27d0a3-1224-43c7-b6c2-799dce5ddbc1",
+      "name": "Prep team assign"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/assignments' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1296,
+        1584
+      ],
+      "id": "325e14df-3533-4345-a2fb-9f4356f91443",
+      "name": "Assign Secretaría team",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GqVsiFUjDt4aJl4f",
+          "name": "Chatwoot API"
+        }
+      },
+      "notes": "POST assignments { team_id: CHATWOOT_TEAM_ID }. Do not assign on the warning itself."
+    },
+    {
+      "parameters": {
+        "jsCode": "function esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\").slice(0, 250);\n}\nconst m = $('Merge Context').first().json;\nconst ctx = (m.context && typeof m.context === 'object') ? m.context : {};\nconst sql = `INSERT INTO turno_solicitudes (phone, nombre, dni, obra_social, telefono_contacto, medico, horario_preferido, status, conversation_id, tipo)\\nVALUES ('${esc(m.telefono)}', '${esc(ctx.nombre)}', '${esc(ctx.dni)}', '${esc(ctx.obra_social)}', '${esc(ctx.telefono_contacto || m.telefono)}', '${esc(ctx.medico)}', '${esc(ctx.dia_hora)}', 'pending', '${esc(m.conversation_id)}', 'cancelar');`;\nreturn [{ json: { sql_insert: sql } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        720
+      ],
+      "id": "7f3c1a90-b2d4-4e81-9c6a-11a1b2c3d4e5",
+      "name": "Prep cancelar solicitud"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.sql_insert }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        400,
+        720
+      ],
+      "id": "7f3c1a90-b2d4-4e81-9c6a-11a1b2c3d4e6",
+      "name": "Insert cancelar solicitud",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      },
+      "notes": "Requires turno_solicitudes.tipo (migrate_solicitudes_tipo.sql). continueOnFail so cancel welcome still runs."
+    },
+    {
+      "parameters": {
+        "jsCode": "function esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\").slice(0, 250);\n}\nconst m = $('Decide Route').first().json;\nconst merged = $('Merge Context').first().json;\nconst ctx = (merged.context && typeof merged.context === 'object') ? merged.context : {};\nconst reason = String(m.handoff_reason || ctx.handoff_reason || '');\nconst isEstudio = reason === 'estudio/precio' || reason.indexOf('estudio') === 0;\nlet sql = 'SELECT 1';\nif (isEstudio) {\n  const quote = m.handoff_quote || ctx.handoff_quote || m.last_line || m.texto || '';\n  sql = `INSERT INTO turno_solicitudes (phone, nombre, dni, obra_social, telefono_contacto, medico, horario_preferido, status, conversation_id, tipo)\\nVALUES ('${esc(m.telefono)}', '${esc(ctx.nombre)}', '${esc(ctx.dni)}', '${esc(ctx.obra_social)}', '${esc(ctx.telefono_contacto || merged.telefono)}', '', '${esc(quote)}', 'pending', '${esc(m.conversation_id)}', 'estudio');`;\n}\nreturn [{ json: { sql_insert: sql } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        1776
+      ],
+      "id": "7f3c1a90-b2d4-4e81-9c6a-11a1b2c3d4e7",
+      "name": "Prep estudio solicitud"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.sql_insert }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        624,
+        1776
+      ],
+      "id": "7f3c1a90-b2d4-4e81-9c6a-11a1b2c3d4e8",
+      "name": "Insert estudio solicitud",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      },
+      "notes": "Inserts tipo=estudio on hablar_secretaria (estudio/precio). Media handoff is SELECT 1."
     }
   ],
   "pinData": {},
@@ -932,7 +1321,7 @@
       "main": [
         [
           {
-            "node": "Route Switch",
+            "node": "Sync pending prompt",
             "type": "main",
             "index": 0
           }
@@ -978,7 +1367,7 @@
         ],
         [
           {
-            "node": "Clear state cancel yes",
+            "node": "Prep cancelar solicitud",
             "type": "main",
             "index": 0
           }
@@ -986,6 +1375,27 @@
         [
           {
             "node": "Restore estado_previo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build media warning",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build estudio handoff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build handoff confirm",
             "type": "main",
             "index": 0
           }
@@ -1043,6 +1453,28 @@
         ]
       ]
     },
+    "Prep cancelar solicitud": {
+      "main": [
+        [
+          {
+            "node": "Insert cancelar solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert cancelar solicitud": {
+      "main": [
+        [
+          {
+            "node": "Clear state cancel yes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Clear state cancel yes": {
       "main": [
         [
@@ -1070,6 +1502,127 @@
         [
           {
             "node": "Re-ask after cancel no",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync pending prompt": {
+      "main": [
+        [
+          {
+            "node": "Restore route item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore route item": {
+      "main": [
+        [
+          {
+            "node": "Route Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build media warning": {
+      "main": [
+        [
+          {
+            "node": "Send media warning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build estudio handoff": {
+      "main": [
+        [
+          {
+            "node": "Send estudio handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build handoff confirm": {
+      "main": [
+        [
+          {
+            "node": "Send handoff confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send handoff confirm": {
+      "main": [
+        [
+          {
+            "node": "Prep estudio solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep estudio solicitud": {
+      "main": [
+        [
+          {
+            "node": "Insert estudio solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert estudio solicitud": {
+      "main": [
+        [
+          {
+            "node": "Prep handoff private note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep handoff private note": {
+      "main": [
+        [
+          {
+            "node": "Send handoff private note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send handoff private note": {
+      "main": [
+        [
+          {
+            "node": "Prep team assign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep team assign": {
+      "main": [
+        [
+          {
+            "node": "Assign Secretaría team",
             "type": "main",
             "index": 0
           }

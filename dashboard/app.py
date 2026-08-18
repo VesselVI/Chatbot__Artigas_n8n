@@ -353,6 +353,27 @@ async def api_mark_unavailable(request: Request):
     return {"ok": True, "message": "Días marcados como no disponible."}
 
 
+def parse_solicitud_dt(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if not value:
+        return None
+    s = str(value).strip()[:19]
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def normalize_tipo(value: Any) -> str:
+    tipo = str(value or "turno").strip().lower()
+    if tipo not in ("turno", "cancelar", "estudio"):
+        return "turno"
+    return tipo
+
+
 @app.get("/api/solicitudes")
 @login_required
 async def api_solicitudes(request: Request):
@@ -361,8 +382,19 @@ async def api_solicitudes(request: Request):
         cur = conn.cursor(dictionary=True)
         cur.execute(
             """
+            SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'turno_solicitudes'
+              AND COLUMN_NAME = 'tipo'
+            """
+        )
+        has_tipo = int((cur.fetchone() or {}).get("n") or 0) > 0
+        tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
+        cur.execute(
+            f"""
             SELECT id, created_at, phone, nombre, dni, obra_social,
-                   telefono_contacto, medico, horario_preferido, status
+                   telefono_contacto, medico, horario_preferido, status,
+                   {tipo_sql}
             FROM turno_solicitudes
             ORDER BY created_at DESC
             LIMIT 200
@@ -374,15 +406,25 @@ async def api_solicitudes(request: Request):
 
     out = []
     for r in rows:
-        created = r["created_at"]
-        if isinstance(created, datetime):
+        created = parse_solicitud_dt(r["created_at"])
+        if created:
             created_s = created.strftime("%d/%m/%Y %H:%M")
+            hora = created.strftime("%H:%M")
+            dia = created.date().isoformat()
+            dia_label = f"{DAY_NAMES[created.weekday()]} {created.strftime('%d/%m/%Y')}"
         else:
-            created_s = str(created)
+            created_s = str(r["created_at"] or "-")
+            hora = "-"
+            dia = ""
+            dia_label = "Sin fecha"
         out.append(
             {
                 "id": r["id"],
+                "tipo": normalize_tipo(r.get("tipo")),
                 "created_at": created_s,
+                "hora": hora,
+                "dia": dia,
+                "dia_label": dia_label,
                 "phone": r["phone"],
                 "nombre": r["nombre"] or "-",
                 "dni": r["dni"] or "-",
@@ -393,7 +435,22 @@ async def api_solicitudes(request: Request):
                 "status": r["status"],
             }
         )
-    return {"solicitudes": out}
+
+    dias = []
+    by_day: dict[str, dict] = {}
+    for item in out:
+        key = item["dia"] or item["dia_label"]
+        if key not in by_day:
+            group = {
+                "fecha": item["dia"],
+                "label": item["dia_label"],
+                "solicitudes": [],
+            }
+            by_day[key] = group
+            dias.append(group)
+        by_day[key]["solicitudes"].append(item)
+
+    return {"solicitudes": out, "dias": dias}
 
 
 @app.get("/api/clinic-settings")
