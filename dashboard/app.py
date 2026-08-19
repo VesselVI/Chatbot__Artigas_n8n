@@ -380,7 +380,7 @@ def parse_solicitud_dt(value: Any) -> datetime | None:
 
 def normalize_tipo(value: Any) -> str:
     tipo = str(value or "turno").strip().lower()
-    if tipo not in ("turno", "cancelar", "estudio"):
+    if tipo not in ("turno", "cancelar", "estudio", "reprogramar"):
         return "turno"
     return tipo
 

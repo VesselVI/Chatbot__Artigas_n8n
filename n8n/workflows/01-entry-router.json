@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json;\nconst body = raw.body || raw;\n\nconst event = body.event || body.message?.event || '';\nconst msg = body.message || body;\nconst attEarly = msg.attachments || body.attachments || [];\nconst attEarlyList = Array.isArray(attEarly) ? attEarly : [];\n\nif (event && !String(event).includes('message_created') && event !== 'message_updated') {\n  if (!msg.content && !msg.content_type && !body.content && attEarlyList.length === 0) return [];\n}\n\nconst message = (body.content !== undefined && body.conversation) ? body : msg;\nconst conversation = message.conversation || body.conversation || {};\nconst account = message.account || body.account || {};\nconst sender = message.sender || conversation.meta?.sender || {};\n\nconst messageType = message.message_type;\nconst isIncoming = messageType === 0 || messageType === 'incoming' || messageType === 'Incoming';\nconst isPrivate = message.private === true;\nconst senderType = (sender.type || '').toLowerCase();\n\nif (isPrivate) return [];\nif (messageType === 1 || messageType === 'outgoing' || messageType === 'Outgoing') return [];\nif (senderType === 'user' || senderType === 'agent_bot') return [];\nif (messageType !== undefined && messageType !== null && !isIncoming && messageType !== 'incoming') return [];\n\nconst assignee = conversation.meta?.assignee;\nconst assigneeType = String(conversation.meta?.assignee_type || assignee?.type || '').toLowerCase();\nconst teamId = conversation.team_id || conversation.cached_team_id || conversation.meta?.team?.id;\nconst isBotAssignee = assigneeType.includes('bot') || assigneeType === 'agentbot';\nconst humanAssigned =\n  (conversation.assignee_id && !isBotAssignee) ||\n  (assignee && String(assignee.type || '').toLowerCase() === 'user');\nif (humanAssigned || teamId) return [];\n\nlet phone = sender.phone_number || conversation.meta?.sender?.phone_number || conversation.contact_inbox?.source_id || '';\nphone = String(phone).replace(/\\s+/g, '').replace(/^\\+/, '');\nif (phone.startsWith('549')) phone = '54' + phone.slice(3);\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst attachments = message.attachments || body.attachments || attEarlyList;\nconst attList = Array.isArray(attachments) ? attachments : [];\nconst MEDIA_FILE = new Set(['image', 'audio', 'video', 'file', 'ig_reel', 'story_mention']);\nfunction attKind(a) {\n  const ft = String(a.file_type || a.fileType || '').toLowerCase();\n  const ct = String(a.content_type || a.contentType || a.mime_type || '').toLowerCase();\n  if (ft === 'image' || ct.startsWith('image/')) return 'imagen';\n  if (ft === 'audio' || ct.startsWith('audio/')) return 'audio';\n  if (ft === 'video' || ft === 'ig_reel' || ct.startsWith('video/')) return 'video';\n  if (ft === 'file' || ct === 'application/pdf' || ct.includes('octet-stream')) return 'archivo';\n  if (MEDIA_FILE.has(ft)) return ft;\n  if (ct) return 'archivo';\n  return '';\n}\nconst mediaKinds = attList.map(attKind).filter(Boolean);\nconst hasMedia = mediaKinds.length > 0;\nconst media_kind = (mediaKinds.includes('imagen') && mediaKinds.includes('audio'))\n  ? 'imagen/audio'\n  : (mediaKinds[0] || '');\n\nlet texto = String(message.content || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nlet boton_id = '';\nconst ca = message.content_attributes || {};\nconst submitted = ca.submitted_values || ca.items || [];\nif (Array.isArray(submitted) && submitted.length) {\n  const v = submitted[0];\n  boton_id = String(v.value || v.id || '');\n  if (!texto) texto = String(v.title ?? v.value ?? '');\n}\nif (!boton_id && ca.submitted_values && typeof ca.submitted_values === 'object' && !Array.isArray(ca.submitted_values)) {\n  boton_id = String(ca.submitted_values.value || '');\n}\n\nconst quoteBits = [];\nconst replyId = ca.in_reply_to || ca.in_reply_to_id || message.in_reply_to || '';\nconst convMsgs = conversation.messages || body.conversation?.messages || [];\nif (replyId && Array.isArray(convMsgs)) {\n  const quoted = convMsgs.find(m => String(m.id) === String(replyId) || String(m.source_id || '') === String(ca.in_reply_to_external_id || ''));\n  if (quoted && quoted.content) quoteBits.push(String(quoted.content));\n}\nfor (const k of ['in_reply_to_content', 'quoted_content', 'quoted_message']) {\n  const v = ca[k];\n  if (typeof v === 'string' && v.trim()) quoteBits.push(v);\n  else if (v && typeof v === 'object' && v.content) quoteBits.push(String(v.content));\n}\nif (quoteBits.length) texto = quoteBits.join('\\n') + '\\n' + texto;\nif (replyId) texto += '\\n__cw_in_reply_to__:' + replyId;\n\nconst titleMap = {\n  'horarios de clinica': 'horarios_clinica',\n  'horarios clinica': 'horarios_clinica',\n  'sacar un turno': 'quiero_turno',\n  'volver al menu': 'volver_menu',\n  'volver': 'volver_menu',\n  'menu': 'volver_menu',\n  'repetir pregunta': 'repetir_pregunta',\n  'repetir': 'repetir_pregunta',\n  'cancelar turno': 'cancelar_turno_pedido',\n  'si, cancelar': 'cancel_si',\n  'si cancelar': 'cancel_si',\n  'no, continuar': 'cancel_no',\n  'no continuar': 'cancel_no',\n  'cualquier doctor': 'medico_cualquiera',\n  'mi medico de cabecera': 'medico_cabecera',\n  'otra / particular': 'obra_otra',\n  'otra': 'obra_otra',\n  'otras': 'obra_otra',\n  'particular': 'obra_particular',\n  'sin obra': 'obra_particular',\n  'sin obras': 'obra_particular',\n  'sin obra social': 'obra_particular',\n  'sin obras sociales': 'obra_particular',\n  'particular/sin obra social': 'obra_particular',\n  'particular / sin obra social': 'obra_particular',\n  'particular sin obra': 'obra_particular',\n  'particular sin obra social': 'obra_particular',\n  'no tengo obra': 'obra_particular',\n  'no tengo obra social': 'obra_particular',\n  'no tengo obras sociales': 'obra_particular',\n  'como particular': 'obra_particular',\n  'soy particular': 'obra_particular',\n  'voy particular': 'obra_particular',\n  'voy como particular': 'obra_particular',\n  'pago particular': 'obra_particular',\n  'paciente particular': 'obra_particular',\n  'consulta particular': 'obra_particular',\n  'obra particular': 'obra_particular',\n  'sin cobertura': 'obra_particular',\n  'no tengo cobertura': 'obra_particular',\n  'ninguna obra': 'obra_particular',\n  'ninguna obra social': 'obra_particular',\n  'no tengo': 'obra_particular',\n  'confirmar': 'confirmar_turno',\n  'continuar consulta': 'continuar_consulta',\n  'hablar secretaria': 'hablar_secretaria',\n  'hablar con secretaria': 'hablar_secretaria',\n  'hacer otra consulta': 'otra_consulta',\n  'otra consulta': 'otra_consulta',\n};\n\nif (Array.isArray(submitted) && submitted.length && !boton_id) {\n  const t = fold(submitted[0].title || '');\n  if (titleMap[t]) boton_id = titleMap[t];\n}\n\nif (!boton_id) {\n  boton_id = titleMap[fold(last)] || '';\n}\nif (!boton_id) {\n  const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido', 'cancel_si', 'cancel_no', 'volver_menu', 'confirmar_turno', 'continuar_consulta', 'hablar_secretaria', 'otra_consulta']);\n  for (const c of lines) {\n    const mapped = titleMap[fold(c)];\n    if (mapped && navIds.has(mapped)) { boton_id = mapped; break; }\n  }\n}\n\nif (!phone && !conversation.id && !conversation.display_id) return [];\n\nconst conversationId = conversation.display_id || conversation.id || body.conversation_id; // Chatwoot API path uses display_id\nconst accountId = conversation.account_id || account.id || body.account?.id || body.account_id;\n\nlet tipo = boton_id ? 'interactive' : 'text';\nif (hasMedia) tipo = 'media';\n\nreturn [{\n  json: {\n    telefono: phone || String(conversationId),\n    tipo,\n    texto: texto || '',\n    boton_id: boton_id || '',\n    conversation_id: conversationId,\n    account_id: accountId,\n    media_kind,\n  }\n}];\n"
+        "jsCode": "const raw = $input.first().json;\nconst body = raw.body || raw;\n\nconst event = body.event || body.message?.event || '';\nconst msg = body.message || body;\nconst attEarly = msg.attachments || body.attachments || [];\nconst attEarlyList = Array.isArray(attEarly) ? attEarly : [];\n\nif (event && !String(event).includes('message_created') && event !== 'message_updated') {\n  if (!msg.content && !msg.content_type && !body.content && attEarlyList.length === 0) return [];\n}\n\nconst message = (body.content !== undefined && body.conversation) ? body : msg;\nconst conversation = message.conversation || body.conversation || {};\nconst account = message.account || body.account || {};\nconst sender = message.sender || conversation.meta?.sender || {};\n\nconst messageType = message.message_type;\nconst isIncoming = messageType === 0 || messageType === 'incoming' || messageType === 'Incoming';\nconst isPrivate = message.private === true;\nconst senderType = (sender.type || '').toLowerCase();\n\nif (isPrivate) return [];\nif (messageType === 1 || messageType === 'outgoing' || messageType === 'Outgoing') return [];\nif (senderType === 'user' || senderType === 'agent_bot') return [];\nif (messageType !== undefined && messageType !== null && !isIncoming && messageType !== 'incoming') return [];\n\nconst assignee = conversation.meta?.assignee;\nconst assigneeType = String(conversation.meta?.assignee_type || assignee?.type || '').toLowerCase();\nconst teamId = conversation.team_id || conversation.cached_team_id || conversation.meta?.team?.id;\nconst isBotAssignee = assigneeType.includes('bot') || assigneeType === 'agentbot';\nconst humanAssigned =\n  (conversation.assignee_id && !isBotAssignee) ||\n  (assignee && String(assignee.type || '').toLowerCase() === 'user');\nif (humanAssigned || teamId) return [];\n\nlet phone = sender.phone_number || conversation.meta?.sender?.phone_number || conversation.contact_inbox?.source_id || '';\nphone = String(phone).replace(/\\s+/g, '').replace(/^\\+/, '');\nif (phone.startsWith('549')) phone = '54' + phone.slice(3);\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst attachments = message.attachments || body.attachments || attEarlyList;\nconst attList = Array.isArray(attachments) ? attachments : [];\nconst MEDIA_FILE = new Set(['image', 'audio', 'video', 'file', 'ig_reel', 'story_mention']);\nfunction attKind(a) {\n  const ft = String(a.file_type || a.fileType || '').toLowerCase();\n  const ct = String(a.content_type || a.contentType || a.mime_type || '').toLowerCase();\n  if (ft === 'image' || ct.startsWith('image/')) return 'imagen';\n  if (ft === 'audio' || ct.startsWith('audio/')) return 'audio';\n  if (ft === 'video' || ft === 'ig_reel' || ct.startsWith('video/')) return 'video';\n  if (ft === 'file' || ct === 'application/pdf' || ct.includes('octet-stream')) return 'archivo';\n  if (MEDIA_FILE.has(ft)) return ft;\n  if (ct) return 'archivo';\n  return '';\n}\nconst mediaKinds = attList.map(attKind).filter(Boolean);\nconst hasMedia = mediaKinds.length > 0;\nconst media_kind = (mediaKinds.includes('imagen') && mediaKinds.includes('audio'))\n  ? 'imagen/audio'\n  : (mediaKinds[0] || '');\n\nlet texto = String(message.content || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nlet boton_id = '';\nconst ca = message.content_attributes || {};\nconst submitted = ca.submitted_values || ca.items || [];\nif (Array.isArray(submitted) && submitted.length) {\n  const v = submitted[0];\n  boton_id = String(v.value || v.id || '');\n  if (!texto) texto = String(v.title ?? v.value ?? '');\n}\nif (!boton_id && ca.submitted_values && typeof ca.submitted_values === 'object' && !Array.isArray(ca.submitted_values)) {\n  boton_id = String(ca.submitted_values.value || '');\n}\n\nconst quoteBits = [];\nconst replyId = ca.in_reply_to || ca.in_reply_to_id || message.in_reply_to || '';\nconst convMsgs = conversation.messages || body.conversation?.messages || [];\nif (replyId && Array.isArray(convMsgs)) {\n  const quoted = convMsgs.find(m => String(m.id) === String(replyId) || String(m.source_id || '') === String(ca.in_reply_to_external_id || ''));\n  if (quoted && quoted.content) quoteBits.push(String(quoted.content));\n}\nfor (const k of ['in_reply_to_content', 'quoted_content', 'quoted_message']) {\n  const v = ca[k];\n  if (typeof v === 'string' && v.trim()) quoteBits.push(v);\n  else if (v && typeof v === 'object' && v.content) quoteBits.push(String(v.content));\n}\nif (quoteBits.length) texto = quoteBits.join('\\n') + '\\n' + texto;\nif (replyId) texto += '\\n__cw_in_reply_to__:' + replyId;\n\nconst titleMap = {\n  'horarios de clinica': 'horarios_clinica',\n  'horarios clinica': 'horarios_clinica',\n  'sacar un turno': 'quiero_turno',\n  'volver al menu': 'volver_menu',\n  'volver': 'volver_menu',\n  'menu': 'volver_menu',\n  'repetir pregunta': 'repetir_pregunta',\n  'repetir': 'repetir_pregunta',\n  'cancelar turno': 'cancelar_turno_pedido',\n  'si, cancelar': 'cancel_si',\n  'si cancelar': 'cancel_si',\n  'no, continuar': 'cancel_no',\n  'no continuar': 'cancel_no',\n  'cualquier doctor': 'medico_cualquiera',\n  'mi medico de cabecera': 'medico_cabecera',\n  'otra / particular': 'obra_otra',\n  'otra': 'obra_otra',\n  'otras': 'obra_otra',\n  'particular': 'obra_particular',\n  'sin obra': 'obra_particular',\n  'sin obras': 'obra_particular',\n  'sin obra social': 'obra_particular',\n  'sin obras sociales': 'obra_particular',\n  'particular/sin obra social': 'obra_particular',\n  'particular / sin obra social': 'obra_particular',\n  'particular sin obra': 'obra_particular',\n  'particular sin obra social': 'obra_particular',\n  'no tengo obra': 'obra_particular',\n  'no tengo obra social': 'obra_particular',\n  'no tengo obras sociales': 'obra_particular',\n  'como particular': 'obra_particular',\n  'soy particular': 'obra_particular',\n  'voy particular': 'obra_particular',\n  'voy como particular': 'obra_particular',\n  'pago particular': 'obra_particular',\n  'paciente particular': 'obra_particular',\n  'consulta particular': 'obra_particular',\n  'obra particular': 'obra_particular',\n  'sin cobertura': 'obra_particular',\n  'no tengo cobertura': 'obra_particular',\n  'ninguna obra': 'obra_particular',\n  'ninguna obra social': 'obra_particular',\n  'no tengo': 'obra_particular',\n  'confirmar': 'confirmar_turno',\n  'continuar consulta': 'continuar_consulta',\n  'hablar secretaria': 'hablar_secretaria',\n  'hablar con secretaria': 'hablar_secretaria',\n  'hacer otra consulta': 'otra_consulta',\n  'otra consulta': 'otra_consulta',\n  'reprogramar turno': 'reprogramar_turno',\n  'reprogramar': 'reprogramar_turno',\n  'si': 'si_generico',\n  'no': 'no_generico',\n};\n\nif (Array.isArray(submitted) && submitted.length && !boton_id) {\n  const t = fold(submitted[0].title || '');\n  if (titleMap[t]) boton_id = titleMap[t];\n}\n\nif (!boton_id) {\n  boton_id = titleMap[fold(last)] || '';\n}\nif (!boton_id) {\n  const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido', 'cancel_si', 'cancel_no', 'volver_menu', 'confirmar_turno', 'continuar_consulta', 'hablar_secretaria', 'otra_consulta']);\n  for (const c of lines) {\n    const mapped = titleMap[fold(c)];\n    if (mapped && navIds.has(mapped)) { boton_id = mapped; break; }\n  }\n}\n\nif (!phone && !conversation.id && !conversation.display_id) return [];\n\nconst conversationId = conversation.display_id || conversation.id || body.conversation_id; // Chatwoot API path uses display_id\nconst accountId = conversation.account_id || account.id || body.account?.id || body.account_id;\n\nlet tipo = boton_id ? 'interactive' : 'text';\nif (hasMedia) tipo = 'media';\n\nreturn [{\n  json: {\n    telefono: phone || String(conversationId),\n    tipo,\n    texto: texto || '',\n    boton_id: boton_id || '',\n    conversation_id: conversationId,\n    account_id: accountId,\n    media_kind,\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -75,7 +75,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const n = $('Normalize Message').first().json;\nconst row = $input.first().json;\nlet ctx = row.context ?? {};\nif (typeof ctx === 'string') {\n  try { ctx = JSON.parse(ctx); } catch (e) { ctx = {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nconst PREV_STEP = {\n  awaiting_dni: 'awaiting_nombre',\n  awaiting_obra_social: 'awaiting_dni',\n  awaiting_obra_social_otra: 'awaiting_obra_social',\n  awaiting_telefono: 'awaiting_obra_social',\n  awaiting_medico: 'awaiting_obra_social',\n  awaiting_dia_hora: 'awaiting_medico',\n  awaiting_confirmacion: 'awaiting_dia_hora',\n};\nconst CURRENT_KW = {\n  awaiting_nombre: /nombre completo/,\n  awaiting_dni: /dni/,\n  awaiting_obra_social: /obra social/,\n  awaiting_obra_social_otra: /nombre de tu obra social/,\n  awaiting_telefono: /telefono/,\n  awaiting_medico: /medico preferis|que medico/,\n  awaiting_dia_hora: /horario preferis/,\n  awaiting_confirmacion: /confirmas el turno/,\n};\nfunction quotedStep(texto) {\n  const f = fold(texto);\n  if (/confirmas el turno/.test(f)) return 'awaiting_confirmacion';\n  if (/nombre completo/.test(f)) return 'awaiting_nombre';\n  if (/cual es tu dni|tu dni|\\bdni\\b/.test(f)) return 'awaiting_dni';\n  if (/nombre de tu obra social/.test(f)) return 'awaiting_obra_social_otra';\n  if (/obra social/.test(f)) return 'awaiting_obra_social';\n  if (/numero de telefono/.test(f)) return 'awaiting_telefono';\n  if (/medico preferis|que medico/.test(f)) return 'awaiting_medico';\n  if (/horario preferis/.test(f)) return 'awaiting_dia_hora';\n  return null;\n}\nlet estado = row.state || 'idle';\nconst boton = String(n.boton_id || '').trim();\nconst texto = String(n.texto || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst isRepetir = boton === 'repetir_pregunta'\n  || /^(repetir|repetir pregunta)$/i.test(fold(last))\n  || lines.some(l => /^(repetir|repetir pregunta)$/i.test(fold(l)));\nif (isRepetir && /^awaiting_/.test(estado)) {\n  let q = quotedStep(texto);\n  if (!q) {\n    const kw = CURRENT_KW[estado];\n    if (!kw || !kw.test(fold(texto))) q = PREV_STEP[estado] || null;\n  }\n  if (q) {\n    const order = ['awaiting_nombre','awaiting_dni','awaiting_obra_social','awaiting_obra_social_otra','awaiting_telefono','awaiting_medico','awaiting_dia_hora','awaiting_confirmacion'];\n    const cur = order.indexOf(estado);\n    const tgt = order.indexOf(q);\n    if (tgt >= 0 && (cur < 0 || tgt <= cur)) estado = q;\n  }\n}\nreturn [{\n  json: {\n    telefono: n.telefono,\n    tipo: n.tipo,\n    texto: n.texto,\n    boton_id: n.boton_id,\n    conversation_id: n.conversation_id,\n    account_id: n.account_id,\n    estado,\n    datos_json: ctx,\n    context: ctx,\n    pending_prompt: ctx.pending_prompt || '',\n    handoff_reason: ctx.handoff_reason || '',\n    handoff_quote: ctx.handoff_quote || '',\n    media_kind: n.media_kind || '',\n  }\n}];"
+        "jsCode": "const n = $('Normalize Message').first().json;\nconst row = $input.first().json;\nlet ctx = row.context ?? {};\nif (typeof ctx === 'string') {\n  try { ctx = JSON.parse(ctx); } catch (e) { ctx = {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nconst PREV_STEP = {\n  awaiting_dni: 'awaiting_nombre',\n  awaiting_obra_social: 'awaiting_dni',\n  awaiting_obra_social_otra: 'awaiting_obra_social',\n  awaiting_telefono: 'awaiting_obra_social',\n  awaiting_medico: 'awaiting_obra_social',\n  awaiting_dia_hora: 'awaiting_medico',\n  awaiting_confirmacion: 'awaiting_dia_hora',\n};\nconst CURRENT_KW = {\n  awaiting_nombre: /nombre completo/,\n  awaiting_dni: /dni/,\n  awaiting_obra_social: /obra social/,\n  awaiting_obra_social_otra: /nombre de tu obra social/,\n  awaiting_telefono: /telefono/,\n  awaiting_medico: /medico preferis|que medico/,\n  awaiting_dia_hora: /horario preferis/,\n  awaiting_confirmacion: /confirmas el turno/,\n};\nfunction quotedStep(texto) {\n  const f = fold(texto);\n  if (/confirmas el turno/.test(f)) return 'awaiting_confirmacion';\n  if (/nombre completo/.test(f)) return 'awaiting_nombre';\n  if (/cual es tu dni|tu dni|\\bdni\\b/.test(f)) return 'awaiting_dni';\n  if (/nombre de tu obra social/.test(f)) return 'awaiting_obra_social_otra';\n  if (/obra social/.test(f)) return 'awaiting_obra_social';\n  if (/numero de telefono/.test(f)) return 'awaiting_telefono';\n  if (/medico preferis|que medico/.test(f)) return 'awaiting_medico';\n  if (/horario preferis/.test(f)) return 'awaiting_dia_hora';\n  return null;\n}\nlet estado = row.state || 'idle';\nconst boton = String(n.boton_id || '').trim();\nconst texto = String(n.texto || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst isRepetir = boton === 'repetir_pregunta'\n  || /^(repetir|repetir pregunta)$/i.test(fold(last))\n  || lines.some(l => /^(repetir|repetir pregunta)$/i.test(fold(l)));\nif (isRepetir && /^awaiting_/.test(estado)) {\n  let q = quotedStep(texto);\n  if (!q) {\n    const kw = CURRENT_KW[estado];\n    if (!kw || !kw.test(fold(texto))) q = PREV_STEP[estado] || null;\n  }\n  if (q) {\n    const order = ['awaiting_nombre','awaiting_dni','awaiting_obra_social','awaiting_obra_social_otra','awaiting_telefono','awaiting_medico','awaiting_dia_hora','awaiting_confirmacion'];\n    const cur = order.indexOf(estado);\n    const tgt = order.indexOf(q);\n    if (tgt >= 0 && (cur < 0 || tgt <= cur)) estado = q;\n  }\n}\nreturn [{\n  json: {\n    telefono: n.telefono,\n    tipo: n.tipo,\n    texto: n.texto,\n    boton_id: n.boton_id,\n    conversation_id: n.conversation_id,\n    account_id: n.account_id,\n    estado,\n    datos_json: ctx,\n    context: ctx,\n    pending_prompt: ctx.pending_prompt || '',\n    handoff_reason: ctx.handoff_reason || '',\n    handoff_quote: ctx.handoff_quote || '',\n    media_kind: n.media_kind || '',\n    last_line: last,\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -88,7 +88,82 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nlet estado = item.estado || 'idle';\nlet boton = String(item.boton_id || '').trim();\nconst texto = String(item.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst lastLower = last.toLowerCase();\nconst onMenu = estado === 'idle' || estado === 'menu_shown';\nconst ctx = item.context && typeof item.context === 'object' ? item.context : {};\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction sqlStr(s) {\n  return String(s || '').replace(/\\0/g, '').replace(/[\\r\\n]+/g, ' ').replace(/'/g, \"''\").slice(0, 400);\n}\nfunction isEstudioIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/(consult|pregunt|\\binfo\\b|informacion).{0,60}(tratamiento|estudio|cirugia)/.test(f)) return true;\n  if (/(tratamiento|estudio|cirugia).{0,60}(consult|pregunt|\\binfo\\b|informacion)/.test(f)) return true;\n  if (/cuanto sale|cuanto cuesta|\\bprecio\\b|\\bvalor\\b|se cobra|\\bcobran\\b|cubre la obra/.test(f)) return true;\n  if (/\\bcampo visual\\b/.test(f)) return true;\n  if (/\\bperimetria(\\s+computarizada)?\\b/.test(f)) return true;\n  if (/\\btopografia\\b/.test(f)) return true;\n  if (/\\bpaquimetria\\b/.test(f)) return true;\n  if (/\\bretinografia(\\s+digital)?\\b/.test(f)) return true;\n  if (/\\boct\\s+(anterior|posterior)\\b/.test(f)) return true;\n  if (/\\bocta\\b/.test(f)) return true;\n  if (/\\boct\\b/.test(f)) return true;\n  if (/\\bangiografia\\b/.test(f)) return true;\n  if (/\\bmicroscopia especular\\b/.test(f)) return true;\n  return false;\n}\nfunction isSecretariaIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/^para poder responder mejor esta consulta/.test(f)) return false;\n  if (/hablar con (una )?secretaria/.test(f)) return true;\n  if (/(pasar|derivar|comunicar|conectar).{0,40}(con )?(una )?(persona|humano|humana|secretaria|alguien|operador)/.test(f)) return true;\n  if (/(quiero|necesito|preciso).{0,40}secretaria/.test(f)) return true;\n  if (/(quiero|necesito|preciso).{0,40}(persona|humano|humana|atencion humana)/.test(f)) return true;\n  if (/\\b(atencion humana|persona real|operador humano)\\b/.test(f)) return true;\n  return false;\n}\nfunction wantsHandoffIntent(t) {\n  return isSecretariaIntent(t) || isEstudioIntent(t);\n}\n\nconst lastFold = lastLower.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst allFold = fold(texto);\nconst handoffProbe = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim() || texto;\nconst pending = String(item.pending_prompt || ctx.pending_prompt || '');\nconst quotedMedia = /no podemos recibir fotos ni audios/.test(allFold);\nconst quotedEstudio = /necesitamos derivarlo con una secretaria/.test(allFold);\nconst fromMediaPrompt = pending === 'media_warn' || quotedMedia;\nconst fromEstudioPrompt = pending === 'estudio_handoff' || quotedEstudio;\n\nif (!boton && (fromMediaPrompt || fromEstudioPrompt)) {\n  if (fromMediaPrompt && lastFold === '1') boton = 'continuar_consulta';\n  else if (fromMediaPrompt && lastFold === '2') boton = 'hablar_secretaria';\n  else if (fromEstudioPrompt && lastFold === '1') boton = 'hablar_secretaria';\n  else if (fromEstudioPrompt && lastFold === '2') boton = 'otra_consulta';\n}\n\nconst cancelKw = boton === 'cancelar_turno_pedido' || boton === 'cancelar_turno'\n  || /^(cancelar|salir|menu|menú)$/i.test(lastLower)\n  || /^cancelar turno$/i.test(lastLower);\nconst isAwaiting = /^awaiting_/.test(estado);\nconst yes = boton === 'cancel_si' || /^(si|sí)$/i.test(lastLower) || /sí,? cancelar/i.test(lastLower) || /si,? cancelar/i.test(lastLower);\nconst no = boton === 'cancel_no' || /^no$/i.test(lastLower) || /no,? continuar/i.test(lastLower);\nconst isRepetir = boton === 'repetir_pregunta' || /^(repetir|repetir pregunta)$/i.test(lastLower) || lines.some(l => /^(repetir|repetir pregunta)$/i.test(l));\nconst numericMenu = onMenu && !fromMediaPrompt && !fromEstudioPrompt;\nconst isHorarios = boton === 'horarios_clinica'\n  || (onMenu && /^(horarios|horarios( de( la)?)? clinica)$/i.test(lastFold))\n  || (numericMenu && lastFold === '1');\nconst isTurno = boton === 'quiero_turno' || boton === 'confirmar_turno'\n  || (numericMenu && lastFold === '2')\n  || (onMenu && /\\bturn[oaie]s?\\b|\\bcitas?\\b|sacar\\s+(un\\s+)?turn/i.test(lastFold));\nconst isMenuKw = boton === 'volver_menu'\n  || /^(menu|volver|volver al menu)$/i.test(lastFold);\nconst isGreeting = /^(hola+|holis|buenas|buenos|buen[oa]s?( (dias|tardes|noches))?|hi|hey|hello|que tal)$/i.test(lastFold);\nconst isHablar = boton === 'hablar_secretaria';\nconst isContinuar = boton === 'continuar_consulta';\nconst isOtra = boton === 'otra_consulta';\nconst isMedia = item.tipo === 'media';\nconst wantsHandoff = wantsHandoffIntent(last) || wantsHandoffIntent(handoffProbe) || wantsHandoffIntent(allFold);\n\nlet route = 'welcome';\nlet handoff_reason = String(item.handoff_reason || ctx.handoff_reason || '');\nlet handoff_quote = String(item.handoff_quote || ctx.handoff_quote || '');\n\nif (estado === 'confirmando_cancelacion') {\n  if (yes) route = 'cancel_yes';\n  else if (no) route = 'cancel_no';\n  else if (isMedia) route = 'media_warn';\n  else route = 'cancel_ask';\n} else if (isMedia) {\n  route = 'media_warn';\n} else if (cancelKw && isAwaiting) {\n  route = 'cancel_ask';\n} else if (isRepetir && isAwaiting) {\n  route = 'booking';\n} else if (isHorarios) {\n  route = 'horarios';\n} else if (isMenuKw || isGreeting) {\n  route = 'welcome';\n} else if (isTurno) {\n  route = 'booking';\n} else if (isHablar) {\n  route = 'hablar_secretaria';\n} else if (isContinuar) {\n  route = isAwaiting ? 'booking' : 'welcome';\n} else if (isOtra) {\n  route = 'welcome';\n} else if (wantsHandoff) {\n  route = 'estudio_handoff';\n} else if (isAwaiting) {\n  route = 'booking';\n} else if (estado === 'menu_shown' && texto && !boton) {\n  route = 'faq';\n} else {\n  route = 'welcome';\n}\n\nif (route === 'media_warn') {\n  handoff_reason = 'imagen/audio';\n  const cap = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  handoff_quote = cap || ('[' + (item.media_kind || 'imagen/audio') + ']');\n} else if (route === 'estudio_handoff') {\n  const est = isEstudioIntent(last) || isEstudioIntent(handoffProbe) || isEstudioIntent(allFold);\n  const sec = isSecretariaIntent(last) || isSecretariaIntent(handoffProbe) || isSecretariaIntent(allFold);\n  handoff_reason = est ? 'estudio/precio' : (sec ? 'solicitud_secretaria' : 'estudio/precio');\n  handoff_quote = handoffProbe || texto;\n} else if (route === 'hablar_secretaria') {\n  if (!handoff_reason) {\n    if (fromMediaPrompt || pending === 'media_warn') handoff_reason = 'imagen/audio';\n    else handoff_reason = 'estudio/precio';\n  }\n  if (!handoff_quote) {\n    handoff_quote = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  }\n}\n\nreturn [{ json: { ...item, estado, texto, last_line: last, boton_id: boton, route, handoff_reason, handoff_quote, handoff_quote_sql: sqlStr(handoff_quote) } }];\n"
+        "jsCode": "const m = $('Merge Context').first().json;\nconst text = String(m.last_line || m.texto || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\nconst pre = `Estado actual: ${m.estado || 'idle'}\\nBoton: ${m.boton_id || 'none'}\\nTexto: ${text}`;\nreturn [{ json: { ...m, classify_input: pre } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        272
+      ],
+      "id": "b61f5d22-6b42-4c03-9080-2db5a5b203a1",
+      "name": "Build AI intent prompt"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.classify_input }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Clasificá SOLO en JSON compacto con este esquema: {\"intent\":\"cancelar|reprogramar|estudio_precio|other\",\"confidence\":0.0-1.0}. Reglas: cancelar si pide anular turno/cita; reprogramar si pide cambiar dia/hora/fecha; estudio_precio si consulta estudios/tratamientos/precio; other si no. No agregues texto fuera del JSON."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        -176,
+        272
+      ],
+      "id": "f4308fd5-bfd7-41f3-a584-9d90b88f4f66",
+      "name": "Intent Classifier Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {
+          "temperature": 0.0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -176,
+        464
+      ],
+      "id": "47d6a0b1-3ef9-440f-80fb-a4b3f0548f98",
+      "name": "OpenAI Intent Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_CRED",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('Merge Context').first().json;\nconst raw = String($input.first().json.text || $input.first().json.response || '').trim();\nlet parsed = { intent: 'other', confidence: 0 };\nconst m = raw.match(/\\{[\\s\\S]*\\}/);\nif (m) {\n  try {\n    const j = JSON.parse(m[0]);\n    const intent = String(j.intent || 'other').toLowerCase();\n    const conf = Number(j.confidence || 0);\n    if (['cancelar','reprogramar','estudio_precio','other'].includes(intent)) parsed.intent = intent;\n    parsed.confidence = Number.isFinite(conf) ? Math.max(0, Math.min(1, conf)) : 0;\n  } catch (e) {}\n}\nreturn [{ json: { ...base, ai_intent: parsed.intent, ai_confidence: parsed.confidence, ai_raw: raw } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        272
+      ],
+      "id": "44507d66-f2c5-4b79-b35d-8d0ae0f8733e",
+      "name": "Parse AI intent"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nlet estado = item.estado || 'idle';\nlet boton = String(item.boton_id || '').trim();\nconst texto = String(item.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst lastLower = last.toLowerCase();\nconst onMenu = estado === 'idle' || estado === 'menu_shown';\nconst ctx = item.context && typeof item.context === 'object' ? item.context : {};\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction sqlStr(s) {\n  return String(s || '').replace(/\\0/g, '').replace(/[\\r\\n]+/g, ' ').replace(/'/g, \"''\").slice(0, 400);\n}\nfunction isEstudioIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/(consult|pregunt|\\binfo\\b|informacion).{0,60}(tratamiento|estudio|cirugia)/.test(f)) return true;\n  if (/(tratamiento|estudio|cirugia).{0,60}(consult|pregunt|\\binfo\\b|informacion)/.test(f)) return true;\n  if (/cuanto sale|cuanto cuesta|\\bprecio\\b|\\bvalor\\b|se cobra|\\bcobran\\b|cubre la obra/.test(f)) return true;\n  if (/\\bcampo visual\\b/.test(f)) return true;\n  if (/\\bperimetria(\\s+computarizada)?\\b/.test(f)) return true;\n  if (/\\btopografia\\b/.test(f)) return true;\n  if (/\\bpaquimetria\\b/.test(f)) return true;\n  if (/\\bretinografia(\\s+digital)?\\b/.test(f)) return true;\n  if (/\\boct\\s+(anterior|posterior)\\b/.test(f)) return true;\n  if (/\\bocta\\b/.test(f)) return true;\n  if (/\\boct\\b/.test(f)) return true;\n  if (/\\bangiografia\\b/.test(f)) return true;\n  if (/\\bmicroscopia especular\\b/.test(f)) return true;\n  return false;\n}\nfunction isSecretariaIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/^para poder responder mejor esta consulta/.test(f)) return false;\n  if (/hablar con (una )?secretaria/.test(f)) return true;\n  if (/(pasar|derivar|comunicar|conectar).{0,40}(con )?(una )?(persona|humano|humana|secretaria|alguien|operador)/.test(f)) return true;\n  if (/(quiero|necesito|preciso).{0,40}secretaria/.test(f)) return true;\n  if (/(quiero|necesito|preciso).{0,40}(persona|humano|humana|atencion humana)/.test(f)) return true;\n  if (/\\b(atencion humana|persona real|operador humano)\\b/.test(f)) return true;\n  return false;\n}\nfunction isCancelarIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/\\bcancel(ar|acion|ación)\\b.{0,50}\\b(turno|consulta|cita)\\b/.test(f)) return true;\n  if (/\\bno\\s+voy\\s+a\\s+poder\\s+ir\\b/.test(f)) return true;\n  if (/\\bno\\s+puedo\\s+ir\\b/.test(f)) return true;\n  if (/\\bquiero\\s+cancelar\\b/.test(f)) return true;\n  if (/\\bdar\\s+de\\s+baja\\b.{0,30}\\bturno\\b/.test(f)) return true;\n  return false;\n}\nfunction isReprogramarIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/\\breprogram(ar|acion|ación)\\b.{0,50}\\b(turno|consulta|cita)\\b/.test(f)) return true;\n  if (/\\bcambiar\\b.{0,40}\\b(horario|dia|día|turno|fecha)\\b/.test(f)) return true;\n  if (/\\botro\\s+dia\\b|\\botra\\s+fecha\\b|\\bdia\\s+diferente\\b|\\bdía\\s+diferente\\b/.test(f)) return true;\n  if (/\\bnecesito\\s+un\\s+turno\\s+para\\s+otro\\s+dia\\b|\\bnecesito\\s+un\\s+turno\\s+para\\s+un\\s+dia\\s+diferente\\b/.test(f)) return true;\n  return false;\n}\nfunction wantsHandoffIntent(t) {\n  return isSecretariaIntent(t) || isEstudioIntent(t);\n}\nfunction parseNameDni(t) {\n  const raw = String(t || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  const dniM = raw.match(/\\b(\\d{7,10})\\b/);\n  if (!dniM) return null;\n  const dni = dniM[1];\n  const before = raw.replace(dniM[0], ' ').replace(/[,:;|]+/g, ' ').replace(/\\s+/g, ' ').trim();\n  const clean = before.replace(/^(dni|nombre|soy|me llamo|mi nombre es)\\s+/i, '').trim();\n  if (!clean || clean.split(' ').length < 2) return null;\n  return { nombre: clean.slice(0, 120), dni };\n}\n\nconst lastFold = lastLower.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst allFold = fold(texto);\nconst handoffProbe = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim() || texto;\nconst pending = String(item.pending_prompt || ctx.pending_prompt || '');\nconst quotedMedia = /no podemos recibir fotos ni audios/.test(allFold);\nconst quotedEstudio = /necesitamos derivarlo con una secretaria/.test(allFold);\nconst fromMediaPrompt = pending === 'media_warn' || quotedMedia;\nconst fromEstudioPrompt = pending === 'estudio_handoff' || quotedEstudio;\n\nif (!boton && (fromMediaPrompt || fromEstudioPrompt)) {\n  if (fromMediaPrompt && lastFold === '1') boton = 'continuar_consulta';\n  else if (fromMediaPrompt && lastFold === '2') boton = 'hablar_secretaria';\n  else if (fromEstudioPrompt && lastFold === '1') boton = 'hablar_secretaria';\n  else if (fromEstudioPrompt && lastFold === '2') boton = 'otra_consulta';\n}\n\nconst cancelKw = boton === 'cancelar_turno_pedido' || boton === 'cancelar_turno'\n  || /^(cancelar|salir|menu|menú)$/i.test(lastLower)\n  || /^cancelar turno$/i.test(lastLower);\nconst isAwaiting = /^awaiting_/.test(estado);\nconst yes = ['cancel_si','cancelar_solicitud_si','reprogramar_solicitud_si'].includes(boton)\n  || /^(si|sí)$/i.test(lastLower) || /sí,? cancelar/i.test(lastLower) || /si,? cancelar/i.test(lastLower)\n  || /^si,? reprogramar/i.test(lastLower) || /^sí,? reprogramar/i.test(lastLower);\nconst no = ['cancel_no','cancelar_solicitud_no','reprogramar_solicitud_no'].includes(boton)\n  || /^no$/i.test(lastLower) || /no,? continuar/i.test(lastLower);\nconst isRepetir = boton === 'repetir_pregunta' || /^(repetir|repetir pregunta)$/i.test(lastLower) || lines.some(l => /^(repetir|repetir pregunta)$/i.test(l));\nconst numericMenu = onMenu && !fromMediaPrompt && !fromEstudioPrompt;\nconst isHorarios = boton === 'horarios_clinica'\n  || (onMenu && /^(horarios|horarios( de( la)?)? clinica)$/i.test(lastFold))\n  || (numericMenu && lastFold === '1');\nconst isTurno = boton === 'quiero_turno' || boton === 'confirmar_turno'\n  || (numericMenu && lastFold === '2')\n  || (onMenu && /\\bturn[oaie]s?\\b|\\bcitas?\\b|sacar\\s+(un\\s+)?turn/i.test(lastFold));\nconst isMenuKw = boton === 'volver_menu'\n  || /^(menu|volver|volver al menu)$/i.test(lastFold);\nconst isGreeting = /^(hola+|holis|buenas|buenos|buen[oa]s?( (dias|tardes|noches))?|hi|hey|hello|que tal)$/i.test(lastFold);\nconst isHablar = boton === 'hablar_secretaria';\nconst isContinuar = boton === 'continuar_consulta';\nconst isOtra = boton === 'otra_consulta';\nconst isMedia = item.tipo === 'media';\nconst regexCancelar = isCancelarIntent(last) || isCancelarIntent(handoffProbe) || isCancelarIntent(allFold);\nconst regexReprogramar = isReprogramarIntent(last) || isReprogramarIntent(handoffProbe) || isReprogramarIntent(allFold);\nconst wantsHandoff = wantsHandoffIntent(last) || wantsHandoffIntent(handoffProbe) || wantsHandoffIntent(allFold);\nconst aiIntent = String(item.ai_intent || '').toLowerCase();\nconst aiConf = Number(item.ai_confidence || 0);\nconst aiCancelable = aiConf >= 0.7 && aiIntent === 'cancelar';\nconst aiReprogramable = aiConf >= 0.7 && aiIntent === 'reprogramar';\nconst aiEstudio = aiConf >= 0.7 && aiIntent === 'estudio_precio';\n\nlet route = 'welcome';\nlet handoff_reason = String(item.handoff_reason || ctx.handoff_reason || '');\nlet handoff_quote = String(item.handoff_quote || ctx.handoff_quote || '');\nlet captured_nombre = '';\nlet captured_dni = '';\nconst parsedDatos = parseNameDni(last);\n\nif (estado === 'confirmando_cancelacion') {\n  if (yes) route = 'cancel_yes';\n  else if (no) route = 'cancel_no';\n  else if (isMedia) route = 'media_warn';\n  else route = 'cancel_ask';\n} else if (estado === 'confirmando_cancelacion_solicitud') {\n  if (yes) route = 'cancelar_collect';\n  else if (no) route = 'cancelar_abort';\n  else route = 'cancelar_prompt';\n} else if (estado === 'awaiting_cancelar_datos') {\n  if (parsedDatos) {\n    route = 'cancelar_finalize';\n    captured_nombre = parsedDatos.nombre;\n    captured_dni = parsedDatos.dni;\n  } else {\n    route = 'cancelar_collect';\n  }\n} else if (estado === 'confirmando_reprogramar_solicitud') {\n  if (yes) route = 'reprogramar_collect';\n  else if (no) route = 'reprogramar_abort';\n  else route = 'reprogramar_prompt';\n} else if (estado === 'awaiting_reprogramar_datos') {\n  if (parsedDatos) {\n    route = 'reprogramar_finalize';\n    captured_nombre = parsedDatos.nombre;\n    captured_dni = parsedDatos.dni;\n  } else {\n    route = 'reprogramar_collect';\n  }\n} else if (isMedia) {\n  route = 'media_warn';\n} else if (cancelKw && isAwaiting) {\n  route = 'cancel_ask';\n} else if (isRepetir && isAwaiting) {\n  route = 'booking';\n} else if (isHorarios) {\n  route = 'horarios';\n} else if (isMenuKw || isGreeting) {\n  route = 'welcome';\n} else if (isTurno) {\n  route = 'booking';\n} else if (isHablar) {\n  route = 'hablar_secretaria';\n} else if (isContinuar) {\n  route = isAwaiting ? 'booking' : 'welcome';\n} else if (isOtra) {\n  route = 'welcome';\n} else if (regexCancelar || aiCancelable) {\n  route = 'cancelar_prompt';\n} else if (regexReprogramar || aiReprogramable) {\n  route = 'reprogramar_prompt';\n} else if (wantsHandoff || aiEstudio) {\n  route = 'estudio_handoff';\n} else if (isAwaiting) {\n  route = 'booking';\n} else if (estado === 'menu_shown' && texto && !boton) {\n  route = 'faq';\n} else {\n  route = 'welcome';\n}\n\nif (route === 'media_warn') {\n  handoff_reason = 'imagen/audio';\n  const cap = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  handoff_quote = cap || ('[' + (item.media_kind || 'imagen/audio') + ']');\n} else if (route === 'estudio_handoff') {\n  const est = isEstudioIntent(last) || isEstudioIntent(handoffProbe) || isEstudioIntent(allFold) || aiEstudio;\n  const sec = isSecretariaIntent(last) || isSecretariaIntent(handoffProbe) || isSecretariaIntent(allFold);\n  handoff_reason = est ? 'estudio/precio' : (sec ? 'solicitud_secretaria' : 'estudio/precio');\n  handoff_quote = handoffProbe || texto;\n} else if (route === 'hablar_secretaria') {\n  if (!handoff_reason) {\n    if (fromMediaPrompt || pending === 'media_warn') handoff_reason = 'imagen/audio';\n    else handoff_reason = 'estudio/precio';\n  }\n  if (!handoff_quote) {\n    handoff_quote = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  }\n}\n\nreturn [{ json: { ...item, estado, texto, last_line: last, boton_id: boton, route, handoff_reason, handoff_quote, handoff_quote_sql: sqlStr(handoff_quote), captured_nombre, captured_dni } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -352,6 +427,206 @@
               },
               "renameOutput": true,
               "outputKey": "hablar_secretaria"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-csp",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cancelar_prompt",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancelar_prompt"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-csc",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cancelar_collect",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancelar_collect"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-csf",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cancelar_finalize",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancelar_finalize"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-csa",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "cancelar_abort",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancelar_abort"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-rsp",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "reprogramar_prompt",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reprogramar_prompt"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-rsc",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "reprogramar_collect",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reprogramar_collect"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-rsf",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "reprogramar_finalize",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reprogramar_finalize"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-rsa",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "reprogramar_abort",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reprogramar_abort"
             }
           ]
         },
@@ -1258,6 +1533,524 @@
         }
       },
       "notes": "Inserts tipo=estudio on hablar_secretaria (estudio/precio). Media handoff is SELECT 1."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state SET state = 'confirmando_cancelacion_solicitud' WHERE phone = '{{ $('Decide Route').item.json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        176,
+        816
+      ],
+      "id": "9c6c6e85-7e88-4586-8f18-c22e657b9b6d",
+      "name": "Set confirmando cancelacion solicitud",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nreturn [{ json: { conversation_id: m.conversation_id, account_id: m.account_id, cw_body: { content: '¿Quiere cancelar su turno?', message_type: 'outgoing', private: false, content_type: 'input_select', content_attributes: { items: [{ title: 'Sí', value: 'cancelar_solicitud_si' },{ title: 'No', value: 'cancelar_solicitud_no' }] } } } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        816
+      ],
+      "id": "2f5d08e9-f05e-4a6f-88d3-9c5604346405",
+      "name": "Build cancelar solicitud prompt"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        624,
+        816
+      ],
+      "id": "4ad182d5-0f8f-4ef8-9ad2-bf2c5e34fbe0",
+      "name": "Send cancelar solicitud prompt",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nconst needsRetry = m.estado === 'awaiting_cancelar_datos';\nconst safePhone = String(m.telefono || '').replace(/'/g, \"''\");\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: needsRetry\n        ? 'Necesito su nombre completo y DNI para solicitar la cancelación. Envíelos en un solo mensaje (ejemplo: Juan Pérez 30111222).'\n        : 'Perfecto. Para continuar, envíe su nombre completo y DNI en un solo mensaje (ejemplo: Juan Pérez 30111222).',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    },\n    sql_state: `UPDATE conversation_state SET state = 'awaiting_cancelar_datos' WHERE phone = '${safePhone}'`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        912
+      ],
+      "id": "9b6ecabf-8f94-4828-aa48-020d7b06ce6f",
+      "name": "Build cancelar collect"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql_state }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        400,
+        912
+      ],
+      "id": "8458c1ab-1f22-4cb8-bfb9-0588d6de9094",
+      "name": "Set awaiting cancelar datos",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        624,
+        912
+      ],
+      "id": "0ad92309-3437-42ee-90ac-4580e9ecf4f2",
+      "name": "Send cancelar collect",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function esc(s){\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\").replace(/[\\r\\n]+/g, ' ').slice(0, 250);\n}\nconst m = $('Decide Route').first().json;\nconst nombre = m.captured_nombre || '';\nconst dni = m.captured_dni || '';\nconst quote = (m.last_line || m.texto || '').replace(/\\n?__cw_in_reply_to__:\\S+/g,'').trim();\nconst sqlInsert = `INSERT INTO turno_solicitudes (phone, nombre, dni, obra_social, telefono_contacto, medico, horario_preferido, status, conversation_id, tipo)\\nVALUES ('${esc(m.telefono)}', '${esc(nombre)}', '${esc(dni)}', '', '${esc(m.telefono)}', '', 'Solicitud de cancelacion de turno', 'pending', '${esc(m.conversation_id)}', 'cancelar');`;\nconst sqlState = `UPDATE conversation_state SET state = 'idle', context = JSON_REMOVE(COALESCE(context, JSON_OBJECT()), '$.pending_prompt', '$.handoff_reason', '$.handoff_quote') WHERE phone = '${esc(m.telefono)}';`;\nconst teamId = Number($env.CHATWOOT_TEAM_ID);\nconst teamName = String($env.CHATWOOT_TEAM_NAME || 'Secretaría').trim();\nconst teamMention = teamId && !Number.isNaN(teamId) ? `[@${teamName}](mention://team/${teamId}/${encodeURIComponent(teamName)})` : '';\nconst header = teamMention ? `${teamMention} Solicitud de cancelación de turno` : 'Solicitud de cancelación de turno';\nreturn [{json:{\n  conversation_id:m.conversation_id,\n  account_id:m.account_id,\n  cw_body:{content:'Su turno ha sido cancelado.',message_type:'outgoing',private:false,content_type:'text'},\n  cw_private:{content: header + '\\nNombre: ' + nombre + '\\nDNI: ' + dni + '\\nMensaje del paciente: ' + quote,message_type:'outgoing',private:true,content_type:'text'},\n  sql_insert:sqlInsert,\n  sql_state:sqlState\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        1008
+      ],
+      "id": "dbdd7ab9-3011-47d6-a937-18d1157b8d6f",
+      "name": "Prep cancelar finalize"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        1008
+      ],
+      "id": "d9137098-d4d9-4de0-b8f4-14d8e39ce9f2",
+      "name": "Send cancelar confirm",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql_insert }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        624,
+        1008
+      ],
+      "id": "106ffc1d-7507-49d8-9f71-e1730714d66d",
+      "name": "Insert cancelar solicitud ext",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_private }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        1008
+      ],
+      "id": "69eaa5a6-4d88-4c28-bd03-cd930d78f0c8",
+      "name": "Send cancelar private note",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql_state }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1072,
+        1008
+      ],
+      "id": "f4719513-bf91-4ea6-b6df-9ea7105d31db",
+      "name": "Clear cancelar solicitud state",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state SET state = 'confirmando_reprogramar_solicitud' WHERE phone = '{{ $('Decide Route').item.json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        176,
+        1104
+      ],
+      "id": "72de1f2d-4a37-40f6-b7ca-8b7b5454f673",
+      "name": "Set confirmando reprogramar solicitud",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nreturn [{ json: { conversation_id: m.conversation_id, account_id: m.account_id, cw_body: { content: '¿Quiere reprogramar su turno?', message_type: 'outgoing', private: false, content_type: 'input_select', content_attributes: { items: [{ title: 'Sí', value: 'reprogramar_solicitud_si' },{ title: 'No', value: 'reprogramar_solicitud_no' }] } } } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        1104
+      ],
+      "id": "8d2c1de4-4503-4b48-9baf-78c5da76a0fe",
+      "name": "Build reprogramar solicitud prompt"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        624,
+        1104
+      ],
+      "id": "8a8e7445-46d9-4330-a30f-7f0808599a5e",
+      "name": "Send reprogramar solicitud prompt",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Decide Route').first().json;\nconst needsRetry = m.estado === 'awaiting_reprogramar_datos';\nconst safePhone = String(m.telefono || '').replace(/'/g, \"''\");\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: needsRetry\n        ? 'Necesito su nombre completo y DNI para solicitar la reprogramación. Envíelos en un solo mensaje (ejemplo: Juan Pérez 30111222).'\n        : 'Perfecto. Para continuar, envíe su nombre completo y DNI en un solo mensaje (ejemplo: Juan Pérez 30111222).',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    },\n    sql_state: `UPDATE conversation_state SET state = 'awaiting_reprogramar_datos' WHERE phone = '${safePhone}'`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        1200
+      ],
+      "id": "26ed44d4-a02c-4bb5-9dc8-1a2e01f06dd1",
+      "name": "Build reprogramar collect"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql_state }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        400,
+        1200
+      ],
+      "id": "4ef5dd05-8333-45a4-ac83-4e3cc16be1f6",
+      "name": "Set awaiting reprogramar datos",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        624,
+        1200
+      ],
+      "id": "adf9f7a5-ec18-461a-8e50-9f4f03706495",
+      "name": "Send reprogramar collect",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function esc(s){\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\").replace(/[\\r\\n]+/g, ' ').slice(0, 250);\n}\nconst m = $('Decide Route').first().json;\nconst nombre = m.captured_nombre || '';\nconst dni = m.captured_dni || '';\nconst quote = (m.last_line || m.texto || '').replace(/\\n?__cw_in_reply_to__:\\S+/g,'').trim();\nconst sqlInsert = `INSERT INTO turno_solicitudes (phone, nombre, dni, obra_social, telefono_contacto, medico, horario_preferido, status, conversation_id, tipo)\\nVALUES ('${esc(m.telefono)}', '${esc(nombre)}', '${esc(dni)}', '', '${esc(m.telefono)}', '', 'Solicitud de reprogramacion de turno', 'pending', '${esc(m.conversation_id)}', 'reprogramar');`;\nconst sqlState = `UPDATE conversation_state SET state = 'idle', context = JSON_REMOVE(COALESCE(context, JSON_OBJECT()), '$.pending_prompt', '$.handoff_reason', '$.handoff_quote') WHERE phone = '${esc(m.telefono)}';`;\nconst teamId = Number($env.CHATWOOT_TEAM_ID);\nconst teamName = String($env.CHATWOOT_TEAM_NAME || 'Secretaría').trim();\nconst teamMention = teamId && !Number.isNaN(teamId) ? `[@${teamName}](mention://team/${teamId}/${encodeURIComponent(teamName)})` : '';\nconst header = teamMention ? `${teamMention} Solicitud de reprogramación de turno` : 'Solicitud de reprogramación de turno';\nreturn [{json:{\n  conversation_id:m.conversation_id,\n  account_id:m.account_id,\n  cw_body:{content:'Recibimos su solicitud de reprogramación. Una secretaria se contactará en breve.',message_type:'outgoing',private:false,content_type:'text'},\n  cw_private:{content: header + '\\nNombre: ' + nombre + '\\nDNI: ' + dni + '\\nMensaje del paciente: ' + quote,message_type:'outgoing',private:true,content_type:'text'},\n  sql_insert:sqlInsert,\n  sql_state:sqlState\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        1296
+      ],
+      "id": "90ac4d8c-5476-4bca-8276-6f9a2ad0f4f4",
+      "name": "Prep reprogramar finalize"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        1296
+      ],
+      "id": "9158eb9b-2e8b-47df-a5b0-7997a9d7e112",
+      "name": "Send reprogramar confirm",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql_insert }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        624,
+        1296
+      ],
+      "id": "a6698c9a-9e41-45b7-86e8-fc8025c3f0b9",
+      "name": "Insert reprogramar solicitud",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_private }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        1296
+      ],
+      "id": "8b80becb-f3c6-4927-a08c-0da7cf1ce530",
+      "name": "Send reprogramar private note",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CHATWOOT_CRED",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql_state }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1072,
+        1296
+      ],
+      "id": "26bf1290-c866-4b6c-9b84-6c87a43238f7",
+      "name": "Clear reprogramar solicitud state",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversation_state SET state = 'idle' WHERE phone = '{{ $('Decide Route').item.json.telefono }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        176,
+        1392
+      ],
+      "id": "f781e8df-c30e-4d3b-a626-bdf1d2f0dbfd",
+      "name": "Clear solicitud confirm state",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -1310,7 +2103,7 @@
       "main": [
         [
           {
-            "node": "Decide Route",
+            "node": "Build AI intent prompt",
             "type": "main",
             "index": 0
           }
@@ -1396,6 +2189,62 @@
         [
           {
             "node": "Build handoff confirm",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set confirmando cancelacion solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build cancelar collect",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prep cancelar finalize",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear solicitud confirm state",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set confirmando reprogramar solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build reprogramar collect",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prep reprogramar finalize",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear solicitud confirm state",
             "type": "main",
             "index": 0
           }
@@ -1623,6 +2472,237 @@
         [
           {
             "node": "Assign Secretaría team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI intent prompt": {
+      "main": [
+        [
+          {
+            "node": "Intent Classifier Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Intent Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Intent Classifier Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Classifier Chain": {
+      "main": [
+        [
+          {
+            "node": "Parse AI intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI intent": {
+      "main": [
+        [
+          {
+            "node": "Decide Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set confirmando cancelacion solicitud": {
+      "main": [
+        [
+          {
+            "node": "Build cancelar solicitud prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build cancelar solicitud prompt": {
+      "main": [
+        [
+          {
+            "node": "Send cancelar solicitud prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build cancelar collect": {
+      "main": [
+        [
+          {
+            "node": "Set awaiting cancelar datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set awaiting cancelar datos": {
+      "main": [
+        [
+          {
+            "node": "Send cancelar collect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep cancelar finalize": {
+      "main": [
+        [
+          {
+            "node": "Send cancelar confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send cancelar confirm": {
+      "main": [
+        [
+          {
+            "node": "Insert cancelar solicitud ext",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert cancelar solicitud ext": {
+      "main": [
+        [
+          {
+            "node": "Send cancelar private note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send cancelar private note": {
+      "main": [
+        [
+          {
+            "node": "Clear cancelar solicitud state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set confirmando reprogramar solicitud": {
+      "main": [
+        [
+          {
+            "node": "Build reprogramar solicitud prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build reprogramar solicitud prompt": {
+      "main": [
+        [
+          {
+            "node": "Send reprogramar solicitud prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build reprogramar collect": {
+      "main": [
+        [
+          {
+            "node": "Set awaiting reprogramar datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set awaiting reprogramar datos": {
+      "main": [
+        [
+          {
+            "node": "Send reprogramar collect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep reprogramar finalize": {
+      "main": [
+        [
+          {
+            "node": "Send reprogramar confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send reprogramar confirm": {
+      "main": [
+        [
+          {
+            "node": "Insert reprogramar solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert reprogramar solicitud": {
+      "main": [
+        [
+          {
+            "node": "Send reprogramar private note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send reprogramar private note": {
+      "main": [
+        [
+          {
+            "node": "Clear reprogramar solicitud state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear solicitud confirm state": {
+      "main": [
+        [
+          {
+            "node": "Call Welcome 02",
             "type": "main",
             "index": 0
           }

@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS turno_solicitudes (
   horario_preferido VARCHAR(255) DEFAULT NULL,
   status VARCHAR(40) NOT NULL DEFAULT 'pending',
   conversation_id VARCHAR(64) DEFAULT NULL,
-  tipo ENUM('turno','cancelar','estudio') NOT NULL DEFAULT 'turno'
+  tipo ENUM('turno','cancelar','estudio','reprogramar') NOT NULL DEFAULT 'turno'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- Existing VPS DBs: run mysql/migrate_solicitudes_tipo.sql (init.sql is only applied on first MySQL volume).
 

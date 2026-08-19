@@ -129,6 +129,7 @@
           <span class="badge text-bg-success">turno</span>
           <span class="badge text-bg-danger">cancelar</span>
           <span class="badge text-bg-primary">estudio</span>
+          <span class="badge text-bg-warning">reprogramar</span>
           · agrupadas por el día en que se hizo la solicitud
         </p>
         <div class="table-responsive">
@@ -426,7 +427,8 @@
       const cls = {
         turno: 'text-bg-success',
         cancelar: 'text-bg-danger',
-        estudio: 'text-bg-primary'
+        estudio: 'text-bg-primary',
+        reprogramar: 'text-bg-warning'
       }[t] || 'text-bg-secondary';
       return `<span class="badge ${cls}">${escapeHtml(t)}</span>`;
     }

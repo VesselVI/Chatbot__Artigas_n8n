@@ -118,7 +118,15 @@ docker compose up -d n8n
 
 - Bot **skips** replies when a **human** is assigned (`conversation.meta.assignee.type === 'user'` or `assignee_id` without bot) **or** `conversation.team_id` / team handoff is set. It does **not** assign on the media or estudio warning itself — only after **Hablar secretaria**.
 - Booking states: `idle/menu_shown` → nombre → DNI → obra social (**Particular/Sin Obra Social** first, then dashboard obras, then **Otras**) → médico (**Mi médico de cabecera** first, WhatsApp list) → día/hora → confirmación. Phone is the WhatsApp number from Normalize (no phone question).
-- **Cancelar turno** / keywords `cancelar|salir|menu|menú` → confirm → sí inserts `turno_solicitudes` with `tipo=cancelar` (data filled so far) then clears + welcome / no restores + re-asks
+- **Cancelar turno (mid-booking)** / keywords `cancelar|salir|menu|menú` → confirm → sí inserts `turno_solicitudes` with `tipo=cancelar` (data filled so far) then clears + welcome / no restores + re-asks.
+- **Solicitud de cancelación (NL intent):** frases como `quiero cancelar un turno`, `no voy a poder ir a la consulta`, `cancelar turno` (y variantes) disparan `cancelar_prompt` (Sí/No). Si responde **Sí**, el bot pide **nombre completo + DNI** en un solo mensaje y genera:
+  - mensaje al paciente: `Su turno ha sido cancelado.`
+  - **private note** para Secretaría con nombre, DNI y texto del paciente
+  - fila en `turno_solicitudes` con `tipo=cancelar`
+- **Solicitud de reprogramación (NL intent):** frases como `quiero reprogramar un turno`, `necesito un turno para otro día`, `quiero cambiar el horario de mi turno` (y variantes) disparan `reprogramar_prompt` (Sí/No). Si responde **Sí**, pide **nombre completo + DNI** en un solo mensaje y genera:
+  - mensaje al paciente de confirmación de solicitud
+  - **private note** para Secretaría con nombre, DNI y texto del paciente
+  - fila en `turno_solicitudes` con `tipo=reprogramar`
 - **Repetir pregunta** re-sends the current step
 - Confirm: `INSERT turno_solicitudes` (`tipo` defaults to `turno`) + Chatwoot **private** note + patient message with `volver_menu`. For **Particular / Sin Obra Social** with a **named** doctor, confirmation and the solicitud ficha add `Precio de consulta: 70 mil pesos` (Adrián Artigas) or `40 mil pesos` (other doctors). **Mi médico de cabecera** does not show a price. Other obras never show a price.
 - Typed `particular` / `sin obra` / `sin obra social` / `no tengo obra social` / `soy particular` / `como particular` (and close variants, case-insensitive) save as `Particular / Sin Obra Social` and skip the Otras prompt. `otra` / `otras` still open the free-text obra step.
@@ -126,6 +134,7 @@ docker compose up -d n8n
 - WhatsApp allows **max 3 reply buttons** (titles **max 20 characters**). Obra social stays as text (`Escribí una opción`) plus Cancelar/Repetir. The doctor picker sends **all** rows as Chatwoot `input_select` (more than 3 items → Meta **list**). WhatsApp lists allow at most 10 rows; n8n cannot set the list button label (Chatwoot I18n / locale controls that).
 - **Fotos / audios / video / archivo:** Normalize sets `tipo: media`. Decide Route sends `media_warn` even mid-booking (MySQL `state` unchanged). Message: *Por acá no podemos recibir fotos ni audios…* Buttons: `Continuar consulta` (`continuar_consulta`) / `Hablar secretaria` (`hablar_secretaria`). Continuar re-asks the booking step if `awaiting_*`, otherwise welcome. Hablar secretaria → team assign.
 - **Estudios / tratamientos / precio** and **secretaria / persona phrases** route to the same handoff prompt (`estudio_handoff`), **anytime** (including mid-booking), **before** booking continues. Message: *Para poder responder mejor esta consulta necesitamos derivarlo con una secretaria.* Buttons: `Hablar secretaria` / `Hacer otra consulta` (`otra_consulta`). Typed examples that must **not** reach FAQ: `Quiero hablar con una secretaria`, `me podes pasar con una persona?`, `necesito atención humana`, `¿cuánto sale un OCT?`, `campo visual`. Typed `sacar un turno` / `quiero_turno` still starts booking (`isTurno` wins). FAQ / OpenAI never sees handoff phrases.
+- **Hybrid intent routing:** `Decide Route` now uses regex + OpenAI classifier (`cancelar`, `reprogramar`, `estudio_precio`, `other`) with confidence threshold fallback. Explicit button/state transitions always win over AI.
 - After **Hablar secretaria:** public confirm *Te derivamos con una secretaria. En breve te van a escribir.* + **private** note (motivo `imagen/audio`, `estudio/precio`, or `solicitud_secretaria` + patient quote) + `POST .../assignments` `{ "team_id": CHATWOOT_TEAM_ID }`. Only motivo `estudio/precio` also `INSERT turno_solicitudes` with `tipo=estudio`. Secretary-only requests (`solicitud_secretaria`) do not create a solicitud row. Bot then mutes.
 - Typed `1` / `2` after those prompts follow the last prompt (media: 1 continuar / 2 secretaria; estudio: 1 secretaria / 2 otra). Welcome menu `1`/`2` still mean Horarios / Turno when no such prompt is pending.
 - Confirmation and horarios replies are **plain text** (Meta test numbers often drop buttons). Type `confirmar` / `sí` / `cancelar` / `repetir`. The confirm step must not end without an HTTP send.
@@ -183,14 +192,14 @@ Open the repo file `n8n/workflows/01-entry-router.json` (or open each Code node 
 ### Booking / shifts (older update)
 
 1. Re-import **03 - Booking Flow** only if that workflow changed (re-attach MySQL + Chatwoot credentials and Execute Workflow links).
-2. On the VPS, run `mysql/migrate_shifts.sql` **before** using the new dashboard save (adds `shift` and classifies existing rows). For solicitud labels (`turno` / `cancelar` / `estudio`), also run `mysql/migrate_solicitudes_tipo.sql` (existing rows stay `turno`).
+2. On the VPS, run `mysql/migrate_shifts.sql` **before** using the new dashboard save (adds `shift` and classifies existing rows). For solicitud labels (`turno` / `cancelar` / `estudio` / `reprogramar`), also run `mysql/migrate_solicitudes_tipo.sql` (existing rows stay `turno`).
 
 ```bash
 docker compose exec -T mysql mysql -uartigas -p"$MYSQL_PASSWORD" artigas_bot < mysql/migrate_shifts.sql
 docker compose exec -T mysql mysql -uartigas -p"$MYSQL_PASSWORD" artigas_bot < mysql/migrate_solicitudes_tipo.sql
 ```
 
-### How to test (media + estudio)
+### How to test (media + estudio + cancelar/reprogramar)
 
 Use a conversation that is **not** already assigned to an agent or team.
 
@@ -201,6 +210,24 @@ Use a conversation that is **not** already assigned to an agent or team.
 5. From the estudio prompt, type **sacar un turno** (or tap that welcome button). Expect booking, not assign.
 6. Confirm a booking → dashboard badge `turno` (DNI column filled). Confirm **Sí, cancelar** mid-booking → badge `cancelar`.
 7. Secretaries with assignment notifications enabled should see the new team conversation.
+8. Type `quiero cancelar un turno` (or `no voy a poder ir a la consulta`) in an unassigned chat. Expect **¿Quiere cancelar su turno?** with `Sí/No`. Tap `Sí` and send one message with nombre + DNI (e.g. `Juan Pérez 30111222`). Expect patient confirmation, private note to Secretaría, and dashboard badge `cancelar`.
+9. Type `quiero reprogramar un turno` (or `quiero cambiar el horario de mi turno`). Expect **¿Quiere reprogramar su turno?** with `Sí/No`. Tap `Sí` and send nombre + DNI in one message. Expect private note and dashboard badge `reprogramar` (orange/warning).
+
+## Chatwoot template (secretary use)
+
+Create a canned response template in Chatwoot for manual secretary replies after cancellation:
+
+- Suggested title: `Confirmación cancelación turno`
+- Suggested body:
+
+```text
+Hola {{nombre}}, confirmamos la cancelación de tu turno.
+
+DNI registrado: {{dni}}.
+Si querés reprogramar, respondé por este chat y te ayudamos.
+```
+
+Create it in Chatwoot at **Settings → Canned Responses** (or the templates/canned section your team already uses).
 
 ### Test workflow: team assign only (`05-handoff-test.json`)
 
