@@ -17,10 +17,20 @@ In n8n: **Workflows → Import from File** for each JSON. Leave them **inactive*
 - Database / User / Password: from `.env` (`MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`)
 - Attach to every **MySQL** node (name in exports: `MySQL account`)
 
-### 2. Google Gemini (PaLM) API
+### 2. OpenAI API (pay as you go)
 
-- Create credential **Google Gemini(PaLM) Api account** with your Gemini API key
-- Attach to **Google Gemini Chat Model** in `04 - FAQ IA`
+Use the **OpenAI Platform** API, not a ChatGPT Plus/Pro subscription. ChatGPT Plus does not give n8n an API key.
+
+1. Create/sign in at [platform.openai.com](https://platform.openai.com/signup/) (this is a different product from [chatgpt.com](https://chatgpt.com)).
+2. **Settings → Billing → Payment methods** → add a card. Then either:
+   - **Prepaid credits** (buy a balance, e.g. $5–$10; usage draws it down), or
+   - Leave **auto-recharge** on with a **monthly recharge limit** so spend cannot run away.
+3. Set a **monthly usage limit** under **Settings → Limits** (and optionally a project limit). Without a limit, pay-as-you-go can keep charging.
+4. **API keys → Create new secret key** (name it e.g. `artigas-n8n`). Copy it once; OpenAI will not show it again.
+5. In n8n: **Credentials → Add credential → OpenAI API**. Paste the key. Leave Organization ID blank unless you belong to several orgs. Name it **OpenAI account**.
+6. Attach that credential to **OpenAI Chat Model** in `04 - FAQ IA`. Model in the export is **`gpt-5-mini`** (cheap chat model, billed per token). You can pick another `*-mini` / `*-nano` from the list if that id is missing on your account.
+
+FAQ volume for this clinic is small; `gpt-5-mini` is typically cents per month. Do **not** put the key in `.env` or git — n8n stores it encrypted in its credentials DB.
 
 ### 3. Chatwoot API (Header Auth)
 
@@ -79,8 +89,8 @@ https://n8n.DOMAIN/webhook/chatwoot-bot
 
 Replace `DOMAIN` with your real domain (same host as `N8N_HOST` / `WEBHOOK_URL`).
 
-3. Assign the bot to the WhatsApp inbox
-4. Activate **01 - Entry Router** in n8n (production webhook)
+3. Assign the bot to the **production** WhatsApp inbox (after cutover: the clinic-number inbox, not the Meta test inbox)
+4. Activate **01 - Entry Router** in n8n (production webhook). Do not change this URL when adding a new inbox.
 
 ## Chatwoot team and notifications
 
@@ -112,10 +122,10 @@ docker compose up -d n8n
 - **Repetir pregunta** re-sends the current step
 - Confirm: `INSERT turno_solicitudes` (`tipo` defaults to `turno`) + Chatwoot **private** note + patient message with `volver_menu`. For **Particular / Sin Obra Social** with a **named** doctor, confirmation and the solicitud ficha add `Precio de consulta: 70 mil pesos` (Adrián Artigas) or `40 mil pesos` (other doctors). **Mi médico de cabecera** does not show a price. Other obras never show a price.
 - Typed `particular` / `sin obra` / `sin obra social` / `no tengo obra social` / `soy particular` / `como particular` (and close variants, case-insensitive) save as `Particular / Sin Obra Social` and skip the Otras prompt. `otra` / `otras` still open the free-text obra step.
-- FAQ (free text on `menu_shown` that is not a turno/horarios/`menú`/greeting intent) loads `clinic_settings` + doctors + current-week availability into Gemini. Typed `menú` / `menu` / `hola` return to the welcome menu. `turni` and similar typos still start booking.
+- FAQ (free text on `menu_shown` that is not a turno/horarios/`menú`/greeting intent) loads `clinic_settings` + doctors + current-week availability into OpenAI (`gpt-5-mini`). Typed `menú` / `menu` / `hola` return to the welcome menu. `turni` and similar typos still start booking.
 - WhatsApp allows **max 3 reply buttons** (titles **max 20 characters**). Obra social stays as text (`Escribí una opción`) plus Cancelar/Repetir. The doctor picker sends **all** rows as Chatwoot `input_select` (more than 3 items → Meta **list**). WhatsApp lists allow at most 10 rows; n8n cannot set the list button label (Chatwoot I18n / locale controls that).
 - **Fotos / audios / video / archivo:** Normalize sets `tipo: media`. Decide Route sends `media_warn` even mid-booking (MySQL `state` unchanged). Message: *Por acá no podemos recibir fotos ni audios…* Buttons: `Continuar consulta` (`continuar_consulta`) / `Hablar secretaria` (`hablar_secretaria`). Continuar re-asks the booking step if `awaiting_*`, otherwise welcome. Hablar secretaria → team assign.
-- **Estudios / tratamientos / precio** and **secretaria / persona phrases** route to the same handoff prompt (`estudio_handoff`), **anytime** (including mid-booking), **before** booking continues. Message: *Para poder responder mejor esta consulta necesitamos derivarlo con una secretaria.* Buttons: `Hablar secretaria` / `Hacer otra consulta` (`otra_consulta`). Typed examples that must **not** reach FAQ: `Quiero hablar con una secretaria`, `me podes pasar con una persona?`, `necesito atención humana`, `¿cuánto sale un OCT?`, `campo visual`. Typed `sacar un turno` / `quiero_turno` still starts booking (`isTurno` wins). FAQ / Gemini never sees handoff phrases.
+- **Estudios / tratamientos / precio** and **secretaria / persona phrases** route to the same handoff prompt (`estudio_handoff`), **anytime** (including mid-booking), **before** booking continues. Message: *Para poder responder mejor esta consulta necesitamos derivarlo con una secretaria.* Buttons: `Hablar secretaria` / `Hacer otra consulta` (`otra_consulta`). Typed examples that must **not** reach FAQ: `Quiero hablar con una secretaria`, `me podes pasar con una persona?`, `necesito atención humana`, `¿cuánto sale un OCT?`, `campo visual`. Typed `sacar un turno` / `quiero_turno` still starts booking (`isTurno` wins). FAQ / OpenAI never sees handoff phrases.
 - After **Hablar secretaria:** public confirm *Te derivamos con una secretaria. En breve te van a escribir.* + **private** note (motivo `imagen/audio`, `estudio/precio`, or `solicitud_secretaria` + patient quote) + `POST .../assignments` `{ "team_id": CHATWOOT_TEAM_ID }`. Only motivo `estudio/precio` also `INSERT turno_solicitudes` with `tipo=estudio`. Secretary-only requests (`solicitud_secretaria`) do not create a solicitud row. Bot then mutes.
 - Typed `1` / `2` after those prompts follow the last prompt (media: 1 continuar / 2 secretaria; estudio: 1 secretaria / 2 otra). Welcome menu `1`/`2` still mean Horarios / Turno when no such prompt is pending.
 - Confirmation and horarios replies are **plain text** (Meta test numbers often drop buttons). Type `confirmar` / `sí` / `cancelar` / `repetir`. The confirm step must not end without an HTTP send.
@@ -124,6 +134,20 @@ docker compose up -d n8n
 ## Updating live n8n (do not full-reimport 01)
 
 Re-importing **01** breaks Execute Workflow links to 02/03/04. **Never** Import-from-File the whole `01-entry-router.json` onto a live canvas that already has those links.
+
+### Swap FAQ LLM: Gemini → OpenAI (do not reimport 04)
+
+Re-importing **04** can change its workflow id and break **Call FAQ 04** on live **01**. Swap the model sub-node instead.
+
+1. Create the **OpenAI account** credential (see [OpenAI API (pay as you go)](#2-openai-api-pay-as-you-go)).
+2. Open live **04 - FAQ IA**.
+3. Delete **Google Gemini Chat Model**.
+4. Add **OpenAI Chat Model** (LangChain). Drag its **Model** output onto **Basic LLM Chain**.
+5. Select model **`gpt-5-mini`** (or another `*-mini` / `*-nano` if that id is missing). Temperature **0.2**.
+6. Attach credential **OpenAI account**. Save.
+7. Test: unassigned chat, free-text FAQ such as `dónde queda la clínica?` — expect an OpenAI answer from `clinic_settings`, not a Gemini error. Estudio/precio phrases must still skip FAQ.
+
+The Gemini credential can stay unused in n8n; it is no longer referenced.
 
 ### Media and study handoff (paste + add nodes)
 
@@ -172,7 +196,7 @@ Use a conversation that is **not** already assigned to an agent or team.
 
 1. Send an **image** (empty caption is fine). Expect the fotos/audios warning with **Continuar consulta** / **Hablar secretaria**. Bot must **not** assign yet. If you were booking, the next **Continuar consulta** must re-ask the same step (state still `awaiting_*`).
 2. Tap **Continuar consulta** (or type that title / `1` after the warning). Expect welcome or the current booking question. Send another image, then tap **Hablar secretaria**. Expect the short confirm on WhatsApp, a **private** note in Chatwoot (motivo `imagen/audio` + quote), conversation assigned to team **Secretaría**, and further patient messages **ignored** by the bot.
-3. In a **new** unassigned chat, type a precio/OCT question (`¿cuánto sale un OCT?`, `campo visual`, `topografía`). Expect the estudio message with **Hablar secretaria** / **Hacer otra consulta**. Gemini/FAQ must **not** run. **Hacer otra consulta** returns to the welcome menu. **Hablar secretaria** assigns + private note motivo `estudio/precio`, and a dashboard **Solicitudes** row with badge `estudio`.
+3. In a **new** unassigned chat, type a precio/OCT question (`¿cuánto sale un OCT?`, `campo visual`, `topografía`). Expect the estudio message with **Hablar secretaria** / **Hacer otra consulta**. OpenAI/FAQ must **not** run. **Hacer otra consulta** returns to the welcome menu. **Hablar secretaria** assigns + private note motivo `estudio/precio`, and a dashboard **Solicitudes** row with badge `estudio`.
 4. Type **Quiero hablar con una secretaria** or **me podes pasar con una persona?** (menu or mid-booking). Expect the same handoff prompt, not FAQ/booking. **Hablar secretaria** → private note motivo `solicitud_secretaria` (no dashboard estudio row).
 5. From the estudio prompt, type **sacar un turno** (or tap that welcome button). Expect booking, not assign.
 6. Confirm a booking → dashboard badge `turno` (DNI column filled). Confirm **Sí, cancelar** mid-booking → badge `cancelar`.

@@ -131,20 +131,28 @@
     },
     {
       "parameters": {
-        "options": {}
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
       },
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-      "typeVersion": 1.0,
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
       "position": [
         720,
         240
       ],
-      "id": "n04gem",
-      "name": "Google Gemini Chat Model",
+      "id": "n04oai",
+      "name": "OpenAI Chat Model",
       "credentials": {
-        "googlePalmApi": {
-          "id": "GEMINI_CRED",
-          "name": "Google Gemini(PaLM) Api account"
+        "openAiApi": {
+          "id": "OPENAI_CRED",
+          "name": "OpenAI account"
         }
       }
     },
@@ -250,7 +258,7 @@
         ]
       ]
     },
-    "Google Gemini Chat Model": {
+    "OpenAI Chat Model": {
       "ai_languageModel": [
         [
           {
