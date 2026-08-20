@@ -189,6 +189,39 @@ Open the repo file `n8n/workflows/01-entry-router.json` (or open each Code node 
      - Connect: **Send handoff confirm → Prep estudio solicitud → Insert estudio solicitud → Prep handoff private note**.
 7. Save. Do not deactivate/reactivate in a way that changes the webhook path.
 
+### Cancelar / reprogramar (Decide Route + collect wiring)
+
+When pasting cancel/reprogramar nodes onto live **01**, verify these fixes from the repo (run `node scripts/test-decide-route.js` locally after pull):
+
+1. **Decide Route** (Code):
+   - `cancelar` / `reprogramar` intents are checked **before** generic `turno` booking.
+   - `isTurno` excludes cancel/reprogramar phrases (`&& !regexCancelar && !regexReprogramar`).
+   - Yes/no accepts WhatsApp button ids `si_generico` / `no_generico` plus typed `si` / `no` on any line (quoted replies).
+   - **Mid-booking (`awaiting_*` from workflow 03):** free-text steps (obra, médico, horario like `mar 18`) must stay on `booking`. Route `isAwaiting → booking` **before** NL `reprogramar` / `cancelar` (and before AI reprogramar). Estudio/precio handoff still wins when `wantsHandoff` matches.
+2. **Collect chains must be MySQL → Build → Send** (same pattern as mid-booking cancel confirm):
+   | Route Switch output | Wire order |
+   |---------------------|------------|
+   | `cancelar_collect` | **Set awaiting cancelar datos** (MySQL) → **Build cancelar collect** → **Send cancelar collect** |
+   | `reprogramar_collect` | **Set awaiting reprogramar datos** (MySQL) → **Build reprogramar collect** → **Send reprogramar collect** |
+3. **Set awaiting cancelar datos** query (inline, not `$json.sql_state`):
+
+```sql
+UPDATE conversation_state
+SET state = 'awaiting_cancelar_datos'
+WHERE phone = '{{ $('Decide Route').item.json.telefono }}';
+```
+
+4. **Set awaiting reprogramar datos** — same pattern with `awaiting_reprogramar_datos`.
+5. **Send cancelar collect** / **Send reprogramar collect** keep `jsonBody: ={{ $json.cw_body }}` because **Build** runs immediately before **Send**.
+6. **Finalize chains (n8n 2.34 HTTP Request 4.2):** `Send cancelar confirm` replaces `$json` with the Chatwoot response. Do **not** put `$("Prep …")` in the HTTP **URL** — n8n 2.34 prepends `=` and throws `Invalid URL: =https://…`.
+   - Add Code **Restore cancelar finalize item**: `return [{ json: $('Prep cancelar finalize').first().json }];`
+   - Wire: **Insert cancelar solicitud ext** → **Restore cancelar finalize item** → **Send cancelar private note**
+   - Copy the **URL** from **Send cancelar confirm** (uses `$json.account_id`). If the URL field already has the expression (fx) toggle on, paste **without** a leading `=`.
+   - JSON Body: `={{ $json.cw_private }}`
+   - Insert/Clear may still use `$('Prep cancelar finalize').first().json.sql_insert` / `sql_state`.
+   - Reprogramar: same with **Restore reprogramar finalize item**.
+7. If a patient is stuck mid-flow, reset one row: `UPDATE conversation_state SET state='idle', context=JSON_OBJECT() WHERE phone='54…';` or use [mysql/wipe_test_data.sql](../../mysql/wipe_test_data.sql) for a full test wipe.
+
 ### Booking / shifts (older update)
 
 1. Re-import **03 - Booking Flow** only if that workflow changed (re-attach MySQL + Chatwoot credentials and Execute Workflow links).

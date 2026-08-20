@@ -163,7 +163,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nlet estado = item.estado || 'idle';\nlet boton = String(item.boton_id || '').trim();\nconst texto = String(item.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst lastLower = last.toLowerCase();\nconst onMenu = estado === 'idle' || estado === 'menu_shown';\nconst ctx = item.context && typeof item.context === 'object' ? item.context : {};\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction sqlStr(s) {\n  return String(s || '').replace(/\\0/g, '').replace(/[\\r\\n]+/g, ' ').replace(/'/g, \"''\").slice(0, 400);\n}\nfunction isEstudioIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/(consult|pregunt|\\binfo\\b|informacion).{0,60}(tratamiento|estudio|cirugia)/.test(f)) return true;\n  if (/(tratamiento|estudio|cirugia).{0,60}(consult|pregunt|\\binfo\\b|informacion)/.test(f)) return true;\n  if (/cuanto sale|cuanto cuesta|\\bprecio\\b|\\bvalor\\b|se cobra|\\bcobran\\b|cubre la obra/.test(f)) return true;\n  if (/\\bcampo visual\\b/.test(f)) return true;\n  if (/\\bperimetria(\\s+computarizada)?\\b/.test(f)) return true;\n  if (/\\btopografia\\b/.test(f)) return true;\n  if (/\\bpaquimetria\\b/.test(f)) return true;\n  if (/\\bretinografia(\\s+digital)?\\b/.test(f)) return true;\n  if (/\\boct\\s+(anterior|posterior)\\b/.test(f)) return true;\n  if (/\\bocta\\b/.test(f)) return true;\n  if (/\\boct\\b/.test(f)) return true;\n  if (/\\bangiografia\\b/.test(f)) return true;\n  if (/\\bmicroscopia especular\\b/.test(f)) return true;\n  return false;\n}\nfunction isSecretariaIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/^para poder responder mejor esta consulta/.test(f)) return false;\n  if (/hablar con (una )?secretaria/.test(f)) return true;\n  if (/(pasar|derivar|comunicar|conectar).{0,40}(con )?(una )?(persona|humano|humana|secretaria|alguien|operador)/.test(f)) return true;\n  if (/(quiero|necesito|preciso).{0,40}secretaria/.test(f)) return true;\n  if (/(quiero|necesito|preciso).{0,40}(persona|humano|humana|atencion humana)/.test(f)) return true;\n  if (/\\b(atencion humana|persona real|operador humano)\\b/.test(f)) return true;\n  return false;\n}\nfunction isCancelarIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/\\bcancel(ar|acion|ación)\\b.{0,50}\\b(turno|consulta|cita)\\b/.test(f)) return true;\n  if (/\\bno\\s+voy\\s+a\\s+poder\\s+ir\\b/.test(f)) return true;\n  if (/\\bno\\s+puedo\\s+ir\\b/.test(f)) return true;\n  if (/\\bquiero\\s+cancelar\\b/.test(f)) return true;\n  if (/\\bdar\\s+de\\s+baja\\b.{0,30}\\bturno\\b/.test(f)) return true;\n  return false;\n}\nfunction isReprogramarIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/\\breprogram(ar|acion|ación)\\b.{0,50}\\b(turno|consulta|cita)\\b/.test(f)) return true;\n  if (/\\bcambiar\\b.{0,40}\\b(horario|dia|día|turno|fecha)\\b/.test(f)) return true;\n  if (/\\botro\\s+dia\\b|\\botra\\s+fecha\\b|\\bdia\\s+diferente\\b|\\bdía\\s+diferente\\b/.test(f)) return true;\n  if (/\\bnecesito\\s+un\\s+turno\\s+para\\s+otro\\s+dia\\b|\\bnecesito\\s+un\\s+turno\\s+para\\s+un\\s+dia\\s+diferente\\b/.test(f)) return true;\n  return false;\n}\nfunction wantsHandoffIntent(t) {\n  return isSecretariaIntent(t) || isEstudioIntent(t);\n}\nfunction parseNameDni(t) {\n  const raw = String(t || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  const dniM = raw.match(/\\b(\\d{7,10})\\b/);\n  if (!dniM) return null;\n  const dni = dniM[1];\n  const before = raw.replace(dniM[0], ' ').replace(/[,:;|]+/g, ' ').replace(/\\s+/g, ' ').trim();\n  const clean = before.replace(/^(dni|nombre|soy|me llamo|mi nombre es)\\s+/i, '').trim();\n  if (!clean || clean.split(' ').length < 2) return null;\n  return { nombre: clean.slice(0, 120), dni };\n}\n\nconst lastFold = lastLower.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nconst allFold = fold(texto);\nconst handoffProbe = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim() || texto;\nconst pending = String(item.pending_prompt || ctx.pending_prompt || '');\nconst quotedMedia = /no podemos recibir fotos ni audios/.test(allFold);\nconst quotedEstudio = /necesitamos derivarlo con una secretaria/.test(allFold);\nconst fromMediaPrompt = pending === 'media_warn' || quotedMedia;\nconst fromEstudioPrompt = pending === 'estudio_handoff' || quotedEstudio;\n\nif (!boton && (fromMediaPrompt || fromEstudioPrompt)) {\n  if (fromMediaPrompt && lastFold === '1') boton = 'continuar_consulta';\n  else if (fromMediaPrompt && lastFold === '2') boton = 'hablar_secretaria';\n  else if (fromEstudioPrompt && lastFold === '1') boton = 'hablar_secretaria';\n  else if (fromEstudioPrompt && lastFold === '2') boton = 'otra_consulta';\n}\n\nconst cancelKw = boton === 'cancelar_turno_pedido' || boton === 'cancelar_turno'\n  || /^(cancelar|salir|menu|menú)$/i.test(lastLower)\n  || /^cancelar turno$/i.test(lastLower);\nconst isAwaiting = /^awaiting_/.test(estado);\nconst yes = ['cancel_si','cancelar_solicitud_si','reprogramar_solicitud_si'].includes(boton)\n  || /^(si|sí)$/i.test(lastLower) || /sí,? cancelar/i.test(lastLower) || /si,? cancelar/i.test(lastLower)\n  || /^si,? reprogramar/i.test(lastLower) || /^sí,? reprogramar/i.test(lastLower);\nconst no = ['cancel_no','cancelar_solicitud_no','reprogramar_solicitud_no'].includes(boton)\n  || /^no$/i.test(lastLower) || /no,? continuar/i.test(lastLower);\nconst isRepetir = boton === 'repetir_pregunta' || /^(repetir|repetir pregunta)$/i.test(lastLower) || lines.some(l => /^(repetir|repetir pregunta)$/i.test(l));\nconst numericMenu = onMenu && !fromMediaPrompt && !fromEstudioPrompt;\nconst isHorarios = boton === 'horarios_clinica'\n  || (onMenu && /^(horarios|horarios( de( la)?)? clinica)$/i.test(lastFold))\n  || (numericMenu && lastFold === '1');\nconst isTurno = boton === 'quiero_turno' || boton === 'confirmar_turno'\n  || (numericMenu && lastFold === '2')\n  || (onMenu && /\\bturn[oaie]s?\\b|\\bcitas?\\b|sacar\\s+(un\\s+)?turn/i.test(lastFold));\nconst isMenuKw = boton === 'volver_menu'\n  || /^(menu|volver|volver al menu)$/i.test(lastFold);\nconst isGreeting = /^(hola+|holis|buenas|buenos|buen[oa]s?( (dias|tardes|noches))?|hi|hey|hello|que tal)$/i.test(lastFold);\nconst isHablar = boton === 'hablar_secretaria';\nconst isContinuar = boton === 'continuar_consulta';\nconst isOtra = boton === 'otra_consulta';\nconst isMedia = item.tipo === 'media';\nconst regexCancelar = isCancelarIntent(last) || isCancelarIntent(handoffProbe) || isCancelarIntent(allFold);\nconst regexReprogramar = isReprogramarIntent(last) || isReprogramarIntent(handoffProbe) || isReprogramarIntent(allFold);\nconst wantsHandoff = wantsHandoffIntent(last) || wantsHandoffIntent(handoffProbe) || wantsHandoffIntent(allFold);\nconst aiIntent = String(item.ai_intent || '').toLowerCase();\nconst aiConf = Number(item.ai_confidence || 0);\nconst aiCancelable = aiConf >= 0.7 && aiIntent === 'cancelar';\nconst aiReprogramable = aiConf >= 0.7 && aiIntent === 'reprogramar';\nconst aiEstudio = aiConf >= 0.7 && aiIntent === 'estudio_precio';\n\nlet route = 'welcome';\nlet handoff_reason = String(item.handoff_reason || ctx.handoff_reason || '');\nlet handoff_quote = String(item.handoff_quote || ctx.handoff_quote || '');\nlet captured_nombre = '';\nlet captured_dni = '';\nconst parsedDatos = parseNameDni(last);\n\nif (estado === 'confirmando_cancelacion') {\n  if (yes) route = 'cancel_yes';\n  else if (no) route = 'cancel_no';\n  else if (isMedia) route = 'media_warn';\n  else route = 'cancel_ask';\n} else if (estado === 'confirmando_cancelacion_solicitud') {\n  if (yes) route = 'cancelar_collect';\n  else if (no) route = 'cancelar_abort';\n  else route = 'cancelar_prompt';\n} else if (estado === 'awaiting_cancelar_datos') {\n  if (parsedDatos) {\n    route = 'cancelar_finalize';\n    captured_nombre = parsedDatos.nombre;\n    captured_dni = parsedDatos.dni;\n  } else {\n    route = 'cancelar_collect';\n  }\n} else if (estado === 'confirmando_reprogramar_solicitud') {\n  if (yes) route = 'reprogramar_collect';\n  else if (no) route = 'reprogramar_abort';\n  else route = 'reprogramar_prompt';\n} else if (estado === 'awaiting_reprogramar_datos') {\n  if (parsedDatos) {\n    route = 'reprogramar_finalize';\n    captured_nombre = parsedDatos.nombre;\n    captured_dni = parsedDatos.dni;\n  } else {\n    route = 'reprogramar_collect';\n  }\n} else if (isMedia) {\n  route = 'media_warn';\n} else if (cancelKw && isAwaiting) {\n  route = 'cancel_ask';\n} else if (isRepetir && isAwaiting) {\n  route = 'booking';\n} else if (isHorarios) {\n  route = 'horarios';\n} else if (isMenuKw || isGreeting) {\n  route = 'welcome';\n} else if (isTurno) {\n  route = 'booking';\n} else if (isHablar) {\n  route = 'hablar_secretaria';\n} else if (isContinuar) {\n  route = isAwaiting ? 'booking' : 'welcome';\n} else if (isOtra) {\n  route = 'welcome';\n} else if (regexCancelar || aiCancelable) {\n  route = 'cancelar_prompt';\n} else if (regexReprogramar || aiReprogramable) {\n  route = 'reprogramar_prompt';\n} else if (wantsHandoff || aiEstudio) {\n  route = 'estudio_handoff';\n} else if (isAwaiting) {\n  route = 'booking';\n} else if (estado === 'menu_shown' && texto && !boton) {\n  route = 'faq';\n} else {\n  route = 'welcome';\n}\n\nif (route === 'media_warn') {\n  handoff_reason = 'imagen/audio';\n  const cap = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  handoff_quote = cap || ('[' + (item.media_kind || 'imagen/audio') + ']');\n} else if (route === 'estudio_handoff') {\n  const est = isEstudioIntent(last) || isEstudioIntent(handoffProbe) || isEstudioIntent(allFold) || aiEstudio;\n  const sec = isSecretariaIntent(last) || isSecretariaIntent(handoffProbe) || isSecretariaIntent(allFold);\n  handoff_reason = est ? 'estudio/precio' : (sec ? 'solicitud_secretaria' : 'estudio/precio');\n  handoff_quote = handoffProbe || texto;\n} else if (route === 'hablar_secretaria') {\n  if (!handoff_reason) {\n    if (fromMediaPrompt || pending === 'media_warn') handoff_reason = 'imagen/audio';\n    else handoff_reason = 'estudio/precio';\n  }\n  if (!handoff_quote) {\n    handoff_quote = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  }\n}\n\nreturn [{ json: { ...item, estado, texto, last_line: last, boton_id: boton, route, handoff_reason, handoff_quote, handoff_quote_sql: sqlStr(handoff_quote), captured_nombre, captured_dni } }];\n"
+        "jsCode": "const item = $input.first().json;\nlet estado = item.estado || 'idle';\nlet boton = String(item.boton_id || '').trim();\nconst texto = String(item.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst lastLower = last.toLowerCase();\nconst onMenu = estado === 'idle' || estado === 'menu_shown';\nconst ctx = item.context && typeof item.context === 'object' ? item.context : {};\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nfunction sqlStr(s) {\n  return String(s || '').replace(/\\u0000/g, '').replace(/[\\r\\n]+/g, ' ').replace(/'/g, \"''\").slice(0, 400);\n}\n\nfunction isYesText(t) {\n  const f = fold(t);\n  return f === 'si' || f === 's';\n}\n\nfunction isNoText(t) {\n  return fold(t) === 'no';\n}\n\nfunction isEstudioIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/(consult|pregunt|\\binfo\\b|informacion).{0,60}(tratamiento|estudio|cirugia)/.test(f)) return true;\n  if (/(tratamiento|estudio|cirugia).{0,60}(consult|pregunt|\\binfo\\b|informacion)/.test(f)) return true;\n  if (/cuanto sale|cuanto cuesta|\\bprecio\\b|\\bvalor\\b|se cobra|\\bcobran\\b|cubre la obra/.test(f)) return true;\n  if (/\\bcampo visual\\b/.test(f)) return true;\n  if (/\\bperimetria(\\s+computarizada)?\\b/.test(f)) return true;\n  if (/\\btopografia\\b/.test(f)) return true;\n  if (/\\bpaquimetria\\b/.test(f)) return true;\n  if (/\\bretinografia(\\s+digital)?\\b/.test(f)) return true;\n  if (/\\boct\\s+(anterior|posterior)\\b/.test(f)) return true;\n  if (/\\bocta\\b/.test(f)) return true;\n  if (/\\boct\\b/.test(f)) return true;\n  if (/\\bangiografia\\b/.test(f)) return true;\n  if (/\\bmicroscopia especular\\b/.test(f)) return true;\n  return false;\n}\n\nfunction isSecretariaIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/^para poder responder mejor esta consulta/.test(f)) return false;\n  if (/hablar con (una )?secretaria/.test(f)) return true;\n  if (/(pasar|derivar|comunicar|conectar).{0,40}(con )?(una )?(persona|humano|humana|secretaria|alguien|operador)/.test(f)) return true;\n  if (/(quiero|necesito|preciso).{0,40}secretaria/.test(f)) return true;\n  if (/(quiero|necesito|preciso).{0,40}(persona|humano|humana|atencion humana)/.test(f)) return true;\n  if (/\\b(atencion humana|persona real|operador humano)\\b/.test(f)) return true;\n  return false;\n}\n\nfunction isCancelarIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/\\bcancel(ar|acion)\\b.{0,50}\\b(turno|consulta|cita)\\b/.test(f)) return true;\n  if (/\\bno\\s+voy\\s+a\\s+poder\\s+ir\\b/.test(f)) return true;\n  if (/\\bno\\s+puedo\\s+ir\\b/.test(f)) return true;\n  if (/\\bquiero\\s+cancelar\\b/.test(f)) return true;\n  if (/\\bnecesito\\s+cancelar\\b/.test(f)) return true;\n  if (/\\bdar\\s+de\\s+baja\\b.{0,30}\\bturno\\b/.test(f)) return true;\n  return false;\n}\n\nfunction isReprogramarIntent(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/\\breprogram(ar|acion)\\b.{0,50}\\b(turno|consulta|cita)\\b/.test(f)) return true;\n  if (/\\bcambiar\\b.{0,40}\\b(horario|dia|turno|fecha)\\b/.test(f)) return true;\n  if (/\\botro\\s+dia\\b|\\botra\\s+fecha\\b|\\bdia\\s+diferente\\b/.test(f)) return true;\n  if (/\\bnecesito\\s+un\\s+turno\\s+para\\s+otro\\s+dia\\b/.test(f)) return true;\n  if (/\\bnecesito\\s+un\\s+turno\\s+para\\s+un\\s+dia\\s+diferente\\b/.test(f)) return true;\n  return false;\n}\n\nfunction wantsHandoffIntent(t) {\n  return isSecretariaIntent(t) || isEstudioIntent(t);\n}\n\nfunction parseNameDni(t) {\n  const raw = String(t || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  const compact = raw.replace(/[.]/g, '').replace(/-/g, '');\n  const dniM = compact.match(/\\b(\\d{7,10})\\b/);\n  if (!dniM) return null;\n  const dni = dniM[1];\n  const before = compact.replace(dniM[0], ' ').replace(/[,:;|]+/g, ' ').replace(/\\s+/g, ' ').trim();\n  const clean = before.replace(/^(dni|nombre|soy|me llamo|mi nombre es)\\s+/i, '').trim();\n  if (!clean) return null;\n  return { nombre: clean.slice(0, 120), dni };\n}\n\nconst lastFold = fold(last);\nconst allFold = fold(texto);\nconst handoffProbe = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim() || texto;\nconst pending = String(item.pending_prompt || ctx.pending_prompt || '');\nconst quotedMedia = /no podemos recibir fotos ni audios/.test(allFold);\nconst quotedEstudio = /necesitamos derivarlo con una secretaria/.test(allFold);\nconst fromMediaPrompt = pending === 'media_warn' || quotedMedia;\nconst fromEstudioPrompt = pending === 'estudio_handoff' || quotedEstudio;\n\nif (!boton && (fromMediaPrompt || fromEstudioPrompt)) {\n  if (fromMediaPrompt && lastFold === '1') boton = 'continuar_consulta';\n  else if (fromMediaPrompt && lastFold === '2') boton = 'hablar_secretaria';\n  else if (fromEstudioPrompt && lastFold === '1') boton = 'hablar_secretaria';\n  else if (fromEstudioPrompt && lastFold === '2') boton = 'otra_consulta';\n}\n\nconst cancelKw = boton === 'cancelar_turno_pedido' || boton === 'cancelar_turno'\n  || fold(last) === 'cancelar' || fold(last) === 'cancelar turno';\n\nconst isAwaiting = /^awaiting_/.test(estado);\n\nconst anyYes = lines.some(isYesText);\nconst anyNo = lines.some(isNoText);\n\nconst yes = [\n  'cancel_si',\n  'cancelar_solicitud_si',\n  'reprogramar_solicitud_si',\n  'si_generico'\n].includes(boton)\n  || isYesText(last)\n  || anyYes\n  || fold(last).includes('si cancelar')\n  || fold(last).includes('si reprogramar');\n\nconst no = [\n  'cancel_no',\n  'cancelar_solicitud_no',\n  'reprogramar_solicitud_no',\n  'no_generico'\n].includes(boton)\n  || isNoText(last)\n  || anyNo\n  || fold(last).includes('no continuar');\n\nconst isRepetir = boton === 'repetir_pregunta'\n  || fold(last) === 'repetir'\n  || fold(last) === 'repetir pregunta'\n  || lines.some(l => ['repetir', 'repetir pregunta'].includes(fold(l)));\n\nconst numericMenu = onMenu && !fromMediaPrompt && !fromEstudioPrompt;\n\nconst isHorarios = boton === 'horarios_clinica'\n  || (onMenu && ['horarios', 'horarios clinica', 'horarios de clinica', 'horarios de la clinica'].includes(lastFold))\n  || (numericMenu && lastFold === '1');\n\nconst regexCancelar = isCancelarIntent(last) || isCancelarIntent(handoffProbe) || isCancelarIntent(allFold);\nconst regexReprogramar = isReprogramarIntent(last) || isReprogramarIntent(handoffProbe) || isReprogramarIntent(allFold);\n\nconst isTurno = (\n  boton === 'quiero_turno'\n  || boton === 'confirmar_turno'\n  || (numericMenu && lastFold === '2')\n  || (onMenu && (/\\bturno\\b|\\bturni\\b|\\bcita\\b|\\bcitas\\b|sacar turno|sacar un turno/.test(lastFold)))\n) && !regexCancelar && !regexReprogramar;\n\nconst isMenuKw = boton === 'volver_menu'\n  || ['menu', 'volver', 'volver al menu'].includes(lastFold);\n\nconst isGreeting = ['hola', 'holis', 'buenas', 'buenos dias', 'buenas tardes', 'buenas noches', 'hi', 'hey', 'hello', 'que tal'].includes(lastFold);\n\nconst isHablar = boton === 'hablar_secretaria';\nconst isContinuar = boton === 'continuar_consulta';\nconst isOtra = boton === 'otra_consulta';\nconst isMedia = item.tipo === 'media';\n\nconst wantsHandoff = wantsHandoffIntent(last) || wantsHandoffIntent(handoffProbe) || wantsHandoffIntent(allFold);\n\nconst aiIntent = String(item.ai_intent || '').toLowerCase();\nconst aiConf = Number(item.ai_confidence || 0);\nconst aiCancelable = aiConf >= 0.7 && aiIntent === 'cancelar';\nconst aiReprogramable = aiConf >= 0.7 && aiIntent === 'reprogramar';\nconst aiEstudio = aiConf >= 0.7 && aiIntent === 'estudio_precio';\n\nlet route = 'welcome';\nlet handoff_reason = String(item.handoff_reason || ctx.handoff_reason || '');\nlet handoff_quote = String(item.handoff_quote || ctx.handoff_quote || '');\nlet captured_nombre = '';\nlet captured_dni = '';\n\nconst parsedDatos = parseNameDni(last) || parseNameDni(handoffProbe) || parseNameDni(texto);\n\nif (estado === 'confirmando_cancelacion') {\n  if (yes) route = 'cancel_yes';\n  else if (no) route = 'cancel_no';\n  else if (isMedia) route = 'media_warn';\n  else route = 'cancel_ask';\n\n} else if (estado === 'confirmando_cancelacion_solicitud') {\n  if (yes) route = 'cancelar_collect';\n  else if (no) route = 'cancelar_abort';\n  else route = 'cancelar_prompt';\n\n} else if (estado === 'awaiting_cancelar_datos') {\n  if (parsedDatos) {\n    route = 'cancelar_finalize';\n    captured_nombre = parsedDatos.nombre;\n    captured_dni = parsedDatos.dni;\n  } else {\n    route = 'cancelar_collect';\n  }\n\n} else if (estado === 'confirmando_reprogramar_solicitud') {\n  if (yes) route = 'reprogramar_collect';\n  else if (no) route = 'reprogramar_abort';\n  else route = 'reprogramar_prompt';\n\n} else if (estado === 'awaiting_reprogramar_datos') {\n  if (parsedDatos) {\n    route = 'reprogramar_finalize';\n    captured_nombre = parsedDatos.nombre;\n    captured_dni = parsedDatos.dni;\n  } else {\n    route = 'reprogramar_collect';\n  }\n\n} else if (isMedia) {\n  route = 'media_warn';\n\n} else if (cancelKw && isAwaiting) {\n  route = 'cancel_ask';\n\n} else if (isRepetir && isAwaiting) {\n  route = 'booking';\n\n} else if (isHorarios) {\n  route = 'horarios';\n\n} else if (isMenuKw || isGreeting) {\n  route = 'welcome';\n\n} else if (wantsHandoff || aiEstudio) {\n  route = 'estudio_handoff';\n\n} else if (isAwaiting) {\n  route = 'booking';\n\n} else if (regexCancelar || aiCancelable) {\n  route = 'cancelar_prompt';\n\n} else if (regexReprogramar || aiReprogramable) {\n  route = 'reprogramar_prompt';\n\n} else if (isTurno) {\n  route = 'booking';\n\n} else if (isHablar) {\n  route = 'hablar_secretaria';\n\n} else if (isContinuar) {\n  route = isAwaiting ? 'booking' : 'welcome';\n\n} else if (isOtra) {\n  route = 'welcome';\n\n} else if (estado === 'menu_shown' && texto && !boton) {\n  route = 'faq';\n\n} else {\n  route = 'welcome';\n}\n\nif (route === 'media_warn') {\n  handoff_reason = 'imagen/audio';\n  const cap = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  handoff_quote = cap || ('[' + (item.media_kind || 'imagen/audio') + ']');\n\n} else if (route === 'estudio_handoff') {\n  const est = isEstudioIntent(last) || isEstudioIntent(handoffProbe) || isEstudioIntent(allFold) || aiEstudio;\n  const sec = isSecretariaIntent(last) || isSecretariaIntent(handoffProbe) || isSecretariaIntent(allFold);\n  handoff_reason = est ? 'estudio/precio' : (sec ? 'solicitud_secretaria' : 'estudio/precio');\n  handoff_quote = handoffProbe || texto;\n\n} else if (route === 'hablar_secretaria') {\n  if (!handoff_reason) {\n    if (fromMediaPrompt || pending === 'media_warn') handoff_reason = 'imagen/audio';\n    else handoff_reason = 'estudio/precio';\n  }\n  if (!handoff_quote) {\n    handoff_quote = last.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  }\n}\n\nreturn [{\n  json: {\n    ...item,\n    estado,\n    texto,\n    last_line: last,\n    boton_id: boton,\n    route,\n    handoff_reason,\n    handoff_quote,\n    handoff_quote_sql: sqlStr(handoff_quote),\n    captured_nombre,\n    captured_dni\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1601,7 +1601,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const m = $('Decide Route').first().json;\nconst needsRetry = m.estado === 'awaiting_cancelar_datos';\nconst safePhone = String(m.telefono || '').replace(/'/g, \"''\");\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: needsRetry\n        ? 'Necesito su nombre completo y DNI para solicitar la cancelación. Envíelos en un solo mensaje (ejemplo: Juan Pérez 30111222).'\n        : 'Perfecto. Para continuar, envíe su nombre completo y DNI en un solo mensaje (ejemplo: Juan Pérez 30111222).',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    },\n    sql_state: `UPDATE conversation_state SET state = 'awaiting_cancelar_datos' WHERE phone = '${safePhone}'`\n  }\n}];"
+        "jsCode": "const m = $('Decide Route').first().json;\nconst needsRetry = m.estado === 'awaiting_cancelar_datos';\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: needsRetry\n        ? \"No pude leer nombre y DNI. Envíelos en un solo mensaje: el DNI debe tener 7 a 10 dígitos (ejemplo: Ignacio 30111222).\"\n        : \"Perfecto. Envíe su nombre y DNI en un solo mensaje. El DNI debe tener 7 a 10 dígitos (ejemplo: Juan Pérez 30111222).\",\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    }\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1615,7 +1615,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $json.sql_state }}",
+        "query": "UPDATE conversation_state SET state = 'awaiting_cancelar_datos' WHERE phone = '{{ $('Decide Route').item.json.telefono }}';",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -1710,7 +1710,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $json.sql_insert }}",
+        "query": "={{ $('Prep cancelar finalize').first().json.sql_insert }}",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -1763,7 +1763,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $json.sql_state }}",
+        "query": "={{ $('Prep cancelar finalize').first().json.sql_state }}",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -1849,7 +1849,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const m = $('Decide Route').first().json;\nconst needsRetry = m.estado === 'awaiting_reprogramar_datos';\nconst safePhone = String(m.telefono || '').replace(/'/g, \"''\");\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: needsRetry\n        ? 'Necesito su nombre completo y DNI para solicitar la reprogramación. Envíelos en un solo mensaje (ejemplo: Juan Pérez 30111222).'\n        : 'Perfecto. Para continuar, envíe su nombre completo y DNI en un solo mensaje (ejemplo: Juan Pérez 30111222).',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    },\n    sql_state: `UPDATE conversation_state SET state = 'awaiting_reprogramar_datos' WHERE phone = '${safePhone}'`\n  }\n}];"
+        "jsCode": "const m = $('Decide Route').first().json;\nconst needsRetry = m.estado === 'awaiting_reprogramar_datos';\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: needsRetry\n        ? \"No pude leer nombre y DNI. Envíelos en un solo mensaje: el DNI debe tener 7 a 10 dígitos (ejemplo: Ignacio 30111222).\"\n        : \"Perfecto. Envíe su nombre y DNI en un solo mensaje. El DNI debe tener 7 a 10 dígitos (ejemplo: Juan Pérez 30111222).\",\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    }\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1863,7 +1863,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $json.sql_state }}",
+        "query": "UPDATE conversation_state SET state = 'awaiting_reprogramar_datos' WHERE phone = '{{ $('Decide Route').item.json.telefono }}';",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -1958,7 +1958,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $json.sql_insert }}",
+        "query": "={{ $('Prep reprogramar finalize').first().json.sql_insert }}",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -2011,7 +2011,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $json.sql_state }}",
+        "query": "={{ $('Prep reprogramar finalize').first().json.sql_state }}",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -2051,6 +2051,32 @@
           "name": "MySQL account"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Prep cancelar finalize').first().json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        1008
+      ],
+      "id": "c7a1e2b0-1111-4b22-8c33-restore-cancel-fin",
+      "name": "Restore cancelar finalize item"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Prep reprogramar finalize').first().json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        1296
+      ],
+      "id": "c7a1e2b0-2222-4b22-8c33-restore-reprog-fin",
+      "name": "Restore reprogramar finalize item"
     }
   ],
   "pinData": {},
@@ -2202,7 +2228,7 @@
         ],
         [
           {
-            "node": "Build cancelar collect",
+            "node": "Set awaiting cancelar datos",
             "type": "main",
             "index": 0
           }
@@ -2230,7 +2256,7 @@
         ],
         [
           {
-            "node": "Build reprogramar collect",
+            "node": "Set awaiting reprogramar datos",
             "type": "main",
             "index": 0
           }
@@ -2548,7 +2574,7 @@
       "main": [
         [
           {
-            "node": "Set awaiting cancelar datos",
+            "node": "Send cancelar collect",
             "type": "main",
             "index": 0
           }
@@ -2559,7 +2585,7 @@
       "main": [
         [
           {
-            "node": "Send cancelar collect",
+            "node": "Build cancelar collect",
             "type": "main",
             "index": 0
           }
@@ -2592,7 +2618,7 @@
       "main": [
         [
           {
-            "node": "Send cancelar private note",
+            "node": "Restore cancelar finalize item",
             "type": "main",
             "index": 0
           }
@@ -2636,7 +2662,7 @@
       "main": [
         [
           {
-            "node": "Set awaiting reprogramar datos",
+            "node": "Send reprogramar collect",
             "type": "main",
             "index": 0
           }
@@ -2647,7 +2673,7 @@
       "main": [
         [
           {
-            "node": "Send reprogramar collect",
+            "node": "Build reprogramar collect",
             "type": "main",
             "index": 0
           }
@@ -2680,7 +2706,7 @@
       "main": [
         [
           {
-            "node": "Send reprogramar private note",
+            "node": "Restore reprogramar finalize item",
             "type": "main",
             "index": 0
           }
@@ -2703,6 +2729,28 @@
         [
           {
             "node": "Call Welcome 02",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore cancelar finalize item": {
+      "main": [
+        [
+          {
+            "node": "Send cancelar private note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore reprogramar finalize item": {
+      "main": [
+        [
+          {
+            "node": "Send reprogramar private note",
             "type": "main",
             "index": 0
           }
