@@ -385,6 +385,17 @@ def normalize_tipo(value: Any) -> str:
     return tipo
 
 
+def chatwoot_conversation_url(conversation_id: Any) -> str | None:
+    cid = str(conversation_id or "").strip()
+    if not cid:
+        return None
+    host = (env("CHATWOOT_HOST") or env("DOMAIN") or "").strip().lstrip(".")
+    if not host:
+        return None
+    account_id = (env("CHATWOOT_ACCOUNT_ID") or "2").strip() or "2"
+    return f"https://chat.{host}/app/accounts/{account_id}/conversations/{cid}"
+
+
 @app.get("/api/solicitudes")
 @login_required
 async def api_solicitudes(request: Request):
@@ -405,7 +416,7 @@ async def api_solicitudes(request: Request):
             f"""
             SELECT id, created_at, phone, nombre, dni, obra_social,
                    telefono_contacto, medico, horario_preferido, status,
-                   {tipo_sql}
+                   conversation_id, {tipo_sql}
             FROM turno_solicitudes
             ORDER BY created_at DESC
             LIMIT 200
@@ -444,6 +455,8 @@ async def api_solicitudes(request: Request):
                 "medico": r["medico"] or "-",
                 "horario_preferido": r["horario_preferido"] or "-",
                 "status": r["status"],
+                "conversation_id": r.get("conversation_id") or None,
+                "chat_url": chatwoot_conversation_url(r.get("conversation_id")),
             }
         )
 

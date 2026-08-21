@@ -5,9 +5,85 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clínica Artigas — Dashboard</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .dash-wrap {
+      max-width: 1200px;
+      margin-top: 32px;
+      margin-bottom: 48px;
+    }
+    .solicitudes-table {
+      --bs-table-bg: transparent;
+      margin-bottom: 0;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    .solicitudes-table thead th {
+      color: #6c757d;
+      font-weight: 500;
+      font-size: 0.8125rem;
+      letter-spacing: 0.01em;
+      border-bottom-width: 1px;
+      padding: 0.85rem 1rem;
+      white-space: nowrap;
+      background: #fff;
+    }
+    .solicitudes-table tbody td {
+      padding: 1rem;
+      vertical-align: middle;
+      border-color: #eef0f2;
+      color: #212529;
+    }
+    .solicitudes-table tbody tr.day-group th {
+      background: #f8f9fa;
+      color: #495057;
+      font-weight: 600;
+      font-size: 0.875rem;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .solicitudes-table .col-medico,
+    .solicitudes-table .col-detalle,
+    .solicitudes-table .col-obra {
+      min-width: 9rem;
+      max-width: 16rem;
+      white-space: normal;
+      word-break: break-word;
+    }
+    .solicitudes-table .col-paciente {
+      min-width: 8rem;
+      font-weight: 600;
+    }
+    .btn-abrir-chat {
+      display: inline-block;
+      padding: 0.35rem 0.85rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      line-height: 1.4;
+      color: #0d6efd;
+      background: #fff;
+      border: 1px solid #0d6efd;
+      border-radius: 0.375rem;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+    .btn-abrir-chat:hover,
+    .btn-abrir-chat:focus {
+      color: #fff;
+      background: #0d6efd;
+      border-color: #0d6efd;
+    }
+    .btn-abrir-chat.is-disabled {
+      color: #adb5bd;
+      border-color: #dee2e6;
+      background: #f8f9fa;
+      pointer-events: none;
+      cursor: default;
+    }
+  </style>
 </head>
 <body class="bg-light">
-  <div class="container" style="max-width: 960px; margin-top: 32px; margin-bottom: 48px;">
+  <div class="container dash-wrap">
 
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h4 class="mb-0">Clínica Artigas</h4>
@@ -133,7 +209,7 @@
           · agrupadas por el día en que se hizo la solicitud
         </p>
         <div class="table-responsive">
-          <table class="table table-sm align-middle">
+          <table class="table solicitudes-table align-middle">
             <thead>
               <tr>
                 <th>Tipo</th>
@@ -144,6 +220,7 @@
                 <th>Médico</th>
                 <th>Detalle</th>
                 <th>Obra social</th>
+                <th class="text-end">Chat</th>
               </tr>
             </thead>
             <tbody id="solicitudes-tbody"></tbody>
@@ -433,17 +510,25 @@
       return `<span class="badge ${cls}">${escapeHtml(t)}</span>`;
     }
 
+    function chatAction(b) {
+      if (b.chat_url) {
+        return `<a class="btn-abrir-chat" href="${escapeHtml(b.chat_url)}" target="chatwoot" rel="noopener">Abrir Chat</a>`;
+      }
+      return `<span class="btn-abrir-chat is-disabled" title="Sin conversación vinculada">Abrir Chat</span>`;
+    }
+
     function solicitudRow(b) {
       return `
             <tr>
               <td>${tipoBadge(b.tipo)}</td>
               <td class="text-nowrap">${escapeHtml(b.hora || '-')}</td>
-              <td>${escapeHtml(b.nombre)}</td>
+              <td class="col-paciente">${escapeHtml(b.nombre)}</td>
               <td class="text-nowrap">${escapeHtml(b.dni || '-')}</td>
               <td class="text-nowrap">${escapeHtml(b.telefono_contacto || b.phone)}</td>
-              <td>${escapeHtml(b.medico)}</td>
-              <td>${escapeHtml(b.horario_preferido)}</td>
-              <td>${escapeHtml(b.obra_social)}</td>
+              <td class="col-medico">${escapeHtml(b.medico)}</td>
+              <td class="col-detalle">${escapeHtml(b.horario_preferido)}</td>
+              <td class="col-obra">${escapeHtml(b.obra_social)}</td>
+              <td class="text-end">${chatAction(b)}</td>
             </tr>`;
     }
 
@@ -457,11 +542,11 @@
         const data = await res.json();
         const groups = data.dias || [];
         if (!groups.length) {
-          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Sin solicitudes</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">Sin solicitudes</td></tr>';
         } else {
           tbody.innerHTML = groups.map(g => `
-            <tr class="table-group-divider">
-              <th colspan="8" class="bg-light py-2">${escapeHtml(g.label)}</th>
+            <tr class="day-group">
+              <th colspan="9">${escapeHtml(g.label)}</th>
             </tr>
             ${(g.solicitudes || []).map(solicitudRow).join('')}
           `).join('');
@@ -469,7 +554,7 @@
         statusEl.textContent = 'Actualizado ' + new Date().toLocaleTimeString();
       } catch (err) {
         statusEl.textContent = 'No se pudieron cargar.';
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-4">Error</td></tr>';
       }
     }
 
