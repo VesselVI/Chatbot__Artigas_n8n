@@ -32,23 +32,23 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        2112,
-        5440
+        26656,
+        37776
       ],
-      "id": "222b1d5d-3336-4bb8-917b-ec4d63f36912",
+      "id": "8bb1b5a9-e63f-482d-bba9-907c03eeb409",
       "name": "When Executed by Another Workflow"
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst STEP_ORDER = [\n  'awaiting_nombre',\n  'awaiting_dni',\n  'awaiting_obra_social',\n  'awaiting_obra_social_otra',\n  'awaiting_telefono',\n  'awaiting_medico',\n  'awaiting_dia_hora',\n  'awaiting_confirmacion',\n];\n\nfunction quotedStep(texto) {\n  const f = fold(texto);\n  if (/confirmas el turno/.test(f)) return 'awaiting_confirmacion';\n  if (/nombre completo/.test(f)) return 'awaiting_nombre';\n  if (/cual es tu dni|tu dni|\\bdni\\b/.test(f)) return 'awaiting_dni';\n  if (/nombre de tu obra social/.test(f)) return 'awaiting_obra_social_otra';\n  if (/obra social/.test(f)) return 'awaiting_obra_social';\n  if (/numero de telefono/.test(f)) return 'awaiting_telefono';\n  if (/medico preferis|que medico/.test(f)) return 'awaiting_medico';\n  if (/horario preferis/.test(f)) return 'awaiting_dia_hora';\n  return null;\n}\n\nconst j = $input.first().json;\nconst estado = j.estado || 'idle';\nconst boton = String(j.boton_id || '').trim();\nlet texto = String(j.texto || '').trim();\ntexto = texto.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst lastFold = fold(last);\nconst isNavLine = (l) => /^(repetir|repetir pregunta)$/i.test(fold(l));\nconst isRepetir = boton === 'repetir_pregunta' || isNavLine(last) || lines.some(isNavLine);\nconst isConfirm = boton === 'confirmar_turno'\n  || /^(si|ok|okay|confirmar|confirmo|dale|yes)$/i.test(lastFold);\nconst ctx = parseCtx(j.datos_json);\nlet step = estado;\nif (/^(idle|menu_shown)$/.test(estado)) step = 'Empezar';\n\nif (isRepetir) {\n  const q = quotedStep(texto);\n  if (q) {\n    const cur = STEP_ORDER.indexOf(step);\n    const tgt = STEP_ORDER.indexOf(q);\n    if (tgt >= 0 && (cur < 0 || tgt <= cur)) step = q;\n  }\n}\n\nreturn [{\n  json: {\n    telefono: j.telefono,\n    texto,\n    boton_id: boton,\n    estado,\n    datos_json: ctx,\n    conversation_id: j.conversation_id,\n    account_id: j.account_id,\n    is_repetir: isRepetir,\n    is_confirm: isConfirm,\n    step\n  }\n}];"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst STEP_ORDER = [\n  'awaiting_nombre',\n  'awaiting_dni',\n  'awaiting_obra_social',\n  'awaiting_obra_social_otra',\n  'awaiting_telefono',\n  'awaiting_medico',\n  'awaiting_dia_hora',\n  'awaiting_confirmacion',\n];\n\nfunction quotedStep(texto) {\n  const f = fold(texto);\n  if (/confirmas el turno/.test(f)) return 'awaiting_confirmacion';\n  if (/nombre completo/.test(f)) return 'awaiting_nombre';\n  if (/cual es tu dni|tu dni|\\bdni\\b/.test(f)) return 'awaiting_dni';\n  if (/nombre de tu obra social/.test(f)) return 'awaiting_obra_social_otra';\n  if (/obra social/.test(f)) return 'awaiting_obra_social';\n  if (/numero de telefono/.test(f)) return 'awaiting_telefono';\n  if (/medico preferis|que medico/.test(f)) return 'awaiting_medico';\n  if (/horario preferis/.test(f)) return 'awaiting_confirmacion';\n  return null;\n}\n\nconst j = $input.first().json;\nconst estado = j.estado || 'idle';\nconst boton = String(j.boton_id || '').trim();\nlet texto = String(j.texto || '').trim();\ntexto = texto.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst lastFold = fold(last);\nconst isNavLine = (l) => /^(repetir|repetir pregunta)$/i.test(fold(l));\nconst isRepetir = boton === 'repetir_pregunta' || isNavLine(last) || lines.some(isNavLine);\nconst isConfirm = boton === 'confirmar_turno'\n  || /^(si|ok|okay|confirmar|confirmo|dale|yes)$/i.test(lastFold);\nconst ctx = parseCtx(j.datos_json);\nlet step = estado;\nif (/^(idle|menu_shown)$/.test(estado)) step = 'Empezar';\n\nif (isRepetir) {\n  const q = quotedStep(texto);\n  if (q) {\n    const cur = STEP_ORDER.indexOf(step);\n    const tgt = STEP_ORDER.indexOf(q);\n    if (tgt >= 0 && (cur < 0 || tgt <= cur)) step = q;\n  }\n}\n\nreturn [{\n  json: {\n    telefono: j.telefono,\n    texto,\n    boton_id: boton,\n    estado,\n    datos_json: ctx,\n    conversation_id: j.conversation_id,\n    account_id: j.account_id,\n    is_repetir: isRepetir,\n    is_confirm: isConfirm,\n    step\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2336,
-        5440
+        26880,
+        37776
       ],
-      "id": "e636f7ca-cc04-40ad-a6e7-9ed96a5eb67a",
+      "id": "f0d2847b-56b2-44ba-9c63-8a2ed27dca7e",
       "name": "Prepare Input"
     },
     {
@@ -287,10 +287,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        2560,
-        5328
+        27104,
+        37664
       ],
-      "id": "52e2c908-ac38-4092-b8bf-0978a045eed5",
+      "id": "39accb04-ef2f-48d9-8c64-a3274ab682ef",
       "name": "State Switch"
     },
     {
@@ -302,10 +302,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        2784,
-        3808
+        27328,
+        36144
       ],
-      "id": "8d055c43-ff6f-478b-8244-6aaf35e9442c",
+      "id": "50172cb2-3c4e-48f9-b078-5640eb4b1142",
       "name": "Start awaiting_nombre",
       "alwaysOutputData": true,
       "credentials": {
@@ -322,10 +322,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3008,
-        3808
+        27552,
+        36144
       ],
-      "id": "5e8e6bee-9314-49bb-b067-fec9a9aea7c3",
+      "id": "819ea2d7-aebb-47a1-8f85-b09b2119f4dc",
       "name": "Ask nombre"
     },
     {
@@ -342,10 +342,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3232,
-        3808
+        27776,
+        36144
       ],
-      "id": "055a4ac5-3e76-46ab-9ab3-deb6a45c761e",
+      "id": "1707e852-ec8e-4f68-b33f-ed1239856b8c",
       "name": "Send ask nombre",
       "credentials": {
         "httpHeaderAuth": {
@@ -381,10 +381,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2784,
-        4096
+        27328,
+        36432
       ],
-      "id": "09d48401-d20f-4259-bad4-c13f1d9363f9",
+      "id": "6bc97d27-534a-4704-8cbe-f2d79e6d3904",
       "name": "Nombre: repetir?"
     },
     {
@@ -394,10 +394,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3008,
-        4000
+        27552,
+        36336
       ],
-      "id": "93cee6b8-dcf6-42f7-96e4-5ae017150876",
+      "id": "0638c3b3-3565-4d06-88e1-1ad2f8c9cf2c",
       "name": "Re-ask nombre"
     },
     {
@@ -414,10 +414,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3232,
-        4000
+        27776,
+        36336
       ],
-      "id": "84b7fce5-28df-4623-9a01-639f116704af",
+      "id": "ff944fe7-6c0d-45c5-abc6-76af08cb09f2",
       "name": "Send re-ask nombre",
       "credentials": {
         "httpHeaderAuth": {
@@ -435,10 +435,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3008,
-        4192
+        27552,
+        36528
       ],
-      "id": "a676597c-5f26-476e-b619-b7b1005317bc",
+      "id": "5f3f3b76-b90b-41d6-b435-365fcc630da0",
       "name": "Save nombre",
       "alwaysOutputData": true,
       "credentials": {
@@ -455,10 +455,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3232,
-        4192
+        27776,
+        36528
       ],
-      "id": "60c7c22e-af5e-4f35-98c8-eded2026a308",
+      "id": "fc22bea1-d531-47a0-bcea-e104c649b00c",
       "name": "Ask DNI"
     },
     {
@@ -475,10 +475,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3456,
-        4192
+        28000,
+        36528
       ],
-      "id": "ecaccaa4-5e39-4fdb-b90d-38725f7d65d9",
+      "id": "f2aaba26-84e0-468a-805a-ab2e32fb4c7c",
       "name": "Send ask DNI",
       "credentials": {
         "httpHeaderAuth": {
@@ -514,10 +514,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2784,
-        4480
+        27328,
+        36816
       ],
-      "id": "303f35a4-976e-42b4-bbfa-c02d476c1376",
+      "id": "f15d1622-6890-4f76-a687-c58cf5255167",
       "name": "DNI: repetir?"
     },
     {
@@ -527,10 +527,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3008,
-        4384
+        27552,
+        36720
       ],
-      "id": "3cdeaa1a-f124-4e25-b5ea-830b77fc8e5f",
+      "id": "ef0b0e97-bd06-4b96-a06c-bca37d68d3bd",
       "name": "Re-ask DNI"
     },
     {
@@ -547,10 +547,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3232,
-        4384
+        27776,
+        36720
       ],
-      "id": "9e2d41d0-329d-4036-98c7-2f87fa543c1f",
+      "id": "8ce3d560-fd53-4e76-8f77-9f1da58a4064",
       "name": "Send re-ask DNI",
       "credentials": {
         "httpHeaderAuth": {
@@ -568,10 +568,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3008,
-        4576
+        27552,
+        36912
       ],
-      "id": "a64683c4-a2d2-44f3-a4a9-858378978805",
+      "id": "cdbf7c70-6061-47d0-b888-147916a326b8",
       "name": "Save DNI",
       "alwaysOutputData": true,
       "credentials": {
@@ -590,10 +590,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3232,
-        4576
+        27776,
+        36912
       ],
-      "id": "45e030d9-0d3a-42e0-ae44-4e9b36d2253a",
+      "id": "de1c62f8-2367-4e50-81c8-d8504453c083",
       "name": "Load obras_sociales",
       "alwaysOutputData": true,
       "credentials": {
@@ -610,10 +610,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3456,
-        4576
+        28000,
+        36912
       ],
-      "id": "bcd31ece-7633-44b5-b5f4-abf34b80baa8",
+      "id": "f0a7565a-9cd5-41d1-8dd5-a9f3673561cd",
       "name": "Ask obra list"
     },
     {
@@ -630,10 +630,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3680,
-        4576
+        28224,
+        36912
       ],
-      "id": "631e2496-7172-441a-96b0-2b9422bc95c8",
+      "id": "1627475e-f010-48fd-97dc-db596c4d9b2e",
       "name": "Send obra list",
       "credentials": {
         "httpHeaderAuth": {
@@ -649,10 +649,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2784,
-        4960
+        27328,
+        37296
       ],
-      "id": "7704c88e-608a-41b7-a655-d9ffcec3c25d",
+      "id": "a477642d-6748-453e-87a0-88b35b1f80cf",
       "name": "Handle obra social"
     },
     {
@@ -741,10 +741,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        3008,
-        4944
+        27552,
+        37280
       ],
-      "id": "18e3c205-a090-45ea-a38e-dd674e5284f8",
+      "id": "26a41a88-bbc1-48c5-bffc-500c42733320",
       "name": "Obra action"
     },
     {
@@ -756,10 +756,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3232,
-        4768
+        27776,
+        37104
       ],
-      "id": "3a49430e-3b27-4a0c-a1f1-7706f91bd618",
+      "id": "3d3694b6-355f-41f7-b732-b44d5c97d540",
       "name": "Reload obras repetir",
       "alwaysOutputData": true,
       "credentials": {
@@ -776,10 +776,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3456,
-        4768
+        28000,
+        37104
       ],
-      "id": "d7abbff6-f25f-45cc-915d-76a1fa78ef1a",
+      "id": "e5cfadac-4895-4da6-9c5f-ce4735983852",
       "name": "Re-ask obra list"
     },
     {
@@ -796,10 +796,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3680,
-        4768
+        28224,
+        37104
       ],
-      "id": "0e0e9c2b-d70b-4377-9de8-6ffaef0f9f18",
+      "id": "5e358a91-c002-46d9-b426-c9332e4239a2",
       "name": "Send obra repetir",
       "credentials": {
         "httpHeaderAuth": {
@@ -817,10 +817,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3232,
-        4960
+        27776,
+        37296
       ],
-      "id": "58ac4f20-3849-4aed-91b1-91e39e07e385",
+      "id": "759c32fd-4095-4e89-9a1b-1ba815bd60ee",
       "name": "Set awaiting_obra_otra",
       "alwaysOutputData": true,
       "credentials": {
@@ -837,10 +837,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3456,
-        4960
+        28000,
+        37296
       ],
-      "id": "c8462e96-d249-4afe-bc0d-b3491f947d15",
+      "id": "ca47e4a0-0e77-456c-8038-e26d85102896",
       "name": "Ask obra otra"
     },
     {
@@ -857,10 +857,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3680,
-        4960
+        28224,
+        37296
       ],
-      "id": "a9e51306-269c-4fd7-9dc6-d2d983c35f3a",
+      "id": "00004fd3-b45f-4de1-a3ee-d8d473e37e16",
       "name": "Send obra otra",
       "credentials": {
         "httpHeaderAuth": {
@@ -878,10 +878,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3232,
-        5152
+        27776,
+        37488
       ],
-      "id": "08bb75d8-a4bf-40b6-a29d-b3a4476d0f3c",
+      "id": "ca95af4c-4f48-4738-92e6-f687dba95d11",
       "name": "Save obra listed",
       "alwaysOutputData": true,
       "credentials": {
@@ -898,10 +898,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3456,
-        5152
+        28000,
+        37488
       ],
-      "id": "beb5641d-6389-49ef-b38a-fb0b3e93e442",
+      "id": "ccef25c6-18da-4318-a3fc-d7968e4e4c94",
       "name": "Ask telefono"
     },
     {
@@ -918,10 +918,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3680,
-        5152
+        28224,
+        37488
       ],
-      "id": "ad4cda68-702b-40ef-9330-003699fbba3e",
+      "id": "86af2dc6-baf6-40ec-b4bb-28e06a9955d6",
       "name": "Send ask telefono",
       "credentials": {
         "httpHeaderAuth": {
@@ -957,10 +957,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2784,
-        5456
+        27328,
+        37792
       ],
-      "id": "12b67f82-d39a-449f-8d6a-2b35796350e4",
+      "id": "9cf92816-db1a-4e1e-88b8-4d52d8de0a41",
       "name": "Obra otra: repetir?"
     },
     {
@@ -970,10 +970,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3008,
-        5344
+        27552,
+        37680
       ],
-      "id": "3a007cc9-173d-48d2-b879-309d3a562971",
+      "id": "67a035fd-3832-44c2-b44e-8db558ffff5b",
       "name": "Re-ask obra otra"
     },
     {
@@ -990,10 +990,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3232,
-        5344
+        27776,
+        37680
       ],
-      "id": "3cefdc7a-afc6-4fe5-812a-f3dfc7d1e45c",
+      "id": "9d6c18b7-e085-4545-8c06-f98cc135d6c4",
       "name": "Send re-ask obra otra",
       "credentials": {
         "httpHeaderAuth": {
@@ -1011,10 +1011,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3232,
-        5536
+        27776,
+        37872
       ],
-      "id": "77ae8b49-e19a-44fd-92ef-5036d8ef64d8",
+      "id": "699d6630-a736-408b-a5c4-ad85eebe8d24",
       "name": "Save obra otra",
       "alwaysOutputData": true,
       "credentials": {
@@ -1031,10 +1031,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3232,
-        5536
+        27776,
+        37872
       ],
-      "id": "8b1d36cf-5431-42e2-9ddd-8bf6d58329ad",
+      "id": "a68228dc-8f05-45f2-90cb-bb68010c41f1",
       "name": "Ask telefono after otra"
     },
     {
@@ -1051,10 +1051,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3456,
-        5536
+        28000,
+        37872
       ],
-      "id": "fc78d4b2-fc9b-447d-a349-f760d4c17827",
+      "id": "b1e26bb2-3b7e-4275-8dea-61c611032949",
       "name": "Send telefono after otra",
       "credentials": {
         "httpHeaderAuth": {
@@ -1090,10 +1090,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2784,
-        5840
+        27328,
+        38176
       ],
-      "id": "e6d001e9-a98c-4e4d-95d7-8e88ba1d1f92",
+      "id": "1f0c3a13-be83-44de-bebc-768e40b3cdf9",
       "name": "Tel: repetir?"
     },
     {
@@ -1103,10 +1103,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3008,
-        5728
+        27552,
+        38064
       ],
-      "id": "6f181c05-fccd-45d9-bce9-08b00c6b784b",
+      "id": "ef5790b7-3463-4f1d-9360-fe6e6573dd3f",
       "name": "Re-ask telefono"
     },
     {
@@ -1123,10 +1123,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3232,
-        5728
+        27776,
+        38064
       ],
-      "id": "5ca78bbb-7b54-46ef-bbe0-898a9b1c2bae",
+      "id": "5ade58ad-4f47-4395-a4a9-9b4da3a01499",
       "name": "Send re-ask telefono",
       "credentials": {
         "httpHeaderAuth": {
@@ -1144,10 +1144,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3008,
-        5920
+        27552,
+        38256
       ],
-      "id": "e2962063-801d-4f50-a400-208ff2101d3a",
+      "id": "53583d2d-b00e-4609-a2c7-7e53a68eae59",
       "name": "Save telefono",
       "alwaysOutputData": true,
       "credentials": {
@@ -1166,10 +1166,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3232,
-        5920
+        27776,
+        38256
       ],
-      "id": "8df348d8-1db6-45e7-b9f4-b873b188aa15",
+      "id": "dddc81a1-cf38-45af-91ff-30f692ad0346",
       "name": "Load doctors list",
       "alwaysOutputData": true,
       "credentials": {
@@ -1186,10 +1186,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3456,
-        5920
+        28000,
+        38256
       ],
-      "id": "da4b24bc-d58d-458f-b682-ce58d1f37922",
+      "id": "096f21e4-c911-4cea-9ab4-264d613561fe",
       "name": "Ask medico list"
     },
     {
@@ -1206,10 +1206,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3680,
-        5920
+        28224,
+        38256
       ],
-      "id": "cb304aae-05ad-4324-a461-bbfeb9cbde3f",
+      "id": "0fd33f77-98bc-4293-af0d-475932e3cf04",
       "name": "Send medico list",
       "credentials": {
         "httpHeaderAuth": {
@@ -1220,16 +1220,15 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst m = $('Prepare Input').first().json;\nconst boton = String(m.boton_id || '').trim();\nconst texto = String(m.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nif (m.is_repetir || boton === 'repetir_pregunta') {\n  return [{ json: { ...m, med_action: 'repetir' } }];\n}\n\nlet docs = [];\ntry {\n  const items = $input.all().map(i => i.json);\n  if (items.length === 1 && items[0].doctors_json != null) {\n    let raw = items[0].doctors_json;\n    if (typeof raw === 'string') raw = JSON.parse(raw);\n    docs = Array.isArray(raw) ? raw : [];\n  } else {\n    docs = items.filter(d => d && d.id && d.name);\n  }\n} catch (e) {\n  docs = [];\n}\n\nconst cabeceraTokens = new Set([\n  'medico_cabecera',\n  'medico_cualquiera',\n  fold('Mi médico de cabecera'),\n  fold('Cualquier doctor'),\n  'cabecera',\n]);\nif (cabeceraTokens.has(boton) || cabeceraTokens.has(fold(boton)) || cabeceraTokens.has(fold(last))) {\n  return [{ json: { ...m, med_action: 'save', medico_name: 'Mi médico de cabecera', doctor_id: null, cualquiera: true } }];\n}\n\nfunction findDoc(token) {\n  const raw = String(token || '').trim();\n  if (!raw) return null;\n  if (/^medico_\\d+$/.test(raw)) {\n    const id = Number(raw.replace('medico_', ''));\n    return docs.find(d => Number(d.id) === id) || { id, name: '' };\n  }\n  const f = fold(raw);\n  return docs.find(d => {\n    const n = fold(d.name);\n    const t = fold(String(d.name).slice(0, 24));\n    return f === n || f === t;\n  }) || null;\n}\n\nfunction isPromptLine(line) {\n  const f = fold(line);\n  return /medico preferis|que medico|escribi una opcion/.test(f);\n}\n\nlet hit = findDoc(boton) || findDoc(last);\nif (!hit) {\n  for (const line of [...lines].reverse()) {\n    if (isPromptLine(line)) continue;\n    hit = findDoc(line);\n    if (hit) break;\n  }\n}\n\nif (hit) {\n  return [{ json: { ...m, med_action: 'save', medico_name: hit.name || last, doctor_id: hit.id, cualquiera: false } }];\n}\nreturn [{ json: { ...m, med_action: 'repetir' } }];\n",
-        "mode": "runOnceForAllItems"
+        "jsCode": "\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst m = $('Prepare Input').first().json;\nconst boton = String(m.boton_id || '').trim();\nconst texto = String(m.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nif (m.is_repetir || boton === 'repetir_pregunta') {\n  return [{ json: { ...m, med_action: 'repetir' } }];\n}\n\nlet docs = [];\ntry {\n  const items = $input.all().map(i => i.json);\n  if (items.length === 1 && items[0].doctors_json != null) {\n    let raw = items[0].doctors_json;\n    if (typeof raw === 'string') raw = JSON.parse(raw);\n    docs = Array.isArray(raw) ? raw : [];\n  } else {\n    docs = items.filter(d => d && d.id && d.name);\n  }\n} catch (e) {\n  docs = [];\n}\n\nconst cabeceraTokens = new Set([\n  'medico_cabecera',\n  'medico_cualquiera',\n  fold('Mi médico de cabecera'),\n  fold('Cualquier doctor'),\n  'cabecera',\n]);\nif (cabeceraTokens.has(boton) || cabeceraTokens.has(fold(boton)) || cabeceraTokens.has(fold(last))) {\n  return [{ json: { ...m, med_action: 'save', medico_name: 'Mi médico de cabecera', doctor_id: null, cualquiera: true } }];\n}\n\nfunction findDoc(token) {\n  const raw = String(token || '').trim();\n  if (!raw) return null;\n  if (/^medico_\\d+$/.test(raw)) {\n    const id = Number(raw.replace('medico_', ''));\n    return docs.find(d => Number(d.id) === id) || { id, name: '' };\n  }\n  const f = fold(raw);\n  return docs.find(d => {\n    const n = fold(d.name);\n    const t = fold(String(d.name).slice(0, 24));\n    return f === n || f === t;\n  }) || null;\n}\n\nfunction isPromptLine(line) {\n  const f = fold(line);\n  return /medico preferis|que medico|escribi una opcion/.test(f);\n}\n\nlet hit = findDoc(boton) || findDoc(last);\nif (!hit) {\n  for (const line of [...lines].reverse()) {\n    if (isPromptLine(line)) continue;\n    hit = findDoc(line);\n    if (hit) break;\n  }\n}\n\nif (hit) {\n  return [{ json: { ...m, med_action: 'save', medico_name: hit.name || last, doctor_id: hit.id, cualquiera: false } }];\n}\nreturn [{ json: { ...m, med_action: 'repetir' } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2928,
-        6224
+        27472,
+        38560
       ],
-      "id": "43873a83-49d4-4ff0-8c44-a669146a8426",
+      "id": "b5c25dfe-8cfd-474a-a7ca-40469a0738d8",
       "name": "Handle medico"
     },
     {
@@ -1293,10 +1292,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        3008,
-        6224
+        27552,
+        38560
       ],
-      "id": "5723f078-9e7c-4ca0-a344-50d68fdac5fc",
+      "id": "bcd234d9-a3b3-4166-a8cc-ffd20e33e2ae",
       "name": "Medico action"
     },
     {
@@ -1308,10 +1307,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3232,
-        6112
+        27776,
+        38448
       ],
-      "id": "06b3c837-1f33-4c7b-af85-3e17fdbba8aa",
+      "id": "b1b6985a-eb13-4ad7-9e7f-0feefef237d8",
       "name": "Reload doctors repetir",
       "alwaysOutputData": true,
       "credentials": {
@@ -1328,10 +1327,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3456,
-        6112
+        28000,
+        38448
       ],
-      "id": "05924f2e-51a3-488d-96ac-daca0b1b9206",
+      "id": "2e2e7f3f-6f91-4215-a810-5abf2970a8b0",
       "name": "Re-ask medico"
     },
     {
@@ -1348,10 +1347,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3680,
-        6112
+        28224,
+        38448
       ],
-      "id": "ef7668c8-2f5c-4403-952e-9f6cac183bbb",
+      "id": "76048c32-cc86-47ff-b7a5-ea3ce00001e3",
       "name": "Send medico repetir",
       "credentials": {
         "httpHeaderAuth": {
@@ -1362,15 +1361,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const m = $input.first().json;\nconst cualquiera = !!m.cualquiera;\nconst id = m.doctor_id ? Number(m.doctor_id) : 0;\nconst phone = String(m.telefono).replace(/'/g, \"''\");\nlet sql;\nif (cualquiera) {\n  sql = `UPDATE conversation_state SET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.medico', 'Mi médico de cabecera', '$.medico_cualquiera', true, '$.doctor_id', null), state = 'awaiting_dia_hora' WHERE phone = '${phone}';`;\n} else if (id) {\n  sql = `UPDATE conversation_state SET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.medico', (SELECT name FROM doctors WHERE id = ${id}), '$.medico_cualquiera', false, '$.doctor_id', ${id}), state = 'awaiting_dia_hora' WHERE phone = '${phone}';`;\n} else {\n  sql = `UPDATE conversation_state SET state = 'awaiting_medico' WHERE phone = '${phone}';`;\n}\nreturn [{ json: { ...m, doctor_id: id || null, cualquiera, sql_update: sql } }];\n"
+        "jsCode": "const m = $input.first().json;\nconst cualquiera = !!m.cualquiera;\nconst id = m.doctor_id ? Number(m.doctor_id) : 0;\nconst phone = String(m.telefono).replace(/'/g, \"''\");\nconst diaHora = 'A confirmar por secretaría'.replace(/'/g, \"''\");\nlet sql;\nif (cualquiera) {\n  sql = `UPDATE conversation_state SET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.medico', 'Mi médico de cabecera', '$.medico_cualquiera', true, '$.doctor_id', null, '$.dia_hora', '${diaHora}'), state = 'awaiting_confirmacion' WHERE phone = '${phone}';`;\n} else if (id) {\n  sql = `UPDATE conversation_state SET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.medico', (SELECT name FROM doctors WHERE id = ${id}), '$.medico_cualquiera', false, '$.doctor_id', ${id}, '$.dia_hora', '${diaHora}'), state = 'awaiting_confirmacion' WHERE phone = '${phone}';`;\n} else {\n  sql = `UPDATE conversation_state SET state = 'awaiting_medico' WHERE phone = '${phone}';`;\n}\nreturn [{ json: { ...m, doctor_id: id || null, cualquiera, sql_update: sql } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3232,
-        6304
+        27776,
+        38640
       ],
-      "id": "34396b55-c355-4a72-a502-fb2a4c5d42aa",
+      "id": "4a077170-21dc-47d8-b892-87068b766db9",
       "name": "Prep save medico"
     },
     {
@@ -1382,188 +1381,11 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3456,
-        6304
+        28000,
+        38640
       ],
-      "id": "b51e935c-7e93-4593-9efc-8a96ceb2fd49",
+      "id": "321031bc-c9c5-48d5-a891-23a9697c7a27",
       "name": "Save medico state",
-      "alwaysOutputData": true,
-      "credentials": {
-        "mySql": {
-          "id": "ADbEKvwG8sz2lY2H",
-          "name": "MySQL account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT\n  (SELECT clinic_hours FROM clinic_settings WHERE id = 1) AS clinic_hours,\n  (\n    SELECT GROUP_CONCAT(\n      CONCAT(\n        ELT(g.day+1, 'Lun','Mar','Mié','Jue','Vie','Sáb','Dom'),\n        ' ',\n        g.slots\n      )\n      ORDER BY g.day SEPARATOR ' || '\n    )\n    FROM (\n      SELECT\n        da.day,\n        GROUP_CONCAT(\n          CONCAT(DATE_FORMAT(da.start_time, '%H:%i'), '-', DATE_FORMAT(da.end_time, '%H:%i'))\n          ORDER BY da.start_time SEPARATOR ' y '\n        ) AS slots\n      FROM doctor_availability da\n      WHERE da.doctor_id = {{ Number($('Prep save medico').item.json.doctor_id) || 0 }}\n        AND da.week_start = DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)\n        AND da.is_unavailable = 0\n      GROUP BY da.day\n    ) g\n  ) AS doctor_hours,\n  (SELECT name FROM doctors WHERE id = {{ Number($('Prep save medico').item.json.doctor_id) || 0 }}) AS doctor_name,\n  (SELECT JSON_UNQUOTE(JSON_EXTRACT(context, '$.medico')) FROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}') AS medico_saved;",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.mySql",
-      "typeVersion": 2.5,
-      "position": [
-        3680,
-        6304
-      ],
-      "id": "7f5a9824-06d1-4d50-a5da-649d194aa805",
-      "name": "Load hours for prompt",
-      "alwaysOutputData": true,
-      "credentials": {
-        "mySql": {
-          "id": "ADbEKvwG8sz2lY2H",
-          "name": "MySQL account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nfunction formatDoctorHours(raw) {\n  const days = String(raw || '').split(' || ').map(s => s.trim()).filter(Boolean);\n  if (!days.length) return 'consultar en recepción';\n  return days.map((d) => '• ' + d).join('\\n');\n}\nconst m = $('Prep save medico').first().json;\nconst h = $input.first().json;\nif (m.cualquiera) {\n  return [cwSelect(`¿Qué horario preferís? Recordá que la clínica atiende ${h.clinic_hours || ''}.`, navItems(), m)];\n}\nconst docName = h.doctor_name || h.medico_saved || 'el doctor';\nconst hours = formatDoctorHours(h.doctor_hours);\nreturn [cwSelect(`¿Qué horario preferís? Recordá que ${docName} atiende:\\n${hours}`, navItems(), m)];\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3904,
-        6304
-      ],
-      "id": "9f5641e0-0a6b-4fb9-a477-0a83d603a874",
-      "name": "Ask dia_hora"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.cw_body }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        4128,
-        6304
-      ],
-      "id": "2a387a5a-1151-43f0-9d57-ba0edd3b4c0c",
-      "name": "Send ask dia_hora",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "GqVsiFUjDt4aJl4f",
-          "name": "Chatwoot API"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "rep6",
-              "leftValue": "={{ $json.is_repetir === true || $json.is_repetir === 'true' }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        2784,
-        6608
-      ],
-      "id": "b2e8bcd1-f6d3-4990-9a69-0ea25cc92cf1",
-      "name": "DiaHora: repetir?"
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT\n  JSON_UNQUOTE(JSON_EXTRACT(context, '$.medico')) AS medico,\n  JSON_EXTRACT(context, '$.medico_cualquiera') AS medico_cualquiera,\n  JSON_UNQUOTE(JSON_EXTRACT(context, '$.doctor_id')) AS doctor_id,\n  (SELECT clinic_hours FROM clinic_settings WHERE id = 1) AS clinic_hours,\n  (\n    SELECT GROUP_CONCAT(\n      CONCAT(\n        ELT(g.day+1, 'Lun','Mar','Mié','Jue','Vie','Sáb','Dom'),\n        ' ',\n        g.slots\n      )\n      ORDER BY g.day SEPARATOR ' || '\n    )\n    FROM (\n      SELECT\n        da.day,\n        GROUP_CONCAT(\n          CONCAT(DATE_FORMAT(da.start_time, '%H:%i'), '-', DATE_FORMAT(da.end_time, '%H:%i'))\n          ORDER BY da.start_time SEPARATOR ' y '\n        ) AS slots\n      FROM doctor_availability da\n      WHERE da.doctor_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(\n      (SELECT context FROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}'),\n      '$.doctor_id')) AS UNSIGNED)\n        AND da.week_start = DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)\n        AND da.is_unavailable = 0\n      GROUP BY da.day\n    ) g\n  ) AS doctor_hours\nFROM conversation_state WHERE phone = '{{ $('Prepare Input').item.json.telefono }}' LIMIT 1;",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.mySql",
-      "typeVersion": 2.5,
-      "position": [
-        3008,
-        6496
-      ],
-      "id": "7e24f9dd-1905-47e1-ab78-2c3c4e131879",
-      "name": "Load ctx for re-ask horario",
-      "alwaysOutputData": true,
-      "credentials": {
-        "mySql": {
-          "id": "ADbEKvwG8sz2lY2H",
-          "name": "MySQL account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nfunction formatDoctorHours(raw) {\n  const days = String(raw || '').split(' || ').map(s => s.trim()).filter(Boolean);\n  if (!days.length) return 'consultar en recepción';\n  return days.map((d) => '• ' + d).join('\\n');\n}\nconst m = $('Prepare Input').first().json;\nconst h = $input.first().json;\nconst cualquiera = h.medico_cualquiera === true || h.medico_cualquiera === 'true' || h.medico === 'Cualquier doctor' || h.medico === 'Mi médico de cabecera';\nif (cualquiera) {\n  return [cwSelect(`¿Qué horario preferís? Recordá que la clínica atiende ${h.clinic_hours || ''}.`, navItems(), m)];\n}\nreturn [cwSelect(`¿Qué horario preferís? Recordá que ${h.medico || 'el doctor'} atiende:\\n${formatDoctorHours(h.doctor_hours)}`, navItems(), m)];\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3232,
-        6496
-      ],
-      "id": "78453c3e-1bff-4f3a-b9ef-76decd25d3bf",
-      "name": "Re-ask dia_hora"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.cw_body }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        3456,
-        6496
-      ],
-      "id": "0bbce609-d66a-44c9-b622-cc5ed19beaa0",
-      "name": "Send re-ask dia_hora",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "GqVsiFUjDt4aJl4f",
-          "name": "Chatwoot API"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE conversation_state\nSET context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.dia_hora', '{{ $json.texto.replace(/'/g, \"''\") }}'),\n    state = 'awaiting_confirmacion'\nWHERE phone = '{{ $json.telefono }}';",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.mySql",
-      "typeVersion": 2.5,
-      "position": [
-        3008,
-        6688
-      ],
-      "id": "938aa4d9-1126-4efe-8fa6-8da5f85d9a08",
-      "name": "Save dia_hora",
       "alwaysOutputData": true,
       "credentials": {
         "mySql": {
@@ -1581,10 +1403,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3232,
-        6688
+        27776,
+        39024
       ],
-      "id": "c600100e-1c74-42ae-8a7f-6023b556c80a",
+      "id": "d5e18b46-2734-47df-bd7d-c0f851265325",
       "name": "Load ctx confirm",
       "alwaysOutputData": true,
       "credentials": {
@@ -1596,15 +1418,15 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || fm.includes('cualquier doctor') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\n\nconst m = $('Prepare Input').first().json;\nlet raw = $input.first().json.context;\nconst datos = parseCtx(raw);\nconst priceLine = consultaPriceLine(datos);\nconst text = `Solicitud de turno:\\n👤 ${datos.nombre || '-'}\\n🪪 ${datos.dni || '-'}\\n🏥 ${datos.obra_social || '-'}\\n📞 ${datos.telefono_contacto || '-'}\\n🩺 ${datos.medico || '-'}\\n📅 ${datos.dia_hora || '-'}${priceLine ? '\\n' + priceLine : ''}\\n\\n¿Confirmás el turno?\\n\\nEscribí *Confirmar*, para confirmar el turno.\\n\\nEscribí *cancelar* para cancelar la solicitud.`;\nreturn [cwSelect(text, [\n  { title: 'Confirmar', value: 'confirmar_turno' },\n  { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n], m)];\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || fm.includes('cualquier doctor') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\n\nconst m = $('Prepare Input').first().json;\nlet raw = $input.first().json.context;\nconst datos = parseCtx(raw);\nconst priceLine = consultaPriceLine(datos);\nconst text = `Solicitud de turno:\\n👤 ${datos.nombre || '-'}\\n🪪 ${datos.dni || '-'}\\n🏥 ${datos.obra_social || '-'}\\n📞 ${datos.telefono_contacto || '-'}\\n🩺 ${datos.medico || '-'}${priceLine ? '\\n' + priceLine : ''}\\n\\n¿Confirmás la solicitud?\\n\\nEscribí *Confirmar* para enviar la solicitud.\\n\\nEscribí *cancelar* para cancelar.\\n\\nLa secretaria te va a indicar el día y hora del turno.`;\nreturn [cwSelect(text, [\n  { title: 'Confirmar', value: 'confirmar_turno' },\n  { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n], m)];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3456,
-        6688
+        28000,
+        39024
       ],
-      "id": "2d7bb75d-ec30-4eb8-8111-6bf0ecd272a2",
+      "id": "3934bd3a-d02b-4613-be46-c146a7209c0a",
       "name": "Build confirmation"
     },
     {
@@ -1621,10 +1443,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3680,
-        6688
+        28224,
+        39024
       ],
-      "id": "064c6769-7760-4179-993a-1ef1fcbdabb1",
+      "id": "191dad76-76f1-4572-96e7-9dc841b5a8f7",
       "name": "Send confirmation",
       "credentials": {
         "httpHeaderAuth": {
@@ -1660,10 +1482,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2784,
-        6992
+        27328,
+        39328
       ],
-      "id": "40d1ac6b-554e-48ec-8cbe-966133bb03d0",
+      "id": "79de2bad-90a9-4da5-bcc5-e0b405d6d036",
       "name": "Confirm branch"
     },
     {
@@ -1693,10 +1515,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        3008,
-        7072
+        27552,
+        39408
       ],
-      "id": "34c53de6-d89e-4175-99bc-8b41488ce4cf",
+      "id": "10469779-6e7c-4f75-baa3-edb47be71f3b",
       "name": "Confirm: repetir?"
     },
     {
@@ -1708,10 +1530,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3232,
-        7072
+        27776,
+        39408
       ],
-      "id": "21d6c27a-c45d-47a9-80e5-765e877a0099",
+      "id": "9918f3bd-72c4-4d85-8351-4407e2568e40",
       "name": "Load ctx re-confirm",
       "alwaysOutputData": true,
       "credentials": {
@@ -1728,10 +1550,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3456,
-        7072
+        28000,
+        39408
       ],
-      "id": "e301b7cf-1e5c-4538-93b3-d3d45a766da4",
+      "id": "dcf1f9f9-c61b-40b8-87e2-930bc5d3f625",
       "name": "Re-show confirmation"
     },
     {
@@ -1748,10 +1570,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3680,
-        7072
+        28224,
+        39408
       ],
-      "id": "6016878d-2eb7-4754-bbf2-4989d7f83efb",
+      "id": "809189b8-c659-4ce6-8546-3eb219bd09e0",
       "name": "Send re-confirm",
       "credentials": {
         "httpHeaderAuth": {
@@ -1769,10 +1591,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3008,
-        6880
+        27552,
+        39216
       ],
-      "id": "bceae40d-459d-4b69-a679-29e8f34c5431",
+      "id": "9d1551e9-2f88-42fd-94a0-ab8bb948727c",
       "name": "Load ctx final",
       "alwaysOutputData": true,
       "credentials": {
@@ -1784,15 +1606,15 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || fm.includes('cualquier doctor') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\n\nconst m = $('Prepare Input').first().json;\nconst datos = parseCtx($input.first().json.context);\nconst esc = (s) => String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\nconst phone = esc(m.telefono);\nconst sql = `INSERT INTO turno_solicitudes (phone, nombre, dni, obra_social, telefono_contacto, medico, horario_preferido, status, conversation_id)\nVALUES ('${phone}', '${esc(datos.nombre)}', '${esc(datos.dni)}', '${esc(datos.obra_social)}', '${esc(datos.telefono_contacto)}', '${esc(datos.medico)}', '${esc(datos.dia_hora)}', 'pending', '${esc(m.conversation_id)}');`;\nconst priceLine = consultaPriceLine(datos);\nconst ficha = `🗒️ Nueva solicitud de turno\nNombre: ${datos.nombre || '-'}\nDNI: ${datos.dni || '-'}\nObra social: ${datos.obra_social || '-'}\nTeléfono: ${datos.telefono_contacto || '-'}\nMédico: ${datos.medico || '-'}\nDía/hora: ${datos.dia_hora || '-'}${priceLine ? '\\n' + priceLine : ''}`;\nreturn [{\n  json: {\n    telefono: m.telefono,\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    sql_insert: sql,\n    datos,\n    ficha,\n    cw_private: {\n      content: ficha,\n      message_type: 'outgoing',\n      private: true\n    },\n    cw_body: {\n      content: ficha + '\\n\\n¡Listo! Recibimos tu solicitud. La secretaria te va a confirmar el turno.\\nEscribí *menú* para volver.',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    }\n  }\n}];\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || fm.includes('cualquier doctor') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\n\nfunction isOutsideClinicHours(now) {\n  const h = now.getHours();\n  const inMorning = h >= 8 && h < 12;\n  const inAfternoon = h >= 16 && h < 20;\n  return !(inMorning || inAfternoon);\n}\n\nconst m = $('Prepare Input').first().json;\nconst datos = parseCtx($input.first().json.context);\nconst esc = (s) => String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\nconst phone = esc(m.telefono);\nconst horarioFijo = 'A confirmar por secretaría';\nconst sql = `INSERT INTO turno_solicitudes (phone, nombre, dni, obra_social, telefono_contacto, medico, horario_preferido, status, conversation_id)\nVALUES ('${phone}', '${esc(datos.nombre)}', '${esc(datos.dni)}', '${esc(datos.obra_social)}', '${esc(datos.telefono_contacto)}', '${esc(datos.medico)}', '${esc(horarioFijo)}', 'pending', '${esc(m.conversation_id)}');`;\nconst priceLine = consultaPriceLine(datos);\nconst ficha = `🗒️ Nueva solicitud de turno\nNombre: ${datos.nombre || '-'}\nDNI: ${datos.dni || '-'}\nObra social: ${datos.obra_social || '-'}\nTeléfono: ${datos.telefono_contacto || '-'}\nMédico: ${datos.medico || '-'}\nDía/hora: ${horarioFijo}${priceLine ? '\\n' + priceLine : ''}`;\n\nlet patientMsg = 'Turno solicitado.\\n\\nEspere a que la secretaria le responda con el día y hora de su turno.\\n\\nEscribí *menú* para volver.';\ntry {\n  const now = ($now && typeof $now.toDate === 'function')\n    ? $now.setZone('America/Argentina/Buenos_Aires').toJSDate()\n    : new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));\n  if (isOutsideClinicHours(now)) {\n    patientMsg += '\\n\\nSu solicitud fue enviada fuera del horario de atención de la clínica (8 a 12 hs y 16 a 20 hs). Una secretaria la confirmará dentro de ese horario.';\n  }\n} catch (e) {}\n\nreturn [{\n  json: {\n    telefono: m.telefono,\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    sql_insert: sql,\n    datos,\n    ficha,\n    cw_private: {\n      content: ficha,\n      message_type: 'outgoing',\n      private: true\n    },\n    cw_body: {\n      content: patientMsg,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    }\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3232,
-        6880
+        27776,
+        39216
       ],
-      "id": "cadde59c-99f3-4625-a336-bfc190b7f8cf",
+      "id": "3b6eb703-7cc6-41b8-80b4-a23119244791",
       "name": "Build insert + notes"
     },
     {
@@ -1804,10 +1626,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        3456,
-        6880
+        28000,
+        39216
       ],
-      "id": "87c169b3-248c-4565-a98f-bd1567cd81a9",
+      "id": "bfe6095b-14c7-4781-b532-e7e09cd6a9e9",
       "name": "Insert turno_solicitudes",
       "alwaysOutputData": true,
       "credentials": {
@@ -1824,10 +1646,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3680,
-        6880
+        28224,
+        39216
       ],
-      "id": "68224949-8e50-4097-82ce-9b81b93af521",
+      "id": "34893b1f-6b7e-48e9-bd32-32f60f0e4d9c",
       "name": "Prep private note"
     },
     {
@@ -1844,10 +1666,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3904,
-        6880
+        28448,
+        39216
       ],
-      "id": "6146cb22-ad99-430e-ae9b-1554e8ee1a30",
+      "id": "585e7079-0374-412d-a7a1-1f4d44839eb9",
       "name": "Send private note",
       "credentials": {
         "httpHeaderAuth": {
@@ -1863,10 +1685,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4128,
-        6880
+        28672,
+        39216
       ],
-      "id": "7583e226-5b30-4c0f-8cfa-4f9a107151c7",
+      "id": "bc0bf18a-6cc7-42fb-9a9d-8cf424de21a8",
       "name": "Prep patient confirm"
     },
     {
@@ -1883,10 +1705,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        4352,
-        6880
+        28896,
+        39216
       ],
-      "id": "03064d56-fb9a-4c59-9df8-2d7e1c186a05",
+      "id": "eff6bade-6a32-44dc-869d-fb4adf653e68",
       "name": "Send patient confirm",
       "credentials": {
         "httpHeaderAuth": {
@@ -1904,10 +1726,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        4576,
-        6880
+        29120,
+        39216
       ],
-      "id": "f0541b63-7d93-4e76-b69d-276e879a64d2",
+      "id": "0840c2c3-c79a-4e4b-abae-7ef394786ee9",
       "name": "Reset state after confirm",
       "alwaysOutputData": true,
       "credentials": {
@@ -1926,10 +1748,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        2448,
-        5440
+        26992,
+        37776
       ],
-      "id": "7c8f2a11-4d3e-4b91-9c0a-1f6e8d2b4a70",
+      "id": "e4213890-029f-4fdb-87cd-c321d82ae580",
       "name": "Sync step",
       "alwaysOutputData": true,
       "credentials": {
@@ -1946,10 +1768,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2504,
-        5440
+        27056,
+        37776
       ],
-      "id": "9e1d5c22-8a47-4f03-b6c1-3a9e0d7f5b18",
+      "id": "4c871171-e0e2-431a-bddd-5ed2690acdc0",
       "name": "After sync"
     },
     {
@@ -1961,10 +1783,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        2688,
-        6224
+        27232,
+        38560
       ],
-      "id": "b7f30d39-d0d2-4df8-bdc4-e81d4389fae1",
+      "id": "01758e72-e475-40ee-9e7d-c4f7c65690fc",
       "name": "Load doctors match",
       "alwaysOutputData": true,
       "credentials": {
@@ -1981,10 +1803,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3008,
-        5536
+        27552,
+        37872
       ],
-      "id": "4446845b-6d4a-4d67-9d4a-54ef1d20349c",
+      "id": "5f27cf31-01d1-4537-b494-70bd383b0093",
       "name": "Prep save obra otra"
     }
   ],
@@ -2087,7 +1909,7 @@
         ],
         [
           {
-            "node": "DiaHora: repetir?",
+            "node": "Load ctx confirm",
             "type": "main",
             "index": 0
           }
@@ -2517,79 +2339,6 @@
       "main": [
         [
           {
-            "node": "Load hours for prompt",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Load hours for prompt": {
-      "main": [
-        [
-          {
-            "node": "Ask dia_hora",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Ask dia_hora": {
-      "main": [
-        [
-          {
-            "node": "Send ask dia_hora",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "DiaHora: repetir?": {
-      "main": [
-        [
-          {
-            "node": "Load ctx for re-ask horario",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Save dia_hora",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Load ctx for re-ask horario": {
-      "main": [
-        [
-          {
-            "node": "Re-ask dia_hora",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Re-ask dia_hora": {
-      "main": [
-        [
-          {
-            "node": "Send re-ask dia_hora",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Save dia_hora": {
-      "main": [
-        [
-          {
             "node": "Load ctx confirm",
             "type": "main",
             "index": 0
@@ -2783,7 +2532,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "e8727478-533c-450f-9b84-0b4bc73a099f",
+  "versionId": "556864f8-351c-49dc-a52f-cc95acf142fe",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "93c3cb4635c69a031fa1214bf884cfb87a4cd8a0ecc85e055a10dc007292b2b8"

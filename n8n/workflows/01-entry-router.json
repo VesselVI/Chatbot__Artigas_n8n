@@ -10,10 +10,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -1392,
-        432
+        -960,
+        1632
       ],
-      "id": "4ac4b2da-937c-4653-9ff0-8b6cb3c2b898",
+      "id": "251e3a3a-6048-41ef-a24f-6f51d09a27fa",
       "name": "Chatwoot Webhook",
       "webhookId": "cw-bot-webhook"
     },
@@ -24,10 +24,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1168,
-        432
+        -736,
+        1632
       ],
-      "id": "16137806-20ec-4824-a111-4d45518fbabd",
+      "id": "28c593d6-17fe-4de9-aeec-850e38a1bdf2",
       "name": "Normalize Message"
     },
     {
@@ -39,10 +39,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        -944,
-        432
+        -512,
+        1632
       ],
-      "id": "82505efa-d948-4c7b-939e-129ad5abec46",
+      "id": "369185bf-997a-41d9-b155-2e2cc1b934c3",
       "name": "Ensure conversation_state",
       "alwaysOutputData": true,
       "credentials": {
@@ -61,10 +61,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        -720,
-        432
+        -288,
+        1632
       ],
-      "id": "3746a72f-9d73-4aaf-8adf-a4a25fb2be47",
+      "id": "13beb922-3347-49ce-a989-0175cf1eb40a",
       "name": "Get State",
       "credentials": {
         "mySql": {
@@ -75,15 +75,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const n = $('Normalize Message').first().json;\nconst row = $input.first().json;\nlet ctx = row.context ?? {};\nif (typeof ctx === 'string') {\n  try { ctx = JSON.parse(ctx); } catch (e) { ctx = {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nconst PREV_STEP = {\n  awaiting_dni: 'awaiting_nombre',\n  awaiting_obra_social: 'awaiting_dni',\n  awaiting_obra_social_otra: 'awaiting_obra_social',\n  awaiting_telefono: 'awaiting_obra_social',\n  awaiting_medico: 'awaiting_obra_social',\n  awaiting_dia_hora: 'awaiting_medico',\n  awaiting_confirmacion: 'awaiting_dia_hora',\n};\nconst CURRENT_KW = {\n  awaiting_nombre: /nombre completo/,\n  awaiting_dni: /dni/,\n  awaiting_obra_social: /obra social/,\n  awaiting_obra_social_otra: /nombre de tu obra social/,\n  awaiting_telefono: /telefono/,\n  awaiting_medico: /medico preferis|que medico/,\n  awaiting_dia_hora: /horario preferis/,\n  awaiting_confirmacion: /confirmas el turno/,\n};\nfunction quotedStep(texto) {\n  const f = fold(texto);\n  if (/confirmas el turno/.test(f)) return 'awaiting_confirmacion';\n  if (/nombre completo/.test(f)) return 'awaiting_nombre';\n  if (/cual es tu dni|tu dni|\\bdni\\b/.test(f)) return 'awaiting_dni';\n  if (/nombre de tu obra social/.test(f)) return 'awaiting_obra_social_otra';\n  if (/obra social/.test(f)) return 'awaiting_obra_social';\n  if (/numero de telefono/.test(f)) return 'awaiting_telefono';\n  if (/medico preferis|que medico/.test(f)) return 'awaiting_medico';\n  if (/horario preferis/.test(f)) return 'awaiting_dia_hora';\n  return null;\n}\nlet estado = row.state || 'idle';\nconst boton = String(n.boton_id || '').trim();\nconst texto = String(n.texto || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst isRepetir = boton === 'repetir_pregunta'\n  || /^(repetir|repetir pregunta)$/i.test(fold(last))\n  || lines.some(l => /^(repetir|repetir pregunta)$/i.test(fold(l)));\nif (isRepetir && /^awaiting_/.test(estado)) {\n  let q = quotedStep(texto);\n  if (!q) {\n    const kw = CURRENT_KW[estado];\n    if (!kw || !kw.test(fold(texto))) q = PREV_STEP[estado] || null;\n  }\n  if (q) {\n    const order = ['awaiting_nombre','awaiting_dni','awaiting_obra_social','awaiting_obra_social_otra','awaiting_telefono','awaiting_medico','awaiting_dia_hora','awaiting_confirmacion'];\n    const cur = order.indexOf(estado);\n    const tgt = order.indexOf(q);\n    if (tgt >= 0 && (cur < 0 || tgt <= cur)) estado = q;\n  }\n}\nreturn [{\n  json: {\n    telefono: n.telefono,\n    tipo: n.tipo,\n    texto: n.texto,\n    boton_id: n.boton_id,\n    conversation_id: n.conversation_id,\n    account_id: n.account_id,\n    estado,\n    datos_json: ctx,\n    context: ctx,\n    pending_prompt: ctx.pending_prompt || '',\n    handoff_reason: ctx.handoff_reason || '',\n    handoff_quote: ctx.handoff_quote || '',\n    media_kind: n.media_kind || '',\n    last_line: last,\n  }\n}];"
+        "jsCode": "const n = $('Normalize Message').first().json;\nconst row = $input.first().json;\nlet ctx = row.context ?? {};\nif (typeof ctx === 'string') {\n  try { ctx = JSON.parse(ctx); } catch (e) { ctx = {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nconst PREV_STEP = {\n  awaiting_dni: 'awaiting_nombre',\n  awaiting_obra_social: 'awaiting_dni',\n  awaiting_obra_social_otra: 'awaiting_obra_social',\n  awaiting_telefono: 'awaiting_obra_social',\n  awaiting_medico: 'awaiting_obra_social',\n  awaiting_dia_hora: 'awaiting_medico',\n  awaiting_confirmacion: 'awaiting_medico',\n};\nconst CURRENT_KW = {\n  awaiting_nombre: /nombre completo/,\n  awaiting_dni: /dni/,\n  awaiting_obra_social: /obra social/,\n  awaiting_obra_social_otra: /nombre de tu obra social/,\n  awaiting_telefono: /telefono/,\n  awaiting_medico: /medico preferis|que medico/,\n  awaiting_dia_hora: /horario preferis/,\n  awaiting_confirmacion: /confirmas el turno/,\n};\nfunction quotedStep(texto) {\n  const f = fold(texto);\n  if (/confirmas el turno/.test(f)) return 'awaiting_confirmacion';\n  if (/nombre completo/.test(f)) return 'awaiting_nombre';\n  if (/cual es tu dni|tu dni|\\bdni\\b/.test(f)) return 'awaiting_dni';\n  if (/nombre de tu obra social/.test(f)) return 'awaiting_obra_social_otra';\n  if (/obra social/.test(f)) return 'awaiting_obra_social';\n  if (/numero de telefono/.test(f)) return 'awaiting_telefono';\n  if (/medico preferis|que medico/.test(f)) return 'awaiting_medico';\n  if (/horario preferis/.test(f)) return 'awaiting_dia_hora';\n  return null;\n}\nlet estado = row.state || 'idle';\nconst boton = String(n.boton_id || '').trim();\nconst texto = String(n.texto || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst isRepetir = boton === 'repetir_pregunta'\n  || /^(repetir|repetir pregunta)$/i.test(fold(last))\n  || lines.some(l => /^(repetir|repetir pregunta)$/i.test(fold(l)));\nif (isRepetir && /^awaiting_/.test(estado)) {\n  let q = quotedStep(texto);\n  if (!q) {\n    const kw = CURRENT_KW[estado];\n    if (!kw || !kw.test(fold(texto))) q = PREV_STEP[estado] || null;\n  }\n  if (q) {\n    const order = ['awaiting_nombre','awaiting_dni','awaiting_obra_social','awaiting_obra_social_otra','awaiting_telefono','awaiting_medico','awaiting_dia_hora','awaiting_confirmacion'];\n    const cur = order.indexOf(estado);\n    const tgt = order.indexOf(q);\n    if (tgt >= 0 && (cur < 0 || tgt <= cur)) estado = q;\n  }\n}\nreturn [{\n  json: {\n    telefono: n.telefono,\n    tipo: n.tipo,\n    texto: n.texto,\n    boton_id: n.boton_id,\n    conversation_id: n.conversation_id,\n    account_id: n.account_id,\n    estado,\n    datos_json: ctx,\n    context: ctx,\n    pending_prompt: ctx.pending_prompt || '',\n    handoff_reason: ctx.handoff_reason || '',\n    handoff_quote: ctx.handoff_quote || '',\n    media_kind: n.media_kind || '',\n    last_line: last,\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -496,
-        432
+        -64,
+        1632
       ],
-      "id": "ced9eac1-5b62-42e8-852e-dccfe6340290",
+      "id": "9829fe00-a718-4635-8142-487bde72c72c",
       "name": "Merge Context"
     },
     {
@@ -93,10 +93,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -400,
-        272
+        160,
+        1632
       ],
-      "id": "b61f5d22-6b42-4c03-9080-2db5a5b203a1",
+      "id": "7b1b00fc-c432-4667-add5-35fa6e4022a3",
       "name": "Build AI intent prompt"
     },
     {
@@ -115,35 +115,35 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.7,
       "position": [
-        -176,
-        272
+        384,
+        1632
       ],
-      "id": "f4308fd5-bfd7-41f3-a584-9d90b88f4f66",
+      "id": "b0751426-ff56-4dc4-a11f-b844e726a374",
       "name": "Intent Classifier Chain"
     },
     {
       "parameters": {
         "model": {
           "__rl": true,
+          "value": "gpt-4o-mini",
           "mode": "list",
-          "value": "gpt-5-mini",
-          "cachedResultName": "gpt-5-mini"
+          "cachedResultName": "gpt-4o-mini"
         },
         "options": {
-          "temperature": 0.0
+          "temperature": 0.2
         }
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        -176,
-        464
+        464,
+        1856
       ],
-      "id": "47d6a0b1-3ef9-440f-80fb-a4b3f0548f98",
+      "id": "244d4877-949e-4abd-97c4-b6aec2aaffaa",
       "name": "OpenAI Intent Model",
       "credentials": {
         "openAiApi": {
-          "id": "OPENAI_CRED",
+          "id": "DFaxUlNOmnSAAv5P",
           "name": "OpenAI account"
         }
       }
@@ -155,10 +155,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        48,
-        272
+        944,
+        1648
       ],
-      "id": "44507d66-f2c5-4b79-b35d-8d0ae0f8733e",
+      "id": "1bf4f3a9-09c4-45c1-b421-e9f6ab0b3cc3",
       "name": "Parse AI intent"
     },
     {
@@ -168,10 +168,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -272,
-        432
+        1168,
+        1648
       ],
-      "id": "6657866d-2aa5-410c-a7f3-b2ba42d3bbf9",
+      "id": "daae6075-01fb-4ca5-84fa-74eb26b2f39e",
       "name": "Decide Route"
     },
     {
@@ -638,10 +638,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        -48,
-        336
+        1840,
+        1376
       ],
-      "id": "e0d56e4e-b1cf-48e3-9f6f-403f6d0fd516",
+      "id": "7c7f1233-53ae-4f0b-a792-582a73ee2120",
       "name": "Route Switch"
     },
     {
@@ -698,10 +698,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        176,
-        -144
+        2288,
+        896
       ],
-      "id": "74e4eb47-e338-46ef-8202-626c2cefaa7d",
+      "id": "da05d532-3f06-4e99-a68c-8d65efa03896",
       "name": "Call Welcome 02"
     },
     {
@@ -768,10 +768,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        176,
-        48
+        2064,
+        1040
       ],
-      "id": "987dabdf-84b9-4654-bc16-00d706f19c39",
+      "id": "bb8fe526-7edb-4bf6-a1c3-ce3d2fa0531e",
       "name": "Call FAQ 04"
     },
     {
@@ -868,10 +868,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        176,
-        240
+        2064,
+        1232
       ],
-      "id": "398e1222-3d8d-4541-a80d-c85bc7052831",
+      "id": "af155584-1403-4049-994b-25b936e77c45",
       "name": "Call Booking 03"
     },
     {
@@ -883,10 +883,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        176,
-        432
+        2064,
+        1424
       ],
-      "id": "d5811470-df75-4a94-87aa-89aaa01f4215",
+      "id": "1bcde9a6-8f22-491a-9a47-f3c78a6aa7d5",
       "name": "Load clinic hours",
       "credentials": {
         "mySql": {
@@ -902,10 +902,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
-        432
+        2288,
+        1424
       ],
-      "id": "3ee7206b-5a0e-43a3-bf54-d5486febe393",
+      "id": "c41f2538-a3ec-4d38-b882-37009ded2d53",
       "name": "Build horarios msg"
     },
     {
@@ -922,10 +922,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        624,
-        432
+        2512,
+        1424
       ],
-      "id": "ffedbc15-ce0e-4f24-b650-ca1977554fa6",
+      "id": "3509b0ac-564f-448e-b8f7-7d4c1c28e83a",
       "name": "Send horarios",
       "notesInFlow": true,
       "credentials": {
@@ -945,10 +945,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        176,
-        624
+        2064,
+        1616
       ],
-      "id": "27d74db3-e530-49b6-b446-699ec903fb61",
+      "id": "40ebf726-7aba-4f17-b887-190e6af0218b",
       "name": "Set confirmando_cancelacion",
       "credentials": {
         "mySql": {
@@ -964,10 +964,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
-        624
+        2288,
+        1616
       ],
-      "id": "b1de6c6d-33f7-4ac5-8700-10a3288391cc",
+      "id": "4a6544a3-817c-46ad-805e-36911ad4f0a5",
       "name": "Build cancel confirm"
     },
     {
@@ -984,10 +984,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        624,
-        624
+        2512,
+        1616
       ],
-      "id": "449b12c5-4888-4d85-8ba5-230dcfc1b44d",
+      "id": "4f55e655-321c-4205-a8f8-a9bdd1b1c21b",
       "name": "Send cancel confirm",
       "notesInFlow": true,
       "credentials": {
@@ -1007,10 +1007,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        176,
-        816
+        2512,
+        1808
       ],
-      "id": "d1f18ca6-757c-48bf-934b-effdcaeee860",
+      "id": "3f79916b-09f8-4ed1-8a21-5d2ef034824f",
       "name": "Clear state cancel yes",
       "credentials": {
         "mySql": {
@@ -1073,10 +1073,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        400,
-        816
+        2736,
+        1808
       ],
-      "id": "e4da5376-5c79-4fd9-951b-4453833c74c6",
+      "id": "6df96b04-243c-442b-8507-1a2749c2d846",
       "name": "Welcome after cancel"
     },
     {
@@ -1088,10 +1088,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        176,
-        1008
+        2064,
+        2384
       ],
-      "id": "6ceb1ab0-5b68-4b74-9b26-9f66300f42f3",
+      "id": "2041623e-7751-44ce-b99a-9a6c96143704",
       "name": "Restore estado_previo",
       "credentials": {
         "mySql": {
@@ -1193,10 +1193,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        624,
-        1008
+        2512,
+        2384
       ],
-      "id": "63f35c4f-74f7-4075-ad94-43f4ae5d8b55",
+      "id": "d649603b-c6c3-4c84-84f2-90db0cc1d4d9",
       "name": "Re-ask after cancel no"
     },
     {
@@ -1208,10 +1208,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        400,
-        1008
+        2288,
+        2384
       ],
-      "id": "ed028911-a45f-46cd-aa3d-f0f23732c58c",
+      "id": "7189831f-41bf-41c3-b908-35f9c91b8570",
       "name": "Get restored state",
       "credentials": {
         "mySql": {
@@ -1229,10 +1229,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        -160,
-        432
+        1392,
+        1648
       ],
-      "id": "40391662-d252-4e0a-9dc1-a32567698dc8",
+      "id": "9424426d-eeab-45f5-b429-1d4b75422333",
       "name": "Sync pending prompt",
       "alwaysOutputData": true,
       "credentials": {
@@ -1249,10 +1249,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -160,
-        336
+        1616,
+        1648
       ],
-      "id": "49c5181d-d19e-4aef-b6af-321f8571c9e2",
+      "id": "d2f990d7-bb32-4f15-b90d-a1dc1303eeb6",
       "name": "Restore route item"
     },
     {
@@ -1262,10 +1262,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        176,
-        1200
+        2064,
+        2960
       ],
-      "id": "ebb74443-dbb8-4ade-bf46-cba9712d6b23",
+      "id": "cced065d-844d-43bc-9707-fbafbb4fdb12",
       "name": "Build media warning"
     },
     {
@@ -1282,10 +1282,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        400,
-        1200
+        2288,
+        2960
       ],
-      "id": "0075debb-2236-4d7b-b396-c7fdbcec3802",
+      "id": "7f1a960a-28b7-4d1d-a1ee-25e651eba040",
       "name": "Send media warning",
       "notesInFlow": true,
       "credentials": {
@@ -1303,10 +1303,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        176,
-        1392
+        2064,
+        3536
       ],
-      "id": "4d81d634-f797-4b3c-aa6c-8ce2dd54b423",
+      "id": "d61cb595-8766-458f-b4d6-19352a726f06",
       "name": "Build estudio handoff"
     },
     {
@@ -1323,10 +1323,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        400,
-        1392
+        2288,
+        3536
       ],
-      "id": "84be2507-49ce-4cd8-88d2-ca2c1c146deb",
+      "id": "ac56e690-6574-4919-a5ef-a4fc76ec7529",
       "name": "Send estudio handoff",
       "notesInFlow": true,
       "credentials": {
@@ -1344,10 +1344,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        176,
-        1584
+        2064,
+        3920
       ],
-      "id": "884654da-3029-411c-b9b3-b3af47156096",
+      "id": "e214f6ef-3a95-4280-be5a-a85ebeb9d4ee",
       "name": "Build handoff confirm"
     },
     {
@@ -1364,10 +1364,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        400,
-        1584
+        2288,
+        3920
       ],
-      "id": "f9b7b99d-58aa-4894-94af-39d804e7e2f0",
+      "id": "b2c873f8-405a-46a1-a92e-b7f88abce78f",
       "name": "Send handoff confirm",
       "notesInFlow": true,
       "credentials": {
@@ -1385,10 +1385,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        624,
-        1584
+        2960,
+        3920
       ],
-      "id": "6040adf1-0c12-4db9-8a3c-5c23a68a5739",
+      "id": "a9d04aab-f135-4be8-bb62-fe5634de3f5f",
       "name": "Prep handoff private note"
     },
     {
@@ -1405,10 +1405,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        848,
-        1584
+        3184,
+        3920
       ],
-      "id": "c0242f2e-838d-4db8-b0fe-46eb3fed9f16",
+      "id": "ed58598c-69eb-42e0-86dc-949b4bb594ff",
       "name": "Send handoff private note",
       "notesInFlow": true,
       "credentials": {
@@ -1426,10 +1426,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1072,
-        1584
+        3408,
+        3920
       ],
-      "id": "0d27d0a3-1224-43c7-b6c2-799dce5ddbc1",
+      "id": "cc593a8d-5027-4890-97cd-c2ecf5c7384b",
       "name": "Prep team assign"
     },
     {
@@ -1446,10 +1446,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1296,
-        1584
+        3632,
+        3920
       ],
-      "id": "325e14df-3533-4345-a2fb-9f4356f91443",
+      "id": "50bd81ce-9524-408c-b471-3b4004170028",
       "name": "Assign Secretaría team",
       "notesInFlow": true,
       "credentials": {
@@ -1467,10 +1467,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        176,
-        720
+        2064,
+        1808
       ],
-      "id": "7f3c1a90-b2d4-4e81-9c6a-11a1b2c3d4e5",
+      "id": "dab7a724-1c54-45b1-997c-ab315683d8ce",
       "name": "Prep cancelar solicitud"
     },
     {
@@ -1482,19 +1482,19 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        400,
-        720
+        2288,
+        1808
       ],
-      "id": "7f3c1a90-b2d4-4e81-9c6a-11a1b2c3d4e6",
+      "id": "a5b3ac19-184c-4d28-ae4e-ab20f04c9e0e",
       "name": "Insert cancelar solicitud",
       "alwaysOutputData": true,
-      "onError": "continueRegularOutput",
       "credentials": {
         "mySql": {
           "id": "ADbEKvwG8sz2lY2H",
           "name": "MySQL account"
         }
       },
+      "onError": "continueRegularOutput",
       "notes": "Requires turno_solicitudes.tipo (migrate_solicitudes_tipo.sql). continueOnFail so cancel welcome still runs."
     },
     {
@@ -1504,10 +1504,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
-        1776
+        2512,
+        3920
       ],
-      "id": "7f3c1a90-b2d4-4e81-9c6a-11a1b2c3d4e7",
+      "id": "5c5ccdac-a39d-40c4-b93a-84f1d793659b",
       "name": "Prep estudio solicitud"
     },
     {
@@ -1519,19 +1519,19 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        624,
-        1776
+        2736,
+        3920
       ],
-      "id": "7f3c1a90-b2d4-4e81-9c6a-11a1b2c3d4e8",
+      "id": "86a36cfd-b6d4-435e-999b-2bd0210ea09c",
       "name": "Insert estudio solicitud",
       "alwaysOutputData": true,
-      "onError": "continueRegularOutput",
       "credentials": {
         "mySql": {
           "id": "ADbEKvwG8sz2lY2H",
           "name": "MySQL account"
         }
       },
+      "onError": "continueRegularOutput",
       "notes": "Inserts tipo=estudio on hablar_secretaria (estudio/precio). Media handoff is SELECT 1."
     },
     {
@@ -1543,10 +1543,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        176,
-        816
+        2064,
+        2000
       ],
-      "id": "9c6c6e85-7e88-4586-8f18-c22e657b9b6d",
+      "id": "d4b48717-751f-4a74-b9be-7140ea88d268",
       "name": "Set confirmando cancelacion solicitud",
       "alwaysOutputData": true,
       "credentials": {
@@ -1563,10 +1563,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
-        816
+        2288,
+        2000
       ],
-      "id": "2f5d08e9-f05e-4a6f-88d3-9c5604346405",
+      "id": "5930af0a-a2bf-4dc8-91da-00e7558b1bbe",
       "name": "Build cancelar solicitud prompt"
     },
     {
@@ -1587,14 +1587,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        624,
-        816
+        2512,
+        2000
       ],
-      "id": "4ad182d5-0f8f-4ef8-9ad2-bf2c5e34fbe0",
+      "id": "746356ef-9e7e-4edc-aae4-9af66d266b83",
       "name": "Send cancelar solicitud prompt",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CHATWOOT_CRED",
+          "id": "GqVsiFUjDt4aJl4f",
           "name": "Chatwoot API"
         }
       }
@@ -1606,10 +1606,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        176,
-        912
+        2288,
+        2192
       ],
-      "id": "9b6ecabf-8f94-4828-aa48-020d7b06ce6f",
+      "id": "e07c09e8-a050-4cb9-91a1-67a9db619bde",
       "name": "Build cancelar collect"
     },
     {
@@ -1621,10 +1621,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        400,
-        912
+        2064,
+        2192
       ],
-      "id": "8458c1ab-1f22-4cb8-bfb9-0588d6de9094",
+      "id": "24582395-84f0-4090-a98b-70ae808ce5b1",
       "name": "Set awaiting cancelar datos",
       "alwaysOutputData": true,
       "credentials": {
@@ -1652,14 +1652,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        624,
-        912
+        2512,
+        2192
       ],
-      "id": "0ad92309-3437-42ee-90ac-4580e9ecf4f2",
+      "id": "3252e9cf-30d0-444e-a29f-2ba73aedfa7f",
       "name": "Send cancelar collect",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CHATWOOT_CRED",
+          "id": "GqVsiFUjDt4aJl4f",
           "name": "Chatwoot API"
         }
       }
@@ -1671,10 +1671,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        176,
-        1008
+        2064,
+        2576
       ],
-      "id": "dbdd7ab9-3011-47d6-a937-18d1157b8d6f",
+      "id": "2d735b74-6aea-494b-8f22-1b13928e0473",
       "name": "Prep cancelar finalize"
     },
     {
@@ -1695,14 +1695,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        400,
-        1008
+        2288,
+        2576
       ],
-      "id": "d9137098-d4d9-4de0-b8f4-14d8e39ce9f2",
+      "id": "9ca9453e-b1eb-426e-8033-4dacdf45d247",
       "name": "Send cancelar confirm",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CHATWOOT_CRED",
+          "id": "GqVsiFUjDt4aJl4f",
           "name": "Chatwoot API"
         }
       }
@@ -1710,25 +1710,25 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $('Prep cancelar finalize').first().json.sql_insert }}",
+        "query": "{{ $('Prep cancelar finalize').first().json.sql_insert }}",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        624,
-        1008
+        2512,
+        2576
       ],
-      "id": "106ffc1d-7507-49d8-9f71-e1730714d66d",
+      "id": "a0816821-3ddb-4025-929b-1eb42006a18d",
       "name": "Insert cancelar solicitud ext",
       "alwaysOutputData": true,
-      "onError": "continueRegularOutput",
       "credentials": {
         "mySql": {
           "id": "ADbEKvwG8sz2lY2H",
           "name": "MySQL account"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -1748,14 +1748,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        848,
-        1008
+        2960,
+        2576
       ],
-      "id": "69eaa5a6-4d88-4c28-bd03-cd930d78f0c8",
+      "id": "10091b5f-b0dd-45c7-b5d6-c8568949d2b7",
       "name": "Send cancelar private note",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CHATWOOT_CRED",
+          "id": "GqVsiFUjDt4aJl4f",
           "name": "Chatwoot API"
         }
       }
@@ -1763,16 +1763,16 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $('Prep cancelar finalize').first().json.sql_state }}",
+        "query": "{{ $('Prep cancelar finalize').first().json.sql_state }}",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        1072,
-        1008
+        3184,
+        2576
       ],
-      "id": "f4719513-bf91-4ea6-b6df-9ea7105d31db",
+      "id": "a6d60d84-9b07-409a-9a0a-f2703b1da0d1",
       "name": "Clear cancelar solicitud state",
       "alwaysOutputData": true,
       "credentials": {
@@ -1791,10 +1791,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        176,
-        1104
+        2064,
+        2768
       ],
-      "id": "72de1f2d-4a37-40f6-b7ca-8b7b5454f673",
+      "id": "fab6a1f9-15b6-4089-a8f4-afcdb7f107cf",
       "name": "Set confirmando reprogramar solicitud",
       "alwaysOutputData": true,
       "credentials": {
@@ -1811,10 +1811,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
-        1104
+        2288,
+        2768
       ],
-      "id": "8d2c1de4-4503-4b48-9baf-78c5da76a0fe",
+      "id": "5df46183-3250-44ba-a759-3f32ae6c7d71",
       "name": "Build reprogramar solicitud prompt"
     },
     {
@@ -1835,14 +1835,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        624,
-        1104
+        2512,
+        2768
       ],
-      "id": "8a8e7445-46d9-4330-a30f-7f0808599a5e",
+      "id": "4b9e3468-5448-4bbe-88d3-e10e4b8ae45a",
       "name": "Send reprogramar solicitud prompt",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CHATWOOT_CRED",
+          "id": "GqVsiFUjDt4aJl4f",
           "name": "Chatwoot API"
         }
       }
@@ -1854,10 +1854,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        176,
-        1200
+        2288,
+        3152
       ],
-      "id": "26ed44d4-a02c-4bb5-9dc8-1a2e01f06dd1",
+      "id": "ae5ae333-ea8d-45e2-adc4-76e90a76b912",
       "name": "Build reprogramar collect"
     },
     {
@@ -1869,10 +1869,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        400,
-        1200
+        2064,
+        3152
       ],
-      "id": "4ef5dd05-8333-45a4-ac83-4e3cc16be1f6",
+      "id": "088c5098-e5ae-468e-b320-cdf7ccf62cf9",
       "name": "Set awaiting reprogramar datos",
       "alwaysOutputData": true,
       "credentials": {
@@ -1900,14 +1900,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        624,
-        1200
+        2512,
+        3152
       ],
-      "id": "adf9f7a5-ec18-461a-8e50-9f4f03706495",
+      "id": "2301444a-f210-438f-8cda-9debb6a229c8",
       "name": "Send reprogramar collect",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CHATWOOT_CRED",
+          "id": "GqVsiFUjDt4aJl4f",
           "name": "Chatwoot API"
         }
       }
@@ -1919,10 +1919,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        176,
-        1296
+        2064,
+        3344
       ],
-      "id": "90ac4d8c-5476-4bca-8276-6f9a2ad0f4f4",
+      "id": "426c2549-b84c-4608-a806-b568bd69beae",
       "name": "Prep reprogramar finalize"
     },
     {
@@ -1943,14 +1943,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        400,
-        1296
+        2288,
+        3344
       ],
-      "id": "9158eb9b-2e8b-47df-a5b0-7997a9d7e112",
+      "id": "8f41dcb3-4f69-49e3-b3c0-bfecedd0f3f6",
       "name": "Send reprogramar confirm",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CHATWOOT_CRED",
+          "id": "GqVsiFUjDt4aJl4f",
           "name": "Chatwoot API"
         }
       }
@@ -1958,25 +1958,25 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $('Prep reprogramar finalize').first().json.sql_insert }}",
+        "query": "{{ $('Prep reprogramar finalize').first().json.sql_insert }}",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        624,
-        1296
+        2512,
+        3344
       ],
-      "id": "a6698c9a-9e41-45b7-86e8-fc8025c3f0b9",
+      "id": "7e8a3f30-cf50-4e39-b527-5deee83381ed",
       "name": "Insert reprogramar solicitud",
       "alwaysOutputData": true,
-      "onError": "continueRegularOutput",
       "credentials": {
         "mySql": {
           "id": "ADbEKvwG8sz2lY2H",
           "name": "MySQL account"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -1996,14 +1996,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        848,
-        1296
+        2960,
+        3344
       ],
-      "id": "8b80becb-f3c6-4927-a08c-0da7cf1ce530",
+      "id": "54153b9d-62e7-4623-abc2-b723091d8277",
       "name": "Send reprogramar private note",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CHATWOOT_CRED",
+          "id": "GqVsiFUjDt4aJl4f",
           "name": "Chatwoot API"
         }
       }
@@ -2011,16 +2011,16 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $('Prep reprogramar finalize').first().json.sql_state }}",
+        "query": "{{ $('Prep reprogramar finalize').first().json.sql_state }}",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        1072,
-        1296
+        3184,
+        3344
       ],
-      "id": "26bf1290-c866-4b6c-9b84-6c87a43238f7",
+      "id": "8af77d98-2619-4abc-a0ae-7c201d2ec000",
       "name": "Clear reprogramar solicitud state",
       "alwaysOutputData": true,
       "credentials": {
@@ -2039,10 +2039,10 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        176,
-        1392
+        2064,
+        3728
       ],
-      "id": "f781e8df-c30e-4d3b-a626-bdf1d2f0dbfd",
+      "id": "472698d9-5e88-46a0-bb34-28c46e279d87",
       "name": "Clear solicitud confirm state",
       "alwaysOutputData": true,
       "credentials": {
@@ -2059,10 +2059,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        736,
-        1008
+        2736,
+        2576
       ],
-      "id": "c7a1e2b0-1111-4b22-8c33-restore-cancel-fin",
+      "id": "c74c3cc0-db04-47f0-b73f-b3ad8fef4c6b",
       "name": "Restore cancelar finalize item"
     },
     {
@@ -2072,10 +2072,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        736,
-        1296
+        2736,
+        3344
       ],
-      "id": "c7a1e2b0-2222-4b22-8c33-restore-reprog-fin",
+      "id": "3455b848-7c4c-4fa6-9167-b8c87d87f8ff",
       "name": "Restore reprogramar finalize item"
     }
   ],
@@ -2130,6 +2130,50 @@
         [
           {
             "node": "Build AI intent prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI intent prompt": {
+      "main": [
+        [
+          {
+            "node": "Intent Classifier Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Classifier Chain": {
+      "main": [
+        [
+          {
+            "node": "Parse AI intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Intent Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Intent Classifier Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI intent": {
+      "main": [
+        [
+          {
+            "node": "Decide Route",
             "type": "main",
             "index": 0
           }
@@ -2328,28 +2372,6 @@
         ]
       ]
     },
-    "Prep cancelar solicitud": {
-      "main": [
-        [
-          {
-            "node": "Insert cancelar solicitud",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Insert cancelar solicitud": {
-      "main": [
-        [
-          {
-            "node": "Clear state cancel yes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Clear state cancel yes": {
       "main": [
         [
@@ -2449,28 +2471,6 @@
         ]
       ]
     },
-    "Prep estudio solicitud": {
-      "main": [
-        [
-          {
-            "node": "Insert estudio solicitud",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Insert estudio solicitud": {
-      "main": [
-        [
-          {
-            "node": "Prep handoff private note",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Prep handoff private note": {
       "main": [
         [
@@ -2504,44 +2504,44 @@
         ]
       ]
     },
-    "Build AI intent prompt": {
+    "Prep cancelar solicitud": {
       "main": [
         [
           {
-            "node": "Intent Classifier Chain",
+            "node": "Insert cancelar solicitud",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "OpenAI Intent Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Intent Classifier Chain",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Intent Classifier Chain": {
+    "Insert cancelar solicitud": {
       "main": [
         [
           {
-            "node": "Parse AI intent",
+            "node": "Clear state cancel yes",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parse AI intent": {
+    "Prep estudio solicitud": {
       "main": [
         [
           {
-            "node": "Decide Route",
+            "node": "Insert estudio solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert estudio solicitud": {
+      "main": [
+        [
+          {
+            "node": "Prep handoff private note",
             "type": "main",
             "index": 0
           }
@@ -2764,7 +2764,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "659ed6dc-5913-46d9-8944-772ef528921b",
+  "versionId": "2889f85c-f9b9-4618-9c5f-6a7f6cdcbe15",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "93c3cb4635c69a031fa1214bf884cfb87a4cd8a0ecc85e055a10dc007292b2b8"

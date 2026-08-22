@@ -74,12 +74,15 @@ https://n8n.YOUR_DOMAIN/webhook/chatwoot-bot
 
 1. Nombre → DNI → obra social (list + Otra) → médico (WhatsApp number saved automatically)  
 2. Médico list: **Mi médico de cabecera** first, then doctors (WhatsApp interactive list)  
-3. Horario free text with that doctor’s **current week** hours (or clinic hours)  
-4. Confirm → Chatwoot private note + row in `turno_solicitudes`  
-5. Cancel anytime (button/keywords) with “¿Seguro?” confirmation  
-6. **Repetir pregunta** on each step (except the doctor list)  
+3. Confirm summary (no día/hora; secretaries assign the slot later)  
+4. Patient gets a **short** ack (“Turno solicitado…”); Chatwoot **private note** has the full ficha; dashboard `horario_preferido` = `A confirmar por secretaría`  
+5. Outside clinic hours (outside 8–12 and 16–20 ART), the patient ack adds a footer that secretaría will confirm during opening hours  
+6. Cancel anytime (button/keywords) with “¿Seguro?” confirmation  
+7. **Repetir pregunta** on each step (except the doctor list)  
 
 Human handoff: if a Chatwoot agent is assigned, the bot stops replying.
+
+Secretaries confirm día/hora manually with Chatwoot canned responses (see [n8n/workflows/IMPORT.md](n8n/workflows/IMPORT.md)).
 
 ## WhatsApp cutover (clinic number)
 

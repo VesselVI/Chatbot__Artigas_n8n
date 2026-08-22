@@ -117,7 +117,7 @@ docker compose up -d n8n
 ## Behaviour checklist
 
 - Bot **skips** replies when a **human** is assigned (`conversation.meta.assignee.type === 'user'` or `assignee_id` without bot) **or** `conversation.team_id` / team handoff is set. It does **not** assign on the media or estudio warning itself — only after **Hablar secretaria**.
-- Booking states: `idle/menu_shown` → nombre → DNI → obra social (**Particular/Sin Obra Social** first, then dashboard obras, then **Otras**) → médico (**Mi médico de cabecera** first, WhatsApp list) → día/hora → confirmación. Phone is the WhatsApp number from Normalize (no phone question).
+- Booking states: `idle/menu_shown` → nombre → DNI → obra social (**Particular/Sin Obra Social** first, then dashboard obras, then **Otras**) → médico (**Mi médico de cabecera** first, WhatsApp list) → confirmación (sin día/hora). Phone is the WhatsApp number from Normalize (no phone question). Día/hora lo confirma secretaría por mensaje (canned responses).
 - **Cancelar turno (mid-booking)** / keywords `cancelar|salir|menu|menú` → confirm → sí inserts `turno_solicitudes` with `tipo=cancelar` (data filled so far) then clears + welcome / no restores + re-asks.
 - **Solicitud de cancelación (NL intent):** frases como `quiero cancelar un turno`, `no voy a poder ir a la consulta`, `cancelar turno` (y variantes) disparan `cancelar_prompt` (Sí/No). Si responde **Sí**, el bot pide **nombre completo + DNI** en un solo mensaje y genera:
   - mensaje al paciente: `Su turno ha sido cancelado.`
@@ -197,7 +197,7 @@ When pasting cancel/reprogramar nodes onto live **01**, verify these fixes from 
    - `cancelar` / `reprogramar` intents are checked **before** generic `turno` booking.
    - `isTurno` excludes cancel/reprogramar phrases (`&& !regexCancelar && !regexReprogramar`).
    - Yes/no accepts WhatsApp button ids `si_generico` / `no_generico` plus typed `si` / `no` on any line (quoted replies).
-   - **Mid-booking (`awaiting_*` from workflow 03):** free-text steps (obra, médico, horario like `mar 18`) must stay on `booking`. Route `isAwaiting → booking` **before** NL `reprogramar` / `cancelar` (and before AI reprogramar). Estudio/precio handoff still wins when `wantsHandoff` matches.
+   - **Mid-booking (`awaiting_*` from workflow 03):** free-text steps (obra, médico) must stay on `booking`. Route `isAwaiting → booking` **before** NL `reprogramar` / `cancelar` (and before AI reprogramar). Estudio/precio handoff still wins when `wantsHandoff` matches. Booking no longer asks día/hora.
 2. **Collect chains must be MySQL → Build → Send** (same pattern as mid-booking cancel confirm):
    | Route Switch output | Wire order |
    |---------------------|------------|
@@ -246,12 +246,60 @@ Use a conversation that is **not** already assigned to an agent or team.
 8. Type `quiero cancelar un turno` (or `no voy a poder ir a la consulta`) in an unassigned chat. Expect **¿Quiere cancelar su turno?** with `Sí/No`. Tap `Sí` and send one message with nombre + DNI (e.g. `Juan Pérez 30111222`). Expect patient confirmation, private note to Secretaría, and dashboard badge `cancelar`.
 9. Type `quiero reprogramar un turno` (or `quiero cambiar el horario de mi turno`). Expect **¿Quiere reprogramar su turno?** with `Sí/No`. Tap `Sí` and send nombre + DNI in one message. Expect private note and dashboard badge `reprogramar` (orange/warning).
 
-## Chatwoot template (secretary use)
+## Chatwoot templates (secretary use)
 
-Create a canned response template in Chatwoot for manual secretary replies after cancellation:
+Create these in Chatwoot at **Settings → Canned Responses** (or Templates). Fill `{{nombre}}`, `{{medico}}`, `{{dia_hora}}` when sending.
 
-- Suggested title: `Confirmación cancelación turno`
-- Suggested body:
+### Confirmación de turno (versión A — formal corta)
+
+- Title: `Confirmación turno`
+
+```text
+✅ Turno confirmado
+
+Nombre: {{nombre}}
+Médico: {{medico}}
+Día y hora: {{dia_hora}}
+
+Te esperamos unos minutos antes del horario.
+Si necesitás reprogramar o cancelar, escribinos por acá.
+Escribí menú para volver.
+```
+
+### Confirmación de turno (versión B — pacientes mayores)
+
+- Title: `Confirmación turno (clara)`
+
+```text
+Su turno quedó confirmado.
+
+Nombre: {{nombre}}
+Médico: {{medico}}
+Día y hora: {{dia_hora}}
+
+IMPORTANTE: este mensaje confirma su turno. Por favor no vaya a la clínica hasta tener esta confirmación con día y hora.
+
+Escribí menú para volver.
+```
+
+### Reprogramación (versión C)
+
+- Title: `Confirmación reprogramación`
+
+```text
+✅ Turno reprogramado
+
+Nombre: {{nombre}}
+Médico: {{medico}}
+Nuevo día y hora: {{dia_hora}}
+
+Su turno anterior fue cancelado. Agende este nuevo horario.
+Escribí menú para volver.
+```
+
+### Cancelación
+
+- Title: `Confirmación cancelación turno`
 
 ```text
 Hola {{nombre}}, confirmamos la cancelación de tu turno.
@@ -260,7 +308,14 @@ DNI registrado: {{dni}}.
 Si querés reprogramar, respondé por este chat y te ayudamos.
 ```
 
-Create it in Chatwoot at **Settings → Canned Responses** (or the templates/canned section your team already uses).
+### Booking smoke (no día/hora step)
+
+Workflow **03** no longer includes horario prompt nodes (`Ask dia_hora`, `Load hours for prompt`, etc.). After médico selection the flow goes **Save medico state → Load ctx confirm**.
+
+1. Unassigned chat → `Sacar un turno` → nombre → DNI → obra → médico.
+2. Expect **confirm summary without día/hora** (no “¿Qué horario preferís?” / doctor schedules).
+3. Tap **Confirmar** → patient gets short “Turno solicitado…” (not the ficha). Private note in Chatwoot has full ficha. Dashboard `horario_preferido` = `A confirmar por secretaría`.
+4. Outside 8–12 / 16–20 ART → footer about clinic opening hours on the patient ack.
 
 ### Test workflow: team assign only (`05-handoff-test.json`)
 
