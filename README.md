@@ -161,7 +161,7 @@ Test conversations can stay on the old inbox and disappear with it. Do not bulk-
 | Full booking + confirm | Dashboard **turno** (green) |
 | Mid-booking cancel Sí | **cancelar** (red) |
 | `¿cuánto sale un OCT?` → Hablar secretaria | **estudio** (blue) + Equipo Secretaría |
-| Image → Hablar secretaria | No solicitud row; bot mutes |
+| Audio → Hablar secretaria | No solicitud row; bot mutes |
 | Assigned to an agent or team | Bot silent |
 
 If welcome never arrives: bot not on the **new** inbox, Meta webhook still on the test callback, or the number is still on the phone app.

@@ -166,6 +166,23 @@ const tests = [
     input: base({ texto: 'cuanto sale un OCT?', estado: 'menu_shown' }),
     expect: (r) => r.route === 'estudio_handoff',
   },
+  {
+    name: 'hablar con doctor routes to estudio_handoff not faq',
+    input: base({ texto: 'kiero hablar con el doctor artigas', estado: 'menu_shown' }),
+    expect: (r) =>
+      r.route === 'estudio_handoff' && r.handoff_reason === 'solicitud_secretaria',
+  },
+  {
+    name: 'ser viviente routes to estudio_handoff',
+    input: base({ texto: 'quiero hablar con un ser viviente', estado: 'menu_shown' }),
+    expect: (r) =>
+      r.route === 'estudio_handoff' && r.handoff_reason === 'solicitud_secretaria',
+  },
+  {
+    name: 'turno with doctor still routes to booking',
+    input: base({ texto: 'quiero un turno con el dr artigas', estado: 'menu_shown' }),
+    expect: (r) => r.route === 'booking',
+  },
 ];
 
 let failed = 0;

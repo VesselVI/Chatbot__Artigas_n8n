@@ -1181,7 +1181,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Mi médico de cabecera', value: 'medico_cabecera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: '¿Con qué médico preferís atenderte?',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: items.slice(0, 10) }\n    }\n  }\n}];\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Mi médico de cabecera', value: 'medico_cabecera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: \"¿Con qué médico preferís atenderte?\\n\\nApretá el *botón de abajo* para ver la lista completa y elegir.\",\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: items.slice(0, 10) }\n    }\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1220,7 +1220,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst m = $('Prepare Input').first().json;\nconst boton = String(m.boton_id || '').trim();\nconst texto = String(m.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nif (m.is_repetir || boton === 'repetir_pregunta') {\n  return [{ json: { ...m, med_action: 'repetir' } }];\n}\n\nlet docs = [];\ntry {\n  const items = $input.all().map(i => i.json);\n  if (items.length === 1 && items[0].doctors_json != null) {\n    let raw = items[0].doctors_json;\n    if (typeof raw === 'string') raw = JSON.parse(raw);\n    docs = Array.isArray(raw) ? raw : [];\n  } else {\n    docs = items.filter(d => d && d.id && d.name);\n  }\n} catch (e) {\n  docs = [];\n}\n\nconst cabeceraTokens = new Set([\n  'medico_cabecera',\n  'medico_cualquiera',\n  fold('Mi médico de cabecera'),\n  fold('Cualquier doctor'),\n  'cabecera',\n]);\nif (cabeceraTokens.has(boton) || cabeceraTokens.has(fold(boton)) || cabeceraTokens.has(fold(last))) {\n  return [{ json: { ...m, med_action: 'save', medico_name: 'Mi médico de cabecera', doctor_id: null, cualquiera: true } }];\n}\n\nfunction findDoc(token) {\n  const raw = String(token || '').trim();\n  if (!raw) return null;\n  if (/^medico_\\d+$/.test(raw)) {\n    const id = Number(raw.replace('medico_', ''));\n    return docs.find(d => Number(d.id) === id) || { id, name: '' };\n  }\n  const f = fold(raw);\n  return docs.find(d => {\n    const n = fold(d.name);\n    const t = fold(String(d.name).slice(0, 24));\n    return f === n || f === t;\n  }) || null;\n}\n\nfunction isPromptLine(line) {\n  const f = fold(line);\n  return /medico preferis|que medico|escribi una opcion/.test(f);\n}\n\nlet hit = findDoc(boton) || findDoc(last);\nif (!hit) {\n  for (const line of [...lines].reverse()) {\n    if (isPromptLine(line)) continue;\n    hit = findDoc(line);\n    if (hit) break;\n  }\n}\n\nif (hit) {\n  return [{ json: { ...m, med_action: 'save', medico_name: hit.name || last, doctor_id: hit.id, cualquiera: false } }];\n}\nreturn [{ json: { ...m, med_action: 'repetir' } }];\n"
+        "jsCode": "\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst m = $('Prepare Input').first().json;\nconst boton = String(m.boton_id || '').trim();\nconst texto = String(m.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nif (m.is_repetir || boton === 'repetir_pregunta') {\n  return [{ json: { ...m, med_action: 'repetir' } }];\n}\n\nlet docs = [];\ntry {\n  const items = $input.all().map(i => i.json);\n  if (items.length === 1 && items[0].doctors_json != null) {\n    let raw = items[0].doctors_json;\n    if (typeof raw === 'string') raw = JSON.parse(raw);\n    docs = Array.isArray(raw) ? raw : [];\n  } else {\n    docs = items.filter(d => d && d.id && d.name);\n  }\n} catch (e) {\n  docs = [];\n}\n\nconst cabeceraTokens = new Set([\n  'medico_cabecera',\n  'medico_cualquiera',\n  fold('Mi médico de cabecera'),\n  fold('Cualquier doctor'),\n  'cabecera',\n]);\nif (cabeceraTokens.has(boton) || cabeceraTokens.has(fold(boton)) || cabeceraTokens.has(fold(last))) {\n  return [{ json: { ...m, med_action: 'save', medico_name: 'Mi médico de cabecera', doctor_id: null, cualquiera: true } }];\n}\n\nfunction findDoc(token) {\n  const raw = String(token || '').trim();\n  if (!raw) return null;\n  if (/^medico_\\d+$/.test(raw)) {\n    const id = Number(raw.replace('medico_', ''));\n    return docs.find(d => Number(d.id) === id) || { id, name: '' };\n  }\n  const f = fold(raw);\n  return docs.find(d => {\n    const n = fold(d.name);\n    const t = fold(String(d.name).slice(0, 24));\n    return f === n || f === t;\n  }) || null;\n}\n\nfunction isPromptLine(line) {\n  const f = fold(line);\n  return /medico preferis|que medico|escribi una opcion|boton de abajo|lista completa/.test(f);\n}\n\nlet hit = findDoc(boton) || findDoc(last);\nif (!hit) {\n  for (const line of [...lines].reverse()) {\n    if (isPromptLine(line)) continue;\n    hit = findDoc(line);\n    if (hit) break;\n  }\n}\n\nif (hit) {\n  return [{ json: { ...m, med_action: 'save', medico_name: hit.name || last, doctor_id: hit.id, cualquiera: false } }];\n}\n\nfunction isDoctorListRequest(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/recomend/.test(f)) return true;\n  if (/suger/.test(f) && /medico|doctor|oculista|oftalmologo/.test(f)) return true;\n  if (/(que|cuales|cual).{0,40}(otros? )?(medicos?|doctores?|oculistas?|oftalmologos?)/.test(f)) return true;\n  if (/(lista|opciones).{0,30}(de )?(medicos?|doctores?|oculistas?)/.test(f)) return true;\n  if (/otros? (medicos?|doctores?|oculistas?|oftalmologos?)/.test(f)) return true;\n  if (/aparte del (dr|doctor|dra)/.test(f)) return true;\n  return false;\n}\n\nif (isDoctorListRequest(last) || isDoctorListRequest(texto)) {\n  return [{ json: { ...m, med_action: 'list', doctors: docs } }];\n}\n\nreturn [{ json: { ...m, med_action: 'repetir' } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1284,6 +1284,31 @@
               },
               "renameOutput": true,
               "outputKey": "save"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ma-l",
+                    "leftValue": "={{ $json.med_action }}",
+                    "rightValue": "list",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "list"
             }
           ]
         },
@@ -1322,7 +1347,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Mi médico de cabecera', value: 'medico_cabecera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: '¿Con qué médico preferís atenderte?',\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: items.slice(0, 10) }\n    }\n  }\n}];\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Mi médico de cabecera', value: 'medico_cabecera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: \"¿Con qué médico preferís atenderte?\\n\\nApretá el *botón de abajo* para ver la lista completa y elegir.\",\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: items.slice(0, 10) }\n    }\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1808,6 +1833,67 @@
       ],
       "id": "5f27cf31-01d1-4537-b494-70bd383b0093",
       "name": "Prep save obra otra"
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Handle medico').first().json;\nlet docs = Array.isArray(m.doctors) ? m.doctors : [];\nif (!docs.length) {\n  try {\n    docs = $input.all().map(i => i.json).filter(d => d && d.name);\n  } catch (e) {\n    docs = [];\n  }\n}\nconst lines = docs.map(d => '• ' + String(d.name));\nconst body = [\n  'Estos son los oftalmólogos disponibles:',\n  ...(lines.length ? lines : ['• (sin médicos activos)']),\n  '• Mi médico de cabecera (si no tenés preferencia)',\n  '',\n  'Para elegir, apretá el botón de abajo.'\n].join('\\n');\n\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    telefono: m.telefono,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28024,
+        38648
+      ],
+      "id": "7025154e-0d7d-44b6-8543-ea6aeaca47ce",
+      "name": "Build medico list reply"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://chat.' + ($env.CHATWOOT_HOST || $env.DOMAIN) + '/api/v1/accounts/' + String($json.account_id) + '/conversations/' + String($json.conversation_id) + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.cw_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        28224,
+        38648
+      ],
+      "id": "d1caa0cd-34a5-4290-9ab0-e713f6caffd8",
+      "name": "Send medico list reply",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GqVsiFUjDt4aJl4f",
+          "name": "Chatwoot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, name FROM doctors WHERE active = 1 ORDER BY sort_order, name;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        28424,
+        38648
+      ],
+      "id": "8143ea69-c2d2-4abd-be34-ef31ec439295",
+      "name": "Reload doctors for list",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -2299,6 +2385,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Build medico list reply",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -2519,6 +2612,39 @@
         [
           {
             "node": "Save obra otra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build medico list reply": {
+      "main": [
+        [
+          {
+            "node": "Send medico list reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send medico list reply": {
+      "main": [
+        [
+          {
+            "node": "Reload doctors for list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reload doctors for list": {
+      "main": [
+        [
+          {
+            "node": "Re-ask medico",
             "type": "main",
             "index": 0
           }

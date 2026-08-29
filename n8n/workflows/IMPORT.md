@@ -132,10 +132,13 @@ docker compose up -d n8n
 - Typed `particular` / `sin obra` / `sin obra social` / `no tengo obra social` / `soy particular` / `como particular` (and close variants, case-insensitive) save as `Particular / Sin Obra Social` and skip the Otras prompt. `otra` / `otras` still open the free-text obra step.
 - FAQ (free text on `menu_shown` that is not a turno/horarios/`menú`/greeting intent) loads `clinic_settings` + doctors + current-week availability into OpenAI (`gpt-5-mini`). Typed `menú` / `menu` / `hola` return to the welcome menu. `turni` and similar typos still start booking.
 - WhatsApp allows **max 3 reply buttons** (titles **max 20 characters**). Obra social stays as text (`Escribí una opción`) plus Cancelar/Repetir. The doctor picker sends **all** rows as Chatwoot `input_select` (more than 3 items → Meta **list**). WhatsApp lists allow at most 10 rows; n8n cannot set the list button label (Chatwoot I18n / locale controls that).
-- **Fotos / audios / video / archivo:** Normalize sets `tipo: media`. Decide Route sends `media_warn` even mid-booking (MySQL `state` unchanged). Message: *Por acá no podemos recibir fotos ni audios…* Buttons: `Continuar consulta` (`continuar_consulta`) / `Hablar secretaria` (`hablar_secretaria`). Continuar re-asks the booking step if `awaiting_*`, otherwise welcome. Hablar secretaria → team assign.
-- **Estudios / tratamientos / precio** and **secretaria / persona phrases** route to the same handoff prompt (`estudio_handoff`), **anytime** (including mid-booking), **before** booking continues. Message: *Para poder responder mejor esta consulta necesitamos derivarlo con una secretaria.* Buttons: `Hablar secretaria` / `Hacer otra consulta` (`otra_consulta`). Typed examples that must **not** reach FAQ: `Quiero hablar con una secretaria`, `me podes pasar con una persona?`, `necesito atención humana`, `¿cuánto sale un OCT?`, `campo visual`. Typed `sacar un turno` / `quiero_turno` still starts booking (`isTurno` wins). FAQ / OpenAI never sees handoff phrases.
+- **Audios / video:** Normalize sets `tipo: media` only for **audio** or **video**. Decide Route sends `media_warn` even mid-booking (MySQL `state` unchanged). Message: *Por acá no podemos recibir audios…* Buttons: `Continuar consulta` (`continuar_consulta`) / `Hablar secretaria` (`hablar_secretaria`). Continuar re-asks the booking step if `awaiting_*`, otherwise welcome. Hablar secretaria → team assign (motivo `audio`).
+- **Fotos:** image-only (no caption) → bot stays **silent** (photo stays in Chatwoot for Secretaría). Image + caption → caption is processed as normal text (not a media warn).
+- **Estudios / tratamientos / precio**, **secretaria / persona / ser viviente**, and **hablar con un doctor** phrases route to the same handoff prompt (`estudio_handoff`), **anytime** (including mid-booking), **before** booking continues. Message: *Para poder responder mejor esta consulta necesitamos derivarlo con una secretaria.* Buttons: `Hablar secretaria` / `Hacer otra consulta` (`otra_consulta`). Typed examples that must **not** reach FAQ: `Quiero hablar con una secretaria`, `me podes pasar con una persona?`, `necesito atención humana`, `quiero hablar con un ser viviente`, `kiero hablar con el doctor artigas`, `¿cuánto sale un OCT?`, `campo visual`. Typed `sacar un turno` / `quiero un turno con el dr Artigas` still starts booking (`isTurno` / booking phrases win). FAQ / OpenAI never sees handoff phrases.
+- **Médico picker (workflow 03):** prompt tells the patient to press the **botón de abajo** for the full list. If they ask for other doctors / a recommendation (`que otros oculistas…`, `recomendación`, etc.), the bot sends a bullet list then re-shows the WhatsApp list.
 - **Hybrid intent routing:** `Decide Route` now uses regex + OpenAI classifier (`cancelar`, `reprogramar`, `estudio_precio`, `other`) with confidence threshold fallback. Explicit button/state transitions always win over AI.
-- After **Hablar secretaria:** public confirm *Te derivamos con una secretaria. En breve te van a escribir.* + **private** note (motivo `imagen/audio`, `estudio/precio`, or `solicitud_secretaria` + patient quote) + `POST .../assignments` `{ "team_id": CHATWOOT_TEAM_ID }`. Only motivo `estudio/precio` also `INSERT turno_solicitudes` with `tipo=estudio`. Secretary-only requests (`solicitud_secretaria`) do not create a solicitud row. Bot then mutes.
+- After **Hablar secretaria:** public confirm *Te derivamos con una secretaria.* + *Esperá pacientemente: una secretaria te va a responder cuando se desocupe.* (+ after-hours footer outside **8–12** and **16–20** BA time) + **private** note (motivo `audio`, `estudio/precio`, or `solicitud_secretaria` + patient quote) + `POST .../assignments` `{ "team_id": CHATWOOT_TEAM_ID }`. Only motivo `estudio/precio` also `INSERT turno_solicitudes` with `tipo=estudio`. Secretary-only requests (`solicitud_secretaria`) do not create a solicitud row. Bot then mutes.
+- **Horario de clínica** (FAQ / Horarios button / after-hours footer): `Lunes a Viernes de 8hs a 12hs y de 16hs a 20hs` in `clinic_settings`. Existing DBs: run [`mysql/migrate_clinic_hours_8_20.sql`](../mysql/migrate_clinic_hours_8_20.sql) or edit Configuración in the dashboard.
 - Typed `1` / `2` after those prompts follow the last prompt (media: 1 continuar / 2 secretaria; estudio: 1 secretaria / 2 otra). Welcome menu `1`/`2` still mean Horarios / Turno when no such prompt is pending.
 - Confirmation and horarios replies are **plain text** (Meta test numbers often drop buttons). Type `confirmar` / `sí` / `cancelar` / `repetir`. The confirm step must not end without an HTTP send.
 - Chatwoot inbound often sends the button **title** (and WhatsApp may quote the previous message). The router uses the **last line** for Horarios/Turno and only scans earlier lines for nav titles (Repetir/Cancelar/menú), so a quoted welcome cannot steal the tap. Doctor replies must match `medico_*` ids (typed names are ignored and the list is sent again).
@@ -163,8 +166,10 @@ The Gemini credential can stay unused in n8n; it is no longer referenced.
 Open the repo file `n8n/workflows/01-entry-router.json` (or open each Code node in a text editor) and the live **01 - Entry Router**.
 
 1. **Paste Code nodes** (open the live node → replace `jsCode` with the repo version):
-   - **Normalize Message** — attachments → `tipo: 'media'`; `titleMap` includes `Continuar consulta` / `Hablar secretaria` / `Hacer otra consulta` (do **not** map global `1`/`2` here; that would steal DNI and the welcome menu).
-   - **Decide Route** — `isSecretariaIntent()` (hablar con secretaria, pasar/derivar con persona/humano, atención humana, etc.) + `isEstudioIntent()` → `estudio_handoff` anytime (before `awaiting_*` booking); `handoff_reason` is `solicitud_secretaria` vs `estudio/precio`; `media_warn`, `hablar_secretaria`; `isTurno` still wins over leftover handoff buttons. **Paste this node on live 01 after pulling this change** — do not full-reimport.
+   - **Normalize Message** — **audio/video** → `tipo: 'media'`; **image-only** with empty caption → `return []` (silent); image + caption → text; `titleMap` includes `Continuar consulta` / `Hablar secretaria` / `Hacer otra consulta` (do **not** map global `1`/`2` here; that would steal DNI and the welcome menu).
+   - **Decide Route** — `isSecretariaIntent()` (hablar con secretaria, ser viviente, pasar/derivar con persona/humano, etc.) + `isDoctorTalkIntent()` (hablar con doctor/dr, excluding turno/cita phrases) + `isEstudioIntent()` → `estudio_handoff` anytime (before `awaiting_*` booking); `handoff_reason` is `solicitud_secretaria` vs `estudio/precio`; `media_warn` (motivo `audio`), `hablar_secretaria`; `isTurno` still wins over leftover handoff buttons. **Paste this node on live 01 after pulling this change** — do not full-reimport.
+   - **Build media warning** — audios-only copy (no “fotos”).
+   - **Build handoff confirm** — patience legend + after-hours footer (`isOutsideClinicHours`, 8–12 / 16–20 BA).
    - **Merge Context** (optional but recommended) — passes `pending_prompt`, `handoff_quote`, `media_kind`.
 2. **Do not** change Execute Workflow nodes (Call Welcome 02 / Call FAQ 04 / Call Booking 03).
 3. Between **Decide Route** and **Route Switch**, insert (copy from repo if missing):
@@ -184,7 +189,7 @@ Open the repo file `n8n/workflows/01-entry-router.json` (or open each Code node 
      - MySQL **Insert cancelar solicitud** — query `{{ $json.sql_insert }}`, same MySQL credential as **Get State**. `alwaysOutputData: true`. `onError: continueRegularOutput` so a missing column does not block welcome.
      - Connect: **Route Switch `cancel_yes` → Prep cancelar solicitud → Insert cancelar solicitud → Clear state cancel yes**.
    - On **hablar_secretaria**, after **Send handoff confirm** and before **Prep handoff private note**:
-     - Code **Prep estudio solicitud** — if `handoff_reason` is `estudio/precio`, builds `INSERT ... tipo='estudio'` (quote in `horario_preferido`; DNI/nombre from context or empty). Media handoff (`imagen/audio`) runs `SELECT 1` (no row).
+     - Code **Prep estudio solicitud** — if `handoff_reason` is `estudio/precio`, builds `INSERT ... tipo='estudio'` (quote in `horario_preferido`; DNI/nombre from context or empty). Media handoff (`audio`) runs `SELECT 1` (no row).
      - MySQL **Insert estudio solicitud** — same as cancelar insert node. `alwaysOutputData: true`, `onError: continueRegularOutput`.
      - Connect: **Send handoff confirm → Prep estudio solicitud → Insert estudio solicitud → Prep handoff private note**.
 7. Save. Do not deactivate/reactivate in a way that changes the webhook path.
@@ -222,6 +227,34 @@ WHERE phone = '{{ $('Decide Route').item.json.telefono }}';
    - Reprogramar: same with **Restore reprogramar finalize item**.
 7. If a patient is stuck mid-flow, reset one row: `UPDATE conversation_state SET state='idle', context=JSON_OBJECT() WHERE phone='54…';` or use [mysql/wipe_test_data.sql](../../mysql/wipe_test_data.sql) for a full test wipe.
 
+### Secretary handoff + booking UX + media (paste; do not full-reimport)
+
+Open repo `n8n/workflows/01-entry-router.json` / `03-booking-flow.json` and the live canvases.
+
+**01 — paste Code nodes only:**
+- **Normalize Message**, **Decide Route**, **Build media warning**, **Build handoff confirm**
+
+**03 — paste + wire list branch:**
+- Paste **Ask medico list**, **Re-ask medico**, **Handle medico**
+- On **Medico action**, add rule `med_action` equals `list` (third output)
+- Add **Build medico list reply** (Code) → **Send medico list reply** (HTTP, clone **Send medico repetir**) → **Reload doctors for list** (MySQL, clone **Reload doctors repetir**) → **Re-ask medico**
+- Connect **Medico action** `list` → **Build medico list reply**
+
+**MySQL (live VPS):**
+
+```bash
+docker compose exec -T mysql mysql -uartigas -p"$MYSQL_PASSWORD" artigas_bot < mysql/migrate_clinic_hours_8_20.sql
+```
+
+Or set the same string in dashboard **Configuración → Horario de la clínica**.
+
+Local checks before deploy:
+
+```bash
+node scripts/test-decide-route.js
+node scripts/test-booking-messages.js
+```
+
 ### Booking / shifts (older update)
 
 1. Re-import **03 - Booking Flow** only if that workflow changed (re-attach MySQL + Chatwoot credentials and Execute Workflow links).
@@ -236,16 +269,18 @@ docker compose exec -T mysql mysql -uartigas -p"$MYSQL_PASSWORD" artigas_bot < m
 
 Use a conversation that is **not** already assigned to an agent or team.
 
-1. Send an **image** (empty caption is fine). Expect the fotos/audios warning with **Continuar consulta** / **Hablar secretaria**. Bot must **not** assign yet. If you were booking, the next **Continuar consulta** must re-ask the same step (state still `awaiting_*`).
-2. Tap **Continuar consulta** (or type that title / `1` after the warning). Expect welcome or the current booking question. Send another image, then tap **Hablar secretaria**. Expect the short confirm on WhatsApp, a **private** note in Chatwoot (motivo `imagen/audio` + quote), conversation assigned to team **Secretaría**, and further patient messages **ignored** by the bot.
-3. In a **new** unassigned chat, type a precio/OCT question (`¿cuánto sale un OCT?`, `campo visual`, `topografía`). Expect the estudio message with **Hablar secretaria** / **Hacer otra consulta**. OpenAI/FAQ must **not** run. **Hacer otra consulta** returns to the welcome menu. **Hablar secretaria** assigns + private note motivo `estudio/precio`, and a dashboard **Solicitudes** row with badge `estudio`.
-4. Type **Quiero hablar con una secretaria** or **me podes pasar con una persona?** (menu or mid-booking). Expect the same handoff prompt, not FAQ/booking. **Hablar secretaria** → private note motivo `solicitud_secretaria` (no dashboard estudio row).
-5. From the estudio prompt, type **sacar un turno** (or tap that welcome button). Expect booking, not assign.
-6. Confirm a booking → dashboard badge `turno` (DNI column filled). Confirm **Sí, cancelar** mid-booking → badge `cancelar`.
-7. Secretaries with assignment notifications enabled should see the new team conversation.
-8. Type `quiero cancelar un turno` (or `no voy a poder ir a la consulta`) in an unassigned chat. Expect **¿Quiere cancelar su turno?** with `Sí/No`. Tap `Sí` and send one message with nombre + DNI (e.g. `Juan Pérez 30111222`). Expect patient confirmation, private note to Secretaría, and dashboard badge `cancelar`.
-9. Type `quiero reprogramar un turno` (or `quiero cambiar el horario de mi turno`). Expect **¿Quiere reprogramar su turno?** with `Sí/No`. Tap `Sí` and send nombre + DNI in one message. Expect private note and dashboard badge `reprogramar` (orange/warning).
-
+1. Send an **audio**. Expect the audios-only warning with **Continuar consulta** / **Hablar secretaria**. Bot must **not** assign yet. If you were booking, the next **Continuar consulta** must re-ask the same step (state still `awaiting_*`).
+2. Send an **image** with empty caption. Expect **no bot reply** (photo visible in Chatwoot). Send an image **with a caption** — caption is processed as normal text (not media warn).
+3. From an audio warning, tap **Hablar secretaria**. Expect the patience confirm (+ after-hours footer outside 8–12 / 16–20), a **private** note (motivo `audio` + quote), conversation assigned to team **Secretaría**, and further patient messages **ignored** by the bot.
+4. In a **new** unassigned chat, type a precio/OCT question (`¿cuánto sale un OCT?`, `campo visual`, `topografía`). Expect the estudio message with **Hablar secretaria** / **Hacer otra consulta**. OpenAI/FAQ must **not** run. **Hacer otra consulta** returns to the welcome menu. **Hablar secretaria** assigns + private note motivo `estudio/precio`, and a dashboard **Solicitudes** row with badge `estudio`.
+5. Type **Quiero hablar con una secretaria**, **quiero hablar con un ser viviente**, or **kiero hablar con el doctor artigas** (menu or mid-booking). Expect the handoff prompt, not FAQ. **Hablar secretaria** → private note motivo `solicitud_secretaria` (no dashboard estudio row).
+6. Mid-booking at médico: type **que otros oculistas hay**. Expect a bullet list of doctors, then the médico list prompt again (with *botón de abajo*).
+7. From the estudio prompt, type **sacar un turno** (or tap that welcome button). Expect booking, not assign. Typed **quiero un turno con el dr artigas** must still start booking.
+8. Confirm a booking → dashboard badge `turno` (DNI column filled). Confirm **Sí, cancelar** mid-booking → badge `cancelar`. Outside clinic hours, the short **Turno solicitado** ack includes the after-hours footer.
+9. Secretaries with assignment notifications enabled should see the new team conversation.
+10. Type `quiero cancelar un turno` (or `no voy a poder ir a la consulta`) in an unassigned chat. Expect **¿Quiere cancelar su turno?** with `Sí/No`. Tap `Sí` and send one message with nombre + DNI (e.g. `Juan Pérez 30111222`). Expect patient confirmation, private note to Secretaría, and dashboard badge `cancelar`.
+11. Type `quiero reprogramar un turno` (or `quiero cambiar el horario de mi turno`). Expect **¿Quiere reprogramar su turno?** with `Sí/No`. Tap `Sí` and send nombre + DNI in one message. Expect private note and dashboard badge `reprogramar` (orange/warning).
+12. Tap **Horarios** / ask FAQ about hours — expect **8hs a 12hs** and **16hs a 20hs**.
 ## Chatwoot templates (secretary use)
 
 Create these in Chatwoot at **Settings → Canned Responses** (or Templates). Fill `{{nombre}}`, `{{medico}}`, `{{dia_hora}}` when sending.

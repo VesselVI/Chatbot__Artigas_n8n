@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS doctor_availability (
 CREATE TABLE IF NOT EXISTS clinic_settings (
   id TINYINT NOT NULL PRIMARY KEY DEFAULT 1,
   address VARCHAR(255) NOT NULL DEFAULT 'Avenida Nicolas Avellaneda 347',
-  clinic_hours VARCHAR(255) NOT NULL DEFAULT 'Lunes a Viernes de 9hs a 12hs y de 16hs a 19hs',
+  clinic_hours VARCHAR(255) NOT NULL DEFAULT 'Lunes a Viernes de 8hs a 12hs y de 16hs a 20hs',
   obras_sociales JSON NOT NULL,
   welcome_text VARCHAR(500) NOT NULL DEFAULT '¡Hola! Bienvenido/a a la Clínica Oftalmológica Artigas. ¿En qué te puedo ayudar?',
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS turno_solicitudes (
 INSERT INTO clinic_settings (id, address, clinic_hours, obras_sociales, welcome_text) VALUES (
   1,
   'Avenida Nicolas Avellaneda 347',
-  'Lunes a Viernes de 9hs a 12hs y de 16hs a 19hs',
+  'Lunes a Viernes de 8hs a 12hs y de 16hs a 20hs',
   JSON_ARRAY(
     'PAMI',
     'Subsidio de Salud',
