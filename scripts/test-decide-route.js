@@ -183,6 +183,32 @@ const tests = [
     input: base({ texto: 'quiero un turno con el dr artigas', estado: 'menu_shown' }),
     expect: (r) => r.route === 'booking',
   },
+  {
+    name: 'DNI blob on menu skips welcome',
+    input: base({
+      texto: 'quiero turno Juan Pérez 30111222 OSDE Artigas',
+      estado: 'menu_shown',
+    }),
+    expect: (r) => r.route === 'booking',
+  },
+  {
+    name: 'post_solicitud first corregir routes booking',
+    input: base({
+      estado: 'post_solicitud',
+      boton_id: 'corregir_datos',
+      context: { correction_count: 0 },
+    }),
+    expect: (r) => r.route === 'booking',
+  },
+  {
+    name: 'post_solicitud second corregir routes handoff',
+    input: base({
+      estado: 'post_solicitud',
+      boton_id: 'corregir_datos',
+      context: { correction_count: 1 },
+    }),
+    expect: (r) => r.route === 'hablar_secretaria',
+  },
 ];
 
 let failed = 0;

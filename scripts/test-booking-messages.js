@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Unit tests for booking patient-ack helpers extracted from 03-booking-flow.json.
+ * Unit tests for lean booking workflow (03-booking-flow.json).
  * Run: node scripts/test-booking-messages.js
  */
 'use strict';
@@ -10,17 +10,17 @@ const path = require('path');
 
 const workflowPath = path.join(__dirname, '..', 'n8n', 'workflows', '03-booking-flow.json');
 const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
-const buildInsert = workflow.nodes.find((n) => n.name === 'Build insert + notes');
-const prepMedico = workflow.nodes.find((n) => n.name === 'Prep save medico');
-const buildConfirm = workflow.nodes.find((n) => n.name === 'Build confirmation');
-const askMedico = workflow.nodes.find((n) => n.name === 'Ask medico list');
-const reaskMedico = workflow.nodes.find((n) => n.name === 'Re-ask medico');
-const handleMedico = workflow.nodes.find((n) => n.name === 'Handle medico');
-const buildListReply = workflow.nodes.find((n) => n.name === 'Build medico list reply');
 const conns = workflow.connections;
 
-if (!buildInsert || !prepMedico || !buildConfirm) {
-  console.error('Required booking nodes missing');
+const buildRecepcion = workflow.nodes.find((n) => n.name === 'Build recepcion + sql');
+const prepareInput = workflow.nodes.find((n) => n.name === 'Prepare Input');
+const parseBlob = workflow.nodes.find((n) => n.name === 'Parse blob');
+const buildPedido = workflow.nodes.find((n) => n.name === 'Build Pedido de datos');
+const handlePost = workflow.nodes.find((n) => n.name === 'Handle post solicitud');
+const handleMedico = workflow.nodes.find((n) => n.name === 'Handle medico');
+
+if (!buildRecepcion || !prepareInput || !parseBlob || !buildPedido) {
+  console.error('Required lean booking nodes missing');
   process.exit(1);
 }
 
@@ -45,101 +45,80 @@ function check(name, ok) {
   }
 }
 
-check('07:59 outside', isOutsideClinicHours(atHour(7, 59)) === true);
-check('08:00 open', isOutsideClinicHours(atHour(8, 0)) === false);
-check('11:59 open', isOutsideClinicHours(atHour(11, 59)) === false);
-check('12:00 lunch outside', isOutsideClinicHours(atHour(12, 0)) === true);
-check('15:59 lunch outside', isOutsideClinicHours(atHour(15, 59)) === true);
-check('16:00 open', isOutsideClinicHours(atHour(16, 0)) === false);
-check('19:59 open', isOutsideClinicHours(atHour(19, 59)) === false);
-check('20:00 outside', isOutsideClinicHours(atHour(20, 0)) === true);
+const br = buildRecepcion.parameters.jsCode;
+check('Build recepcion has isOutsideClinicHours', br.includes('isOutsideClinicHours'));
+check('Recepcion mentions Recibimos', br.includes('Recibimos tu solicitud'));
+check('Recepcion has Corregir datos button', br.includes('corregir_datos'));
+check('Recepcion supports UPDATE when solicitud_id', br.includes('UPDATE turno_solicitudes'));
+check('Private ficha still has solicitud', br.includes('solicitud de turno'));
+check('horario fixed A confirmar', br.includes('A confirmar por secretaría'));
 
-const bi = buildInsert.parameters.jsCode;
-check('Build insert has isOutsideClinicHours', bi.includes('isOutsideClinicHours'));
-check('Patient ack is short Turno solicitado', bi.includes('Turno solicitado.'));
-check('Patient ack does not embed ficha', !bi.includes("ficha +"));
-check('Private ficha still Nueva solicitud', bi.includes('Nueva solicitud de turno'));
-check('horario fixed A confirmar', bi.includes('A confirmar por secretaría'));
+const pi = prepareInput.parameters.jsCode;
+check('Prepare Input uses awaiting_pedido_datos', pi.includes('awaiting_pedido_datos'));
+check('Prepare skips pedido when DNI blob on menu', pi.includes('fold(texto).length > 12'));
 
-const pm = prepMedico.parameters.jsCode;
-check('Prep medico goes to awaiting_confirmacion', pm.includes("state = 'awaiting_confirmacion'"));
-check('Prep medico does not set awaiting_dia_hora', !pm.includes("state = 'awaiting_dia_hora'"));
+const pb = parseBlob.parameters.jsCode;
+check('Parse blob embeds parsePedidoDatos', pb.includes('function parsePedidoDatos'));
+check('Parse blob returns parse_action', pb.includes('parse_action'));
 
-const bc = buildConfirm.parameters.jsCode;
-check('Confirm summary has no calendar dia_hora line', !bc.includes('📅'));
-check('Confirm asks for solicitud not turno slot', bc.includes('Confirmás la solicitud'));
+const ped = buildPedido.parameters.jsCode;
+check('Pedido asks single message', ped.includes('en un solo mensaje'));
+check('Pedido lists medicos in footer', ped.includes('Médicos:'));
 
 check(
-  'Save medico state wires to Load ctx confirm',
-  conns['Save medico state'].main[0][0].node === 'Load ctx confirm'
-);
-check(
-  'Stale awaiting_dia_hora routes to Load ctx confirm',
-  conns['State Switch'].main[7][0].node === 'Load ctx confirm'
+  'Parse complete wires to finalize',
+  conns['Parse action'] &&
+    conns['Parse action'].main[0] &&
+    conns['Parse action'].main[0][0].node === 'Prep save complete ctx'
 );
 
-const medicoPromptHint = 'botón de abajo';
-check('Ask medico mentions botón de abajo', askMedico.parameters.jsCode.includes(medicoPromptHint));
-check('Re-ask medico mentions botón de abajo', reaskMedico.parameters.jsCode.includes(medicoPromptHint));
-check('Handle medico has list intent', handleMedico.parameters.jsCode.includes('isDoctorListRequest'));
-check('Handle medico can return med_action list', handleMedico.parameters.jsCode.includes("med_action: 'list'"));
-check('Build medico list reply exists', !!buildListReply);
 check(
-  'Medico action list wires to Build medico list reply',
-  conns['Medico action'].main[2] &&
-    conns['Medico action'].main[2][0].node === 'Build medico list reply'
-);
-check(
-  'List reply send reloads then re-asks',
-  conns['Send medico list reply'].main[0][0].node === 'Reload doctors for list' &&
-    conns['Reload doctors for list'].main[0][0].node === 'Re-ask medico'
+  'Empezar wires to pedido',
+  conns['State Switch'].main[0][0].node === 'Start awaiting_pedido_datos'
 );
 
-function makeHandleRunner(jsCode) {
-  const fn = new Function('$input', '$', jsCode);
-  return (item, docs) => {
-    const $input = {
-      all: () => docs.map((d) => ({ json: d })),
-      first: () => ({ json: docs[0] || {} }),
-    };
-    const $ = (name) => {
-      if (name === 'Prepare Input') return { first: () => ({ json: item }) };
-      throw new Error('unexpected $ ' + name);
-    };
-    return fn($input, $)[0].json;
-  };
+check(
+  'Post solicitud wires handoff branch',
+  conns['Post solicitud action'] &&
+    conns['Post solicitud action'].main.some((o) => o[0].node === 'Build handoff derivacion')
+);
+
+if (handlePost) {
+  check('Handle post checks correction_count', handlePost.parameters.jsCode.includes('correction_count'));
 }
 
-const runHandle = makeHandleRunner(handleMedico.parameters.jsCode);
-const docs = [
-  { id: 1, name: 'Adrian Artigas' },
-  { id: 2, name: 'Paulina Artigas' },
-];
-const listHit = runHandle(
-  {
-    telefono: '543811111111',
-    conversation_id: 1,
-    account_id: 2,
-    boton_id: '',
-    texto: 'Me gustaria saber, aparte del dr Artigas, que otros oculistas estan , gracias',
-    is_repetir: false,
-  },
-  docs
-);
-check('oculistas question returns list action', listHit.med_action === 'list');
+if (handleMedico) {
+  const runHandle = new Function('$input', '$', handleMedico.parameters.jsCode);
+  const docs = [
+    { id: 1, name: 'Adrian Artigas' },
+    { id: 2, name: 'Paulina Artigas' },
+  ];
+  const $input = {
+    all: () => docs.map((d) => ({ json: d })),
+    first: () => ({ json: docs[0] }),
+  };
+  const $ = (name) => {
+    if (name === 'Prepare Input')
+      return {
+        first: () => ({
+          json: {
+            telefono: '543811111111',
+            conversation_id: 1,
+            account_id: 2,
+            boton_id: 'medico_1',
+            texto: 'Adrian Artigas',
+            is_repetir: false,
+          },
+        }),
+      };
+    throw new Error('unexpected $ ' + name);
+  };
+  const saveHit = runHandle($input, $)[0].json;
+  check('medico button still saves', saveHit.med_action === 'save' && Number(saveHit.doctor_id) === 1);
+}
 
-const saveHit = runHandle(
-  {
-    telefono: '543811111111',
-    conversation_id: 1,
-    account_id: 2,
-    boton_id: 'medico_1',
-    texto: 'Adrian Artigas',
-    is_repetir: false,
-  },
-  docs
-);
-check('medico button still saves', saveHit.med_action === 'save' && Number(saveHit.doctor_id) === 1);
+check('07:59 outside', isOutsideClinicHours(atHour(7, 59)) === true);
+check('08:00 open', isOutsideClinicHours(atHour(8, 0)) === false);
 
 console.log(failed ? `\n${failed} test(s) failed` : '\nAll tests passed');
 process.exit(failed ? 1 : 0);

@@ -29,7 +29,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT welcome_text FROM clinic_settings WHERE id = 1 LIMIT 1;",
+        "query": "SELECT welcome_text, clinic_hours, address FROM clinic_settings WHERE id = 1 LIMIT 1;",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -49,7 +49,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const trig = $('When Executed by Another Workflow').first().json;\nconst welcome = ($input.first().json.welcome_text || '¡Hola! Bienvenido/a a la Clínica Oftalmológica Artigas. ¿En qué te puedo ayudar?');\nconst host = $env.CHATWOOT_HOST || $env.DOMAIN;\nreturn [{\n  json: {\n    telefono: trig.telefono,\n    conversation_id: trig.conversation_id,\n    account_id: trig.account_id,\n    cw_body: {\n      content: welcome,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: {\n        items: [\n          { title: 'Horarios de Clinica', value: 'horarios_clinica' },\n          { title: 'Sacar un turno', value: 'quiero_turno' }\n        ]\n      }\n    }\n  }\n}];"
+        "jsCode": "const trig = $('When Executed by Another Workflow').first().json;\nconst row = $input.first().json;\nconst welcome = row.welcome_text || '¡Hola! Bienvenido/a a la Clínica Oftalmológica Artigas.';\nconst hours = row.clinic_hours || '';\nconst address = row.address || '';\nconst content = `${welcome}\n\n🕘 *Horarios:* ${hours}\n📍 *Ubicación:* ${address}\n\n¿Necesitás un turno? Apretá el botón de abajo.`;\nreturn [{\n  json: {\n    telefono: trig.telefono,\n    conversation_id: trig.conversation_id,\n    account_id: trig.account_id,\n    cw_body: {\n      content,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: {\n        items: [\n          { title: 'Sacar un turno', value: 'quiero_turno' }\n        ]\n      }\n    }\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

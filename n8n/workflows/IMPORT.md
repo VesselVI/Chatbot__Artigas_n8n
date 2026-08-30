@@ -117,7 +117,7 @@ docker compose up -d n8n
 ## Behaviour checklist
 
 - Bot **skips** replies when a **human** is assigned (`conversation.meta.assignee.type === 'user'` or `assignee_id` without bot) **or** `conversation.team_id` / team handoff is set. It does **not** assign on the media or estudio warning itself — only after **Hablar secretaria**.
-- Booking states: `idle/menu_shown` → nombre → DNI → obra social (**Particular/Sin Obra Social** first, then dashboard obras, then **Otras**) → médico (**Mi médico de cabecera** first, WhatsApp list) → confirmación (sin día/hora). Phone is the WhatsApp number from Normalize (no phone question). Día/hora lo confirma secretaría por mensaje (canned responses).
+- Booking (lean **Pedido de datos**): `idle/menu_shown` → optional menú (horario + ubicación + **Sacar un turno** only) → **one** ask for nombre + DNI + obra + médico → parse → **Recepción de solicitud** (datos + **Corregir datos**); obra/médico lists only if unclear. No confirm wizard, no teléfono step. Complete blob in one message (`quiero turno Juan…`) skips menú and Pedido. Second **Corregir datos** → Derivación.
 - **Cancelar turno (mid-booking)** / keywords `cancelar|salir|menu|menú` → confirm → sí inserts `turno_solicitudes` with `tipo=cancelar` (data filled so far) then clears + welcome / no restores + re-asks.
 - **Solicitud de cancelación (NL intent):** frases como `quiero cancelar un turno`, `no voy a poder ir a la consulta`, `cancelar turno` (y variantes) disparan `cancelar_prompt` (Sí/No). Si responde **Sí**, el bot pide **nombre completo + DNI** en un solo mensaje y genera:
   - mensaje al paciente: `Su turno ha sido cancelado.`
@@ -227,18 +227,47 @@ WHERE phone = '{{ $('Decide Route').item.json.telefono }}';
    - Reprogramar: same with **Restore reprogramar finalize item**.
 7. If a patient is stuck mid-flow, reset one row: `UPDATE conversation_state SET state='idle', context=JSON_OBJECT() WHERE phone='54…';` or use [mysql/wipe_test_data.sql](../../mysql/wipe_test_data.sql) for a full test wipe.
 
-### Secretary handoff + booking UX + media (paste; do not full-reimport)
+### Lean booking — Pedido de datos (Phase 1)
+
+See also [`docs/plan-lean-booking-and-accumulation.md`](../../docs/plan-lean-booking-and-accumulation.md).
+
+**Repo:** regenerate **03** after parser changes:
+
+```bash
+python3 scripts/build-lean-03-workflow.py
+node scripts/test-parse-pedido-datos.js
+node scripts/test-booking-messages.js
+node scripts/test-decide-route.js
+```
+
+**Live deploy (test phone first):**
+
+1. **02 — Welcome Menu:** paste **Load welcome_text** (SQL now selects `clinic_hours`, `address`) and **Build welcome message** (horario + ubicación body; only **Sacar un turno** button).
+2. **03 — Booking Flow:** **re-import** the whole workflow from repo `03-booking-flow.json` (safe — only **01** must stay paste-only). Re-attach MySQL + Chatwoot credentials. Confirm **Call Booking 03** on live **01** still points at this workflow.
+3. **01 — paste Code nodes only** (never full-reimport **01**):
+   - **Normalize Message** — add `corregir datos` → `corregir_datos` in `titleMap`
+   - **Merge Context** — lean `PREV_STEP` / `CURRENT_KW` for `awaiting_pedido_datos`, etc.
+   - **Decide Route** — `post_solicitud` + `corregir_datos`; DNI blob on menú → `booking` (skip welcome); `awaiting_pedido_datos` / `awaiting_correccion_datos` → `booking`
+4. Reset test patient: `UPDATE conversation_state SET state='idle', context=JSON_OBJECT() WHERE phone='54…';`
+
+**Behaviour smoke tests:**
+
+1. `hola` → menú with horarios + dirección; one button **Sacar un turno**
+2. Tap **Sacar un turno** → **Pedido de datos** (médicos in footer)
+3. One message: `Juan Pérez 30111222 OSDE Adrian Artigas` → **Recepción** with datos + **Corregir datos** (no confirm step)
+4. `quiero turno …` (complete blob) → skip menú; one **Recepción**
+5. Partial blob → short “Falta…” or obra/médico list (one follow-up each)
+6. **Corregir datos** once → re-Pedido → UPDATE same solicitud
+7. **Corregir datos** again → Derivación message + private note
+
+### Secretary handoff + booking UX + media (legacy paste notes)
 
 Open repo `n8n/workflows/01-entry-router.json` / `03-booking-flow.json` and the live canvases.
 
 **01 — paste Code nodes only:**
 - **Normalize Message**, **Decide Route**, **Build media warning**, **Build handoff confirm**
 
-**03 — paste + wire list branch:**
-- Paste **Ask medico list**, **Re-ask medico**, **Handle medico**
-- On **Medico action**, add rule `med_action` equals `list` (third output)
-- Add **Build medico list reply** (Code) → **Send medico list reply** (HTTP, clone **Send medico repetir**) → **Reload doctors for list** (MySQL, clone **Reload doctors repetir**) → **Re-ask medico**
-- Connect **Medico action** `list` → **Build medico list reply**
+**03 — superseded by lean booking above** (old step-by-step nombre/DNI chain removed from repo).
 
 **MySQL (live VPS):**
 
