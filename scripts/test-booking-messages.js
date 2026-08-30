@@ -52,6 +52,11 @@ check('Recepcion has Corregir datos button', br.includes('corregir_datos'));
 check('Recepcion supports UPDATE when solicitud_id', br.includes('UPDATE turno_solicitudes'));
 check('Private ficha still has solicitud', br.includes('solicitud de turno'));
 check('horario fixed A confirmar', br.includes('A confirmar por secretaría'));
+check(
+  'After recepcion state returns to idle (not stuck post_solicitud)',
+  /state\s*=\s*'idle'/.test(br) &&
+    !/state\s*=\s*'post_solicitud'/.test(br)
+);
 
 const pi = prepareInput.parameters.jsCode;
 check('Prepare Input uses awaiting_pedido_datos', pi.includes('awaiting_pedido_datos'));

@@ -1,6 +1,6 @@
 # Plan: Lean booking + message accumulation
 
-**Status:** Phase 1 implemented in repo (live VPS paste pending)  
+**Status:** Phase 2 implemented in repo (live VPS: bot-redis + 01 import pending)  
 **Goal:** Fewer outbound WhatsApp messages before Meta per-message billing (~Oct 2026), faster turno solicitado, clinic-familiar UX.  
 **Domain terms:** `[CONTEXT.md](../CONTEXT.md)`  
 **Decisions:** [ADR-0001](adr/0001-lean-booking-pedido-datos.md), [ADR-0002](adr/0002-message-accumulation-redis.md)
@@ -273,16 +273,18 @@ Button: **Corregir datos** (`corregir_datos`)
 
 | Step | Work                                                 | Files                                 |
 | ---- | ---------------------------------------------------- | ------------------------------------- |
-| 2.0  | Confirm **01 webhook → Respond Immediately** on live | n8n UI                                |
-| 2.1  | `bot-redis` service + env on n8n                     | `docker-compose.yml`                  |
-| 2.2  | Accumulation branch (RPUSH, INCR, Wait 7s, flush)    | `01-entry-router.json`                |
-| 2.3  | Bypass rules for `boton_id` / interactive            | Code in 01                            |
-| 2.4  | Soak test: 3 quick texts → one parse                 | Manual + optional script              |
-| 2.5  | Document                                             | `IMPORT.md`, ADR-0002 already written |
+| 2.0  | Webhook **Respond Immediately** (`onReceived`)       | `01-entry-router.json`                |
+| 2.1  | `bot-redis` service + env on n8n                     | `docker-compose.yml`, `.env.example`  |
+| 2.2  | Accumulation branch (RPUSH, Wait 7s, flush)          | `01-entry-router.json`, `scripts/patch-01-accumulation.py` |
+| 2.3  | Bypass rules for `boton_id` / interactive            | `scripts/acc-gate.js`                 |
+| 2.4  | Unit + wiring tests                                  | `scripts/test-acc-gate.js`, `scripts/test-accumulation-wiring.js` |
+| 2.5  | Deploy notes                                         | `n8n/workflows/IMPORT.md`             |
+| 2.6  | Live: compose up bot-redis, Bot Redis credential, re-import 01 | Human |
 
 
 **Phase 2 exit criteria**
 
+- [x] Repo: bot-redis + Acc nodes + tests green
 - [ ] Burst “Juan” / “Pérez” / “30111222 OSDE Artigas” → one merged parse
 - [ ] Sacar un turno tap → instant (no 7s wait)
 - [ ] No Chatwoot “agent bot error” on burst
@@ -356,4 +358,4 @@ Button: **Corregir datos** (`corregir_datos`)
 
 ## Next action
 
-**Start Phase 1.1** — `parsePedidoDatos` + tests, then 02 → 03 → 01 in repo before live paste.
+**Live Phase 2:** `docker compose up -d bot-redis n8n`, create **Bot Redis** credential, re-import **01**, re-link 02/03/04, soak-test a 3-fragment burst.

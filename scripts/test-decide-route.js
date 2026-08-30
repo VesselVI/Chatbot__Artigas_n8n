@@ -209,6 +209,24 @@ const tests = [
     }),
     expect: (r) => r.route === 'hablar_secretaria',
   },
+  {
+    name: 'post_solicitud sacar turno routes booking not faq',
+    input: base({
+      estado: 'post_solicitud',
+      texto: 'sacar turno',
+      context: { solicitud_id: 1, correction_count: 0 },
+    }),
+    expect: (r) => r.route === 'booking',
+  },
+  {
+    name: 'idle corregir_datos with solicitud_id routes booking',
+    input: base({
+      estado: 'idle',
+      boton_id: 'corregir_datos',
+      context: { solicitud_id: 1, correction_count: 0 },
+    }),
+    expect: (r) => r.route === 'booking',
+  },
 ];
 
 let failed = 0;

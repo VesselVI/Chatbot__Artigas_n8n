@@ -44,5 +44,28 @@ check('invalid/incomplete short dni', badDni.parse_action === 'invalid_dni' || b
 const empty = parsePedidoDatos('hola', { doctors, obras });
 check('greeting incomplete', empty.parse_action === 'incomplete');
 
+// Live smoke failures (2026-08-29/30 WhatsApp transcript)
+const kiero = parsePedidoDatos(
+  'kiero turno  ignacio caram 4320202 PAMI Esteban Artigas',
+  { doctors, obras: [...obras, 'PAMI'] }
+);
+check(
+  'smoke4: typo kiero turno stripped from nombre',
+  kiero.parse_action === 'complete' &&
+    !/kiero|turno/i.test(kiero.nombre) &&
+    /ignacio/i.test(kiero.nombre)
+);
+
+const garbageObra = parsePedidoDatos(
+  'Juan ignacio 43030303 sajuafwf Adrian Artigas',
+  { doctors, obras }
+);
+check(
+  'smoke8: unknown obra triggers need_obra (not free-text accept)',
+  garbageObra.parse_action === 'need_obra' &&
+    garbageObra.medico.includes('Adrian') &&
+    !garbageObra.obra_social
+);
+
 console.log(failed ? `\n${failed} test(s) failed` : '\nAll tests passed');
 process.exit(failed ? 1 : 0);

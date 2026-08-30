@@ -20,7 +20,8 @@ function compact(s) {
 function stripTurnoPrefix(texto) {
   return String(texto || '')
     .replace(/\n?__cw_in_reply_to__:\S+/g, '')
-    .replace(/^(quiero|necesito|qiero|preciso)\s+(un\s+)?(turno|cita)\b[:\s]*/i, '')
+    // Common typos: qiero, kiero, quero for quiero
+    .replace(/^(quiero|necesito|qiero|kiero|quero|preciso)\s+(un\s+)?(turno|cita)\b[:\s]*/i, '')
     .replace(/^(sacar|pedir|solicitar)\s+(un\s+)?(turno|cita)\b[:\s]*/i, '')
     .trim();
 }
@@ -97,14 +98,8 @@ function matchObra(remainder, obras, doctors) {
     if (!fo) continue;
     if (fRem === fo || fRem.includes(fo)) return String(o);
   }
-  const medOnly = matchMedico(remainder, doctors);
-  if (medOnly && (fRem === fold(medOnly.medico) || fRem === fold(medOnly.medico).split(' ').pop())) {
-    return null;
-  }
-  const tokens = remainder.split(/\s+/).filter(Boolean);
-  if (tokens.length >= 1 && tokens.length <= 4 && !/\d/.test(remainder)) {
-    return remainder.slice(0, 120);
-  }
+  // Unknown tokens are unclear — caller should send obra list (need_obra).
+  // Free-text obra is only accepted later via "Otras" in that list flow.
   return null;
 }
 

@@ -247,7 +247,7 @@ node scripts/test-decide-route.js
 3. **01 — paste Code nodes only** (never full-reimport **01**):
    - **Normalize Message** — add `corregir datos` → `corregir_datos` in `titleMap`
    - **Merge Context** — lean `PREV_STEP` / `CURRENT_KW` for `awaiting_pedido_datos`, etc.
-   - **Decide Route** — `post_solicitud` + `corregir_datos`; DNI blob on menú → `booking` (skip welcome); `awaiting_pedido_datos` / `awaiting_correccion_datos` → `booking`
+   - **Decide Route** — after Recepción state is `idle` (not stuck `post_solicitud`); `corregir_datos` still works via `solicitud_id` in context; DNI blob / `sacar turno` on menú → `booking`
 4. Reset test patient: `UPDATE conversation_state SET state='idle', context=JSON_OBJECT() WHERE phone='54…';`
 
 **Behaviour smoke tests:**
@@ -260,6 +260,35 @@ node scripts/test-decide-route.js
 6. **Corregir datos** once → re-Pedido → UPDATE same solicitud
 7. **Corregir datos** again → Derivación message + private note
 
+### Message accumulation — bot-redis (Phase 2)
+
+See [ADR-0002](../../docs/adr/0002-message-accumulation-redis.md).
+
+**Repo checks:**
+
+```bash
+python3 scripts/patch-01-accumulation.py   # idempotent
+node scripts/test-acc-gate.js
+node scripts/test-accumulation-wiring.js
+```
+
+**VPS / docker:**
+
+1. Pull branch; `docker compose up -d bot-redis n8n` (n8n now depends on `bot-redis`).
+2. In n8n: **Credentials → Redis →** name **`Bot Redis`**, host `bot-redis`, port `6379`, no password. Attach to every **Acc Push / Acc Incr / Acc Get* / Acc Del*** node (or re-import **01** and re-select that credential).
+3. **01 Chatwoot Webhook** must use **Respond Immediately** (`responseMode: onReceived`). Without this, Chatwoot’s ~5s timeout fires during the 7s Wait (“agent bot error”).
+4. Phase 2 adds many nodes on **01**. Practical path: **Import from File** `01-entry-router.json`, then re-link Execute Workflow targets (02/03/04) and re-attach MySQL + Chatwoot + **Bot Redis**. Confirm Chatwoot still points at this webhook path.
+
+**Behaviour:**
+
+| Input | Expect |
+|-------|--------|
+| Burst `Juan` → `Pérez` → `30111222 OSDE Adrian Artigas` (≤7s apart) in Pedido | **One** parse / one Recepción (space-joined) |
+| Tap **Sacar un turno** | Instant Pedido (**no** 7s wait) |
+| Obra/médico list taps | Instant (bypass) |
+| Free-text `hola` on idle | Menú after ~7s (ADR scope includes idle) |
+
+**Note:** Superseded fragment executions exit after Wait (version mismatch). Expect extra n8n executions per burst; only the last continues.
 ### Secretary handoff + booking UX + media (legacy paste notes)
 
 Open repo `n8n/workflows/01-entry-router.json` / `03-booking-flow.json` and the live canvases.

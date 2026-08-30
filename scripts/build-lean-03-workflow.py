@@ -324,8 +324,9 @@ if (/^(idle|menu_shown)$/.test(estado)) {
   if (/\b\d{7,10}\b/.test(texto) && fold(texto).length > 12) step = 'awaiting_pedido_datos';
   else step = 'Empezar';
 }
-if (estado === 'post_solicitud' && boton === 'corregir_datos') step = 'post_solicitud';
-
+if (boton === 'corregir_datos' && (estado === 'post_solicitud' || ctx.solicitud_id)) {
+  step = 'post_solicitud';
+}
 return [{
   json: {
     telefono: j.telefono,
@@ -661,8 +662,8 @@ try {
 const recepcion = cwSelect(patientBody.join('\n'), [{ title: 'Corregir datos', value: 'corregir_datos' }], m);
 const newCorrection = isUpdate ? Number(datos.correction_count || 0) + 1 : Number(datos.correction_count || 0);
 const sqlState = isUpdate
-  ? `UPDATE conversation_state SET state='post_solicitud', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.correction_count', ${newCorrection}) WHERE phone='${phone}';`
-  : `UPDATE conversation_state SET state='post_solicitud', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.solicitud_id', LAST_INSERT_ID(), '$.correction_count', ${newCorrection}) WHERE phone='${phone}';`;
+  ? `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.correction_count', ${newCorrection}) WHERE phone='${phone}';`
+  : `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.solicitud_id', LAST_INSERT_ID(), '$.correction_count', ${newCorrection}) WHERE phone='${phone}';`;
 return [{
   json: {
     telefono: m.telefono,

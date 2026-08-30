@@ -61,6 +61,12 @@ services:
         condition: service_healthy
     mem_limit: 256m
 
+  bot-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    mem_limit: 96m
+
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
     restart: unless-stopped
@@ -79,12 +85,16 @@ services:
       CHATWOOT_TEAM_NAME: ${CHATWOOT_TEAM_NAME:-Secretaría}
       N8N_BLOCK_ENV_ACCESS_IN_EXPRESSIONS: "false"
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      BOT_REDIS_HOST: bot-redis
+      BOT_REDIS_PORT: "6379"
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n/workflows:/workflows:ro
     depends_on:
       mysql:
         condition: service_healthy
+      bot-redis:
+        condition: service_started
     mem_limit: 768m
 
   chatwoot-postgres:
