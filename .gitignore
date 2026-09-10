@@ -1,6 +1,16 @@
 .env
 *.pem
 *.key
+
+# Client commercial documents: pricing, payment terms, deliverables. Not for a public repo.
+docs/presupuesto-*
+docs/addendum-*
+
+# Local AI tooling configuration
+.agents/
+.cursor/
+AGENTS.md
+docs/agents/
 __pycache__/
 .venv/
 venv/

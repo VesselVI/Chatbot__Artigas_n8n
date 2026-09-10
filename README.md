@@ -1,183 +1,162 @@
-# Clínica Artigas — Chatbot (n8n + Chatwoot + Dashboard)
+# Clínica Artigas WhatsApp Chatbot
 
-WhatsApp clinic bot on Hostinger **KVM2**: Chatwoot owns the channel, n8n runs the bot, MySQL stores state and doctor weekly availability, secretaries use a Bootstrap dashboard.
+A WhatsApp booking assistant for a private medical clinic in San Miguel de Tucumán, Argentina.
+Patients request appointments in an ordinary WhatsApp conversation. The clinic's secretaries manage
+doctor availability and incoming requests from a web dashboard, and can take over any conversation
+at any moment.
+
+Built for a real client and running in production on a single Ubuntu VPS.
+
+## The problem
+
+The clinic handled appointments with one WhatsApp Business auto-reply that asked patients to send
+all their details at once. A secretary then read every message by hand and copied the appointment
+into an agenda. That works until volume grows: messages arrive outside opening hours, details come
+in incomplete or spread across several messages, and nothing is recorded in a form anyone can query
+later.
+
+The aim was to leave the conversation feeling the same to the patient while making the data
+structured, searchable and visible to the whole front desk.
 
 ## Architecture
 
 ```
 Patient (WhatsApp)
-    → Chatwoot (inbox + human takeover)
-        → n8n Agent Bot webhook
-            → MySQL + OpenAI
-        ← replies / buttons
-Secretaries → dash.DOMAIN (horarios por semana) + Chatwoot UI
+       │
+       ▼
+WhatsApp Cloud API
+       │
+       ▼
+   Chatwoot  ─────────────────────►  Secretaries (shared inbox, human takeover)
+       │
+       │  agent bot webhook
+       ▼
+     n8n  ──►  bot-redis   burst accumulation
+       │  ──►  MySQL       conversation state, doctors, availability, requests
+       │  ──►  OpenAI      parsing fallback and FAQ answers
+       │
+       ▼
+  replies, buttons and interactive lists
+
+
+   Secretaries  ──►  Dashboard (FastAPI)  ──►  MySQL
 ```
+
+Nine containers behind Caddy, which terminates TLS and issues Let's Encrypt certificates
+automatically. Chatwoot owns the WhatsApp channel so that a human can always step in; n8n runs the
+bot logic; MySQL is the single source of truth for clinic data.
 
 ## Stack
 
-| Service | URL |
-|---------|-----|
-| Dashboard | `https://dash.YOUR_DOMAIN` |
-| n8n | `https://n8n.YOUR_DOMAIN` |
-| Chatwoot | `https://chat.YOUR_DOMAIN` |
-| MySQL | internal only (`mysql:3306`) |
+| Layer | Choice |
+|---|---|
+| Messaging | WhatsApp Cloud API, Chatwoot |
+| Bot logic | n8n workflows, OpenAI API |
+| Dashboard | Python, FastAPI, Jinja2, Bootstrap |
+| Data | MySQL 8, Redis |
+| Infrastructure | Docker Compose, Caddy, Ubuntu VPS, Bash |
 
-## Prerequisites
+## How a booking works
 
-- Hostinger KVM2 (2 vCPU / 8 GB) with Ubuntu
-- Domain with DNS A records for `n8n`, `chat`, `dash` (and apex optional) → VPS IP
-- OpenAI API key (pay-as-you-go on [platform.openai.com](https://platform.openai.com); not ChatGPT Plus)
-- WhatsApp Cloud API (clinic Business number via Chatwoot Embedded Signup; not the Meta test sender)
-- Docker + Docker Compose plugin
+1. A patient messages the clinic number. If the intent is already clear, the welcome menu is skipped.
+2. One **pedido de datos** message asks for name, DNI, obra social and doctor together.
+3. The reply is parsed. Obra social and doctor fall back to a structured WhatsApp list only when the
+   free text was ambiguous.
+4. The request is written to MySQL and acknowledged. The acknowledgement echoes what was captured and
+   offers a single correction pass.
+5. Chatwoot receives a private note with the full record; the dashboard shows the request to the
+   secretaries, who assign the actual day and time.
+6. Outside clinic hours the acknowledgement says so, rather than implying instant confirmation.
 
-## Quick deploy
+If a Chatwoot agent is assigned to the conversation, the bot stops replying. Human handoff always
+wins.
 
-```bash
-git clone <this-repo> && cd Chatbot__Artigas_n8n
-cp .env.example .env
-# Edit .env: DOMAIN, passwords, N8N_ENCRYPTION_KEY, CHATWOOT_SECRET_KEY_BASE
-# Generate secrets:
-#   openssl rand -hex 32   # N8N_ENCRYPTION_KEY / DASHBOARD_SECRET_KEY
-#   openssl rand -hex 64   # CHATWOOT_SECRET_KEY_BASE
+## Engineering decisions
 
-sudo bash scripts/setup-swap.sh   # 2G swap once
+The two decisions that shaped the current design are written up as ADRs, with the alternatives and
+the consequences.
 
-docker compose up -d
-bash scripts/prepare-chatwoot.sh  # once: Chatwoot DB migrate
+### Cutting the number of outbound messages, [ADR-0001](docs/adr/0001-lean-booking-pedido-datos.md)
+
+Meta begins billing per outbound WhatsApp message in October 2026. The original step-by-step flow
+(name, then DNI, then obra social, then doctor, then confirm, then acknowledge) sent six or seven bot
+messages per appointment. At the clinic's volume that is a recurring bill that grows with usage.
+
+The capture was rebuilt around a single request for all the data at once, which is also how the
+clinic's old auto-reply behaved, so patients did not have to learn anything new. The separate
+confirmation step was dropped in favour of an acknowledgement that repeats the captured data and
+offers one correction, trading a small risk of a wrong DNI against roughly half the messages.
+Parsing tries regex and heuristics first and only calls OpenAI when those fail, so the language model
+is a fallback rather than a per-message cost.
+
+### Handling patients who type in bursts, [ADR-0002](docs/adr/0002-message-accumulation-redis.md)
+
+Patients rarely send their details in one message. They send four in ten seconds. Every Chatwoot
+webhook was processed the moment it arrived, so a single booking could fire several bot replies and
+the parser would only ever see a fragment of the answer.
+
+Free text is now debounced before routing. Fragments are pushed to a dedicated Redis instance with a
+version counter per phone number, and after a seven second trailing wait the buffer is flushed only
+if no newer fragment has arrived. Button and list taps bypass the buffer entirely so they still feel
+immediate. Redis is kept separate from the one Chatwoot uses so that bot state cannot interfere with
+the inbox.
+
+The trade-off is that superseded fragments still start an n8n execution that exits after the wait,
+so execution volume is worth watching. The escape hatch, if it becomes expensive, is to move the
+buffer into a small sidecar service.
+
+## Data model
+
+Five MySQL tables, created by [`mysql/init.sql`](mysql/init.sql) and evolved through the migrations
+alongside it:
+
+| Table | Holds |
+|---|---|
+| `conversation_state` | Per-phone bot state machine position |
+| `doctors` | Doctors and their WhatsApp numbers |
+| `doctor_availability` | Weekly morning and evening shifts per doctor |
+| `clinic_settings` | Address, opening hours, welcome copy, obras sociales |
+| `turno_solicitudes` | Appointment, cancellation, study and reschedule requests |
+
+## The dashboard
+
+A FastAPI application with session auth, serving both the secretaries' pages and a small REST API
+that the pages call.
+
+- **Horarios** — pick a doctor, move week by week, set morning and evening shifts in 30 minute steps,
+  or mark days unavailable.
+- **Solicitudes** — requests from the bot grouped by day, labelled `turno`, `cancelar`, `estudio` or
+  `reprogramar`, each linking back to its Chatwoot conversation.
+- **Clínica** — address, opening hours, welcome text and the obras sociales list.
+
+It also serves the public privacy policy that Meta requires before a WhatsApp app can go live.
+
+## Tests
+
+Node scripts under [`scripts/`](scripts/) cover the parts most likely to break silently:
+
+| Script | Covers |
+|---|---|
+| `test-decide-route.js` | Intent routing out of the entry router |
+| `test-parse-pedido-datos.js` | Parsing names, DNI, obra social and doctor from free text |
+| `test-acc-gate.js`, `test-accumulation-wiring.js` | Which messages get buffered and which bypass |
+| `test-booking-messages.js` | Wording of the booking messages |
+
+## Repository layout
+
+```
+caddy/       reverse proxy config
+dashboard/   FastAPI app, templates, Dockerfile
+mysql/       schema, migrations, test-data wipe
+n8n/         exported workflows and import notes
+scripts/     deployment, backup and test scripts
+docs/adr/    architecture decision records
 ```
 
-Open:
+## Running it
 
-1. `https://chat.YOUR_DOMAIN` — create Chatwoot admin
-2. `https://n8n.YOUR_DOMAIN` — create n8n owner
-3. `https://dash.YOUR_DOMAIN` — login with `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`
+Deployment, WhatsApp Cloud API setup, the production cutover runbook and backups are in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-Firewall: allow only `22`, `80`, `443`.
-
-## Dashboard (secretaries)
-
-- **Horarios**: pick doctor → navigate weeks → select days → **turno mañana** and/or **turno noche** with start/end (30 min steps) → **Guardar horarios**, or **Marcar no disponible**. Saving again overwrites.
-- **Solicitudes**: requests from the bot, grouped by the day they were made. Labels: `turno` (new booking), `cancelar` (cancel request), `estudio` (estudio/precio handoff), `reprogramar` (reschedule request). Includes DNI and the hour of the request.
-- **Clínica**: address, clinic hours (for “Mi médico de cabecera”), welcome text, obras sociales list.
-
-## n8n workflows
-
-See [n8n/workflows/IMPORT.md](n8n/workflows/IMPORT.md).
-
-Import order: `02` → `03` → `04` → `01`. Create MySQL, OpenAI, and Chatwoot Header Auth credentials. Re-link Execute Workflow nodes. Point Chatwoot Agent Bot to:
-
-```text
-https://n8n.YOUR_DOMAIN/webhook/chatwoot-bot
-```
-
-### Booking UX
-
-1. Nombre → DNI → obra social (list + Otra) → médico (WhatsApp number saved automatically)  
-2. Médico list: **Mi médico de cabecera** first, then doctors (WhatsApp interactive list)  
-3. Confirm summary (no día/hora; secretaries assign the slot later)  
-4. Patient gets a **short** ack (“Turno solicitado…”); Chatwoot **private note** has the full ficha; dashboard `horario_preferido` = `A confirmar por secretaría`  
-5. Outside clinic hours (outside 8–12 and 16–20 ART), the patient ack adds a footer that secretaría will confirm during opening hours  
-6. Cancel anytime (button/keywords) with “¿Seguro?” confirmation  
-7. **Repetir pregunta** on each step (except the doctor list)  
-
-Human handoff: if a Chatwoot agent is assigned, the bot stops replying.
-
-Secretaries confirm día/hora manually with Chatwoot canned responses (see [n8n/workflows/IMPORT.md](n8n/workflows/IMPORT.md)).
-
-## WhatsApp cutover (clinic number)
-
-n8n does **not** store the WhatsApp token or phone number. Cutover is **Meta + a new Chatwoot inbox**, then wipe test rows. **Do not** full-reimport workflow 01.
-
-Connecting a number that is live in the **WhatsApp Business app** to Cloud API **takes it off the phone** unless Meta offers **Coexistence**. Secretaries then use Chatwoot (`https://chat.YOUR_DOMAIN`), not the phone app. Old phone history does not import. Do this in a quiet hour.
-
-If the number is still on the Business app, **do not** “Add phone number” in Meta API Setup. Use Chatwoot **Embedded Signup** (or Coexistence if the wizard shows it).
-
-Live stack (tiden.tech): Meta test sender was `+15556692599`, Chatwoot account **2**, test inbox **3**, agent bot `https://n8n.tiden.tech/webhook/chatwoot-bot`.
-
-### 0. Backup MySQL (before wipe)
-
-```bash
-cd /opt/Chatbot__Artigas_n8n
-set -a && source .env && set +a
-bash scripts/backup-mysql.sh ./backups
-```
-
-Optional: snapshot the Chatwoot Postgres volume. Keep doctors/hours; only solicitudes and bot state are wiped later.
-
-### 1. Meta prerequisites
-
-Same Facebook app as the test number is fine.
-
-- Business portfolio owns (or will own) the WhatsApp Business Account
-- **Display name** = clinic name (Meta must approve it or outbound can fail)
-- **App Live** needs a public Privacy Policy URL. After deploying the dashboard: `https://dash.YOUR_DOMAIN/privacidad` (alias `/privacy`). No login. Paste that in App Dashboard → Settings → Basic, then [Sharing Debugger](https://developers.facebook.com/tools/debug/sharing/).
-- **Business verification** strongly recommended (unverified WABA has a tiny send limit)
-- System user token is only needed for **Manual** inbox setup (`whatsapp_business_messaging` + `whatsapp_business_management`, never expire)
-
-Do **not** change n8n credentials. Chatwoot still uses the Profile `api-access-token`.
-
-### 2. New Chatwoot inbox (clinic number)
-
-In Chatwoot (account 2):
-
-1. **Settings → Inboxes → Add Inbox → WhatsApp**
-2. **Embedded Signup** / Continue with Facebook (not Manual, not edit inbox 3)
-3. Select the clinic number, complete OTP (SMS/call to that SIM)
-4. Inbox name e.g. `Artigas WhatsApp`; add secretary agents + **Asistente Virtual**
-5. **Do not** auto-assign the inbox to team **Secretaría** (that mutes the bot via `team_id`)
-6. Webhook must be `https://chat.YOUR_DOMAIN/webhooks/whatsapp/+54…` (clinic digits, not `+15556692599`)
-7. If Embedded Signup did not register the callback: Meta → WhatsApp → Configuration → Chatwoot URL + verify token; subscribe **`messages`**. One Meta app has **one** callback URL ([Chatwoot FAQ](https://www.chatwoot.com/hc/user-guide/articles/1756799850-how-to-setup-a-whats_app-channel-manual-flow))
-8. **Settings → Applications → Agent Bots** → assign the existing bot (`https://n8n.YOUR_DOMAIN/webhook/chatwoot-bot`) to the **new** inbox. Leave 01 active; do not change the webhook path
-
-Leave the test inbox until a staff phone gets the welcome menu on the clinic number.
-
-### 3. Wipe test appointments and bot state
-
-Does **not** delete doctors, weekly hours, or clínica settings. After backup:
-
-```bash
-docker compose exec -T mysql sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' < mysql/wipe_test_data.sql
-```
-
-(`mysql/wipe_test_data.sql` is `TRUNCATE turno_solicitudes` + `TRUNCATE conversation_state`.)
-
-Dashboard → Solicitudes → Actualizar should be empty.
-
-### 4. Retire the Meta test inbox
-
-1. Staff phone messages the **clinic** number and gets the welcome menu
-2. Chatwoot: disable or delete inbox **3** (`+15556692599`) so the bot is not bound to two senders
-3. Meta: leave or remove the test number; production patients will not use it
-4. No Meta **allow list** on the real number (that was only the test sender)
-
-Test conversations can stay on the old inbox and disappear with it. Do not bulk-delete Chatwoot Postgres unless the UI delete is not enough.
-
-### 5. Smoke test (unassigned chat)
-
-| Check | Expect |
-|-------|--------|
-| `Hola` | Welcome menu |
-| Horarios / `1` | Clinic hours |
-| Full booking + confirm | Dashboard **turno** (green) |
-| Mid-booking cancel Sí | **cancelar** (red) |
-| `¿cuánto sale un OCT?` → Hablar secretaria | **estudio** (blue) + Equipo Secretaría |
-| Audio → Hablar secretaria | No solicitud row; bot mutes |
-| Assigned to an agent or team | Bot silent |
-
-If welcome never arrives: bot not on the **new** inbox, Meta webhook still on the test callback, or the number is still on the phone app.
-
-## Backups
-
-```bash
-cd /opt/Chatbot__Artigas_n8n
-set -a && source .env && set +a
-bash scripts/backup-mysql.sh ./backups
-```
-
-Also snapshot Chatwoot/n8n Docker volumes periodically.
-
-## Local notes
-
-- First MySQL start runs [mysql/init.sql](mysql/init.sql) (schema + seed doctors / obras). Existing VPS DBs need [mysql/migrate_shifts.sql](mysql/migrate_shifts.sql) before the dashboard can save mañana/noche rows, and [mysql/migrate_solicitudes_tipo.sql](mysql/migrate_solicitudes_tipo.sql) for solicitud labels (`turno` / `cancelar` / `estudio` / `reprogramar`). Before clinic go-live, dump with [scripts/backup-mysql.sh](scripts/backup-mysql.sh) then [mysql/wipe_test_data.sql](mysql/wipe_test_data.sql) (solicitudes + conversation_state only).
-- Caddy issues Let’s Encrypt certs automatically once DNS points to the VPS.
-- Memory limits in `docker-compose.yml` keep Chatwoot + n8n within ~8 GB with swap.
+Configuration is entirely environment driven; see [`.env.example`](.env.example). No credentials,
+tokens or phone numbers are stored in this repository.

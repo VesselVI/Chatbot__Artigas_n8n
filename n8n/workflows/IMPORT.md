@@ -47,7 +47,7 @@ Attach this credential to every Chatwoot **HTTP Request** node.
 
 ## n8n environment
 
-`CHATWOOT_HOST` / `DOMAIN` must be the **root** domain (`tiden.tech`), not `chat.tiden.tech`.
+`CHATWOOT_HOST` / `DOMAIN` must be the **root** domain (`YOUR_DOMAIN`), not `chat.YOUR_DOMAIN`.
 
 Set `CHATWOOT_TEAM_ID` to the numeric id of the **Secretaría** team (see [Chatwoot team and notifications](#chatwoot-team-and-notifications)). Compose passes it into the n8n container.
 
@@ -247,7 +247,7 @@ node scripts/test-decide-route.js
 3. **01 — paste Code nodes only** (never full-reimport **01**):
    - **Normalize Message** — add `corregir datos` → `corregir_datos` in `titleMap`
    - **Merge Context** — lean `PREV_STEP` / `CURRENT_KW` for `awaiting_pedido_datos`, etc.
-   - **Decide Route** — after Recepción state is `idle` (not stuck `post_solicitud`); `corregir_datos` still works via `solicitud_id` in context; DNI blob / `sacar turno` on menú → `booking`
+   - **Decide Route** — after Recepción state is `idle` (not stuck `post_solicitud`); `corregir_datos` still works via `solicitud_id` in context; DNI blob / `sacar turno` on menú → `booking`; on `awaiting_pedido_datos` / `awaiting_correccion_datos`, **Cancelar turno** → `cancel_ask` (not Parse “Falta…”)
 4. Reset test patient: `UPDATE conversation_state SET state='idle', context=JSON_OBJECT() WHERE phone='54…';`
 
 **Behaviour smoke tests:**
@@ -258,7 +258,17 @@ node scripts/test-decide-route.js
 4. `quiero turno …` (complete blob) → skip menú; one **Recepción**
 5. Partial blob → short “Falta…” or obra/médico list (one follow-up each)
 6. **Corregir datos** once → re-Pedido → UPDATE same solicitud
-7. **Corregir datos** again → Derivación message + private note
+7. **Corregir datos** again → Derivación
+8. **Multiline Pedido** (Enter between fields) — must **not** say “No pudimos leer el DNI”:
+   ```
+   Carolina Rodriguez
+   28681450
+   Swiss medical- Asunt
+   Dr Eduardo Artigas
+   ```
+   Expect **Recepción**. Local: `node scripts/smoke-carolina-multiline.js`
+9. **Corregir datos** after Recepción → **Pedido** again (not menú). Re-send blob → **UPDATE** same solicitud. Second Corregir → Derivación.
+   - If Corregir opens the welcome menú, re-import fixed **03**: `Run solicitud sql` must use **independently** batching and the INSERT query must include `UPDATE … LAST_INSERT_ID()` (n8n discards OkPacket `insertId` and returns `{success:true}`). message + private note
 
 ### Message accumulation — bot-redis (Phase 2)
 
