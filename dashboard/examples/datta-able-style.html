@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clínica Artigas — Datta Able style example</title>
+  <!--
+    Standalone mock inspired by:
+    https://github.com/codedthemes/datta-able-bootstrap-dashboard
+    Colors match Datta Able free tokens (--pc-sidebar-background, --bs-primary).
+
+    Purpose: visual shell for adapting dashboard/templates/index.html
+    (Horarios / Solicitudes / Clínica). Open this file in a browser; no backend.
+  -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --da-sidebar-bg: #3f4d67;
+      --da-sidebar-color: #a9b7d0;
+      --da-sidebar-caption: #e8edf7;
+      --da-sidebar-active-bg: rgba(0, 0, 0, 0.12);
+      --da-primary: #04a9f5;
+      --da-heading: #1d2630;
+      --da-muted: #5b6b79;
+      --da-body-bg: #f4f7fa;
+      --da-card-shadow: 0 1px 20px 0 rgba(69, 90, 100, 0.08);
+      --da-sidebar-width: 200px;
+      --da-header-height: 70px;
+      --bs-primary: #04a9f5;
+      --bs-primary-rgb: 4, 169, 245;
+      --bs-link-color: #04a9f5;
+      --bs-success: #1de9b6;
+      --bs-danger: #f44236;
+      --bs-warning: #f4c22b;
+      --bs-info: #3ebfea;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--da-body-bg);
+      color: var(--da-heading);
+      min-height: 100vh;
+    }
+
+    /* —— Sidebar (Datta Able dark) —— */
+    .pc-sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: var(--da-sidebar-width);
+      background: var(--da-sidebar-bg);
+      box-shadow: 1px 0 20px 0 #3f4d67;
+      z-index: 1020;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s ease;
+    }
+    .pc-sidebar .logo {
+      height: var(--da-header-height);
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0 0.85rem;
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      text-decoration: none;
+    }
+    .pc-sidebar .logo-mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, #04a9f5, #3ebfea);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 0.95rem;
+      flex-shrink: 0;
+    }
+    .pc-sidebar .caption {
+      padding: 1rem 0.85rem 0.35rem;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--da-sidebar-caption);
+      opacity: 0.85;
+    }
+    .pc-sidebar .nav {
+      flex: 1;
+      padding: 0.25rem 0.5rem 1rem;
+      overflow-y: auto;
+    }
+    .pc-sidebar .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.6rem 0.7rem;
+      margin-bottom: 0.15rem;
+      border-radius: 6px;
+      color: var(--da-sidebar-color);
+      font-size: 0.875rem;
+      text-decoration: none;
+      border: 0;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .pc-sidebar .nav-link i {
+      font-size: 1.15rem;
+      width: 1.35rem;
+      text-align: center;
+      opacity: 0.9;
+    }
+    .pc-sidebar .nav-link:hover {
+      color: #fff;
+      background: var(--da-sidebar-active-bg);
+    }
+    .pc-sidebar .nav-link.active {
+      color: #fff;
+      background: var(--da-sidebar-active-bg);
+      box-shadow: inset 3px 0 0 var(--da-primary);
+    }
+    .pc-sidebar .nav-link.active i { color: var(--da-primary); }
+
+    .pc-sidebar-footer {
+      margin-top: auto;
+      padding: 0.75rem 0.65rem 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .pc-sidebar-footer .btn-outline-secondary {
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      color: var(--da-sidebar-color);
+      border-color: rgba(169, 183, 208, 0.45);
+      background: transparent;
+    }
+    .pc-sidebar-footer .btn-outline-secondary:hover {
+      color: #fff;
+      background: rgba(0, 0, 0, 0.15);
+      border-color: rgba(169, 183, 208, 0.7);
+    }
+
+    /* —— Main shell —— */
+    .pc-container {
+      margin-left: var(--da-sidebar-width);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .pc-header {
+      position: sticky;
+      top: 0;
+      z-index: 1010;
+      min-height: var(--da-header-height);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #eef2f6;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.85rem 1.5rem;
+    }
+    #doctor-select-wrap .form-label {
+      display: block;
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+    }
+    .pc-header .page-title {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      line-height: 1.25;
+      color: var(--da-heading);
+    }
+    .pc-header .page-subtitle {
+      margin: 0.15rem 0 0;
+      font-size: 0.9rem;
+      color: var(--da-muted);
+    }
+    .pc-content {
+      padding: 1.5rem;
+      flex: 1;
+    }
+
+    /* —— Cards —— */
+    .card-da {
+      background: #fff;
+      border: 0;
+      border-radius: 8px;
+      box-shadow: var(--da-card-shadow);
+    }
+    .card-da .card-header {
+      background: transparent;
+      border-bottom: 1px solid #f0f2f5;
+      padding: 1rem 1.25rem;
+      font-weight: 600;
+      color: var(--da-heading);
+    }
+    .card-da .card-body { padding: 1.25rem; }
+
+    .btn-primary {
+      --bs-btn-bg: var(--da-primary);
+      --bs-btn-border-color: var(--da-primary);
+      --bs-btn-hover-bg: #0398db;
+      --bs-btn-hover-border-color: #0398db;
+      --bs-btn-active-bg: #0288c7;
+      --bs-btn-active-border-color: #0288c7;
+    }
+    .form-control:focus,
+    .form-select:focus {
+      border-color: var(--da-primary);
+      box-shadow: 0 0 0 0.2rem rgba(4, 169, 245, 0.2);
+    }
+    .form-check-input:checked {
+      background-color: var(--da-primary);
+      border-color: var(--da-primary);
+    }
+
+    /* Table (Solicitudes) */
+    .solicitudes-table {
+      width: 100%;
+      margin: 0;
+      font-size: 0.9rem;
+    }
+    .solicitudes-table thead th {
+      color: var(--da-muted);
+      font-weight: 500;
+      font-size: 0.8rem;
+      border-bottom: 1px solid #eef0f2;
+      padding: 0.65rem 0.5rem;
+      white-space: nowrap;
+    }
+    .solicitudes-table tbody td {
+      padding: 0.65rem 0.5rem;
+      vertical-align: middle;
+      border-color: #f0f2f5;
+    }
+    .solicitudes-table tbody tr.day-group th {
+      background: #f8fafb;
+      color: var(--da-muted);
+      font-weight: 600;
+      font-size: 0.85rem;
+      padding: 0.55rem 0.5rem;
+    }
+    .btn-abrir-chat {
+      display: inline-block;
+      padding: 0.28rem 0.7rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--da-primary);
+      background: #fff;
+      border: 1px solid var(--da-primary);
+      border-radius: 4px;
+      text-decoration: none;
+    }
+    .btn-abrir-chat:hover {
+      color: #fff;
+      background: var(--da-primary);
+    }
+
+    .badge-turno { background: #1de9b6; color: #0a3d32; }
+    .badge-cancelar { background: #f44236; color: #fff; }
+    .badge-estudio { background: #04a9f5; color: #fff; }
+    .badge-reprogramar { background: #f4c22b; color: #5c4800; }
+
+    .week-nav {
+      display: inline-flex;
+      align-items: stretch;
+      border: 1px solid #dbe0e5;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .week-nav .btn {
+      border: 0;
+      border-radius: 0;
+      background: #fff;
+      color: var(--da-heading);
+      font-size: 0.8125rem;
+      padding: 0.35rem 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .week-nav .btn:hover {
+      background: #f3f5f7;
+      color: var(--da-primary);
+    }
+    .week-nav .week-label {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35rem 0.85rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--da-heading);
+      border-left: 1px solid #e8edf2;
+      border-right: 1px solid #e8edf2;
+      background: #fafbfc;
+      white-space: nowrap;
+    }
+
+    .shift-box {
+      border: 1px solid #e8edf2;
+      border-radius: 8px;
+      padding: 1rem;
+      background: #fafbfc;
+    }
+
+    .mobile-toggle {
+      display: none;
+      border: 0;
+      background: transparent;
+      color: var(--da-muted);
+      font-size: 1.35rem;
+      padding: 0.25rem;
+    }
+
+    @media (max-width: 991.98px) {
+      .pc-sidebar { transform: translateX(-100%); }
+      .pc-sidebar.open { transform: translateX(0); }
+      .pc-container { margin-left: 0; }
+      .mobile-toggle { display: inline-flex; }
+      .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(29, 38, 48, 0.45);
+        z-index: 1015;
+      }
+      .sidebar-backdrop.show { display: block; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <aside class="pc-sidebar" id="pcSidebar">
+    <a class="logo" href="#">
+      <span class="logo-mark"><i class="bi bi-eye"></i></span>
+      <span>Clínica Artigas</span>
+    </a>
+    <div class="caption">Dashboard</div>
+    <nav class="nav flex-column" role="tablist">
+      <button class="nav-link active" id="nav-solicitudes" data-pane="solicitudes-pane" type="button">
+        <i class="bi bi-inbox"></i> Solicitudes
+      </button>
+      <button class="nav-link" id="nav-horarios" data-pane="availability-pane" type="button">
+        <i class="bi bi-calendar3"></i> Horarios
+      </button>
+      <button class="nav-link" id="nav-clinica" data-pane="clinic-pane" type="button">
+        <i class="bi bi-building"></i> Clínica
+      </button>
+    </nav>
+    <div class="pc-sidebar-footer">
+      <button type="button" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-box-arrow-right"></i> Salir
+      </button>
+    </div>
+  </aside>
+
+  <div class="pc-container">
+    <header class="pc-header">
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" class="mobile-toggle" id="sidebarToggle" aria-label="Menú">
+          <i class="bi bi-list"></i>
+        </button>
+        <div>
+          <h1 class="page-title" id="headerTitle">Solicitudes</h1>
+          <p class="page-subtitle mb-2">Pedidos del chatbot agrupados por día</p>
+          <div id="doctor-select-wrap" class="d-none">
+            <label class="form-label small text-muted mb-1" for="doctor_id">Médico</label>
+            <select id="doctor_id" class="form-select form-select-sm" style="min-width: 220px; max-width: 280px;">
+              <option>Dr. Adrián Artigas</option>
+              <option>Dr. Eduardo Artigas</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="pc-content">
+
+      <!-- HORARIOS -->
+      <section class="pane d-none" id="availability-pane">
+        <div class="card card-da mb-3">
+          <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>Semana</span>
+            <div class="week-nav">
+              <button type="button" class="btn" aria-label="Semana anterior">
+                <i class="bi bi-chevron-left"></i> Semana anterior
+              </button>
+              <span class="week-label">Semana del 15/09/2026</span>
+              <button type="button" class="btn" aria-label="Semana siguiente">
+                Semana siguiente <i class="bi bi-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <label class="form-label fw-medium">Seleccioná día(s)</label>
+            <div class="list-group mb-4">
+              <label class="list-group-item d-flex justify-content-between align-items-center">
+                <span><input class="form-check-input me-2" type="checkbox" checked> Lunes <span class="text-muted">15/09</span></span>
+                <span class="badge text-bg-light border text-dark">Mañana 09:00–12:00 · Noche 16:00–19:00</span>
+              </label>
+              <label class="list-group-item d-flex justify-content-between align-items-center">
+                <span><input class="form-check-input me-2" type="checkbox"> Martes <span class="text-muted">16/09</span></span>
+                <span class="badge text-bg-light border text-muted fst-italic">Sin configurar</span>
+              </label>
+              <label class="list-group-item d-flex justify-content-between align-items-center">
+                <span><input class="form-check-input me-2" type="checkbox"> Miércoles <span class="text-muted">17/09</span></span>
+                <span class="badge text-bg-danger">No disponible</span>
+              </label>
+            </div>
+
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <div class="shift-box">
+                  <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="ex_manana" checked>
+                    <label class="form-check-label fw-medium" for="ex_manana">Turno mañana</label>
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <label class="form-label small mb-1">Inicio</label>
+                      <select class="form-select form-select-sm"><option>09:00</option></select>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small mb-1">Fin</label>
+                      <select class="form-select form-select-sm"><option>12:00</option></select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="shift-box">
+                  <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="ex_noche" checked>
+                    <label class="form-check-label fw-medium" for="ex_noche">Turno noche</label>
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <label class="form-label small mb-1">Inicio</label>
+                      <select class="form-select form-select-sm"><option>16:00</option></select>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small mb-1">Fin</label>
+                      <select class="form-select form-select-sm"><option>19:00</option></select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-primary">Guardar horarios</button>
+              <button type="button" class="btn btn-outline-danger">Marcar no disponible</button>
+            </div>
+            <p class="text-muted small mt-3 mb-0">
+              Mock estático. En el dashboard real, wirear los mismos IDs/handlers de <code>index.html</code>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SOLICITUDES -->
+      <section class="pane" id="solicitudes-pane">
+        <div class="card card-da">
+          <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>Solicitudes</span>
+            <div class="d-flex align-items-center gap-2">
+              <span class="text-muted small">Actualizado 14:32:10</span>
+              <button type="button" class="btn btn-sm btn-light border">Actualizar</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Etiquetas:
+              <span class="badge badge-turno">turno</span>
+              <span class="badge badge-cancelar">cancelar</span>
+              <span class="badge badge-estudio">estudio</span>
+              <span class="badge badge-reprogramar">reprogramar</span>
+            </p>
+            <div class="table-responsive">
+              <table class="table solicitudes-table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Tipo</th>
+                    <th>Hora</th>
+                    <th>Paciente</th>
+                    <th>DNI</th>
+                    <th>Teléfono</th>
+                    <th>Médico</th>
+                    <th>Detalle</th>
+                    <th>Obra</th>
+                    <th class="text-end">Chat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="day-group"><th colspan="9">Hoy — domingo 20/09</th></tr>
+                  <tr>
+                    <td><span class="badge badge-turno">turno</span></td>
+                    <td>10:15</td>
+                    <td class="fw-semibold">Juan Pérez</td>
+                    <td>30111222</td>
+                    <td>+54 381…</td>
+                    <td>Adrián Artigas</td>
+                    <td>A confirmar por secretaría</td>
+                    <td>OSDE</td>
+                    <td class="text-end"><a class="btn-abrir-chat" href="#">Abrir Chat</a></td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge badge-cancelar">cancelar</span></td>
+                    <td>11:02</td>
+                    <td class="fw-semibold">María López</td>
+                    <td>28555111</td>
+                    <td>+54 381…</td>
+                    <td>Eduardo Artigas</td>
+                    <td>—</td>
+                    <td>Particular</td>
+                    <td class="text-end"><a class="btn-abrir-chat" href="#">Abrir Chat</a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CLINICA -->
+      <section class="pane d-none" id="clinic-pane">
+        <div class="card card-da">
+          <div class="card-header">Datos de la clínica</div>
+          <div class="card-body" style="max-width: 640px;">
+            <div class="mb-3">
+              <label class="form-label">Dirección</label>
+              <input type="text" class="form-control" value="Avenida Nicolas Avellaneda 345">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Horario de la clínica</label>
+              <input type="text" class="form-control" value="Lunes a Viernes de 8hs a 12hs y de 16hs a 20hs">
+              <div class="form-text">Se usa cuando el paciente elige “Mi médico de cabecera”.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Texto de bienvenida</label>
+              <textarea class="form-control" rows="2">¡Hola! Bienvenido/a al Centro Oftalmológico Artigas.</textarea>
+            </div>
+            <div class="mb-4">
+              <label class="form-label">Obras sociales (una por línea)</label>
+              <textarea class="form-control" rows="5">OSDE
+Swiss Medical
+Particular</textarea>
+            </div>
+            <button type="button" class="btn btn-primary">Guardar datos de clínica</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    const titles = {
+      'availability-pane': ['Horarios', 'Disponibilidad semanal por médico'],
+      'solicitudes-pane': ['Solicitudes', 'Pedidos del chatbot agrupados por día'],
+      'clinic-pane': ['Clínica', 'Dirección, horarios y obras sociales']
+    };
+
+    const sidebar = document.getElementById('pcSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+
+    function setPane(paneId) {
+      document.querySelectorAll('.pane').forEach(p => p.classList.add('d-none'));
+      document.getElementById(paneId).classList.remove('d-none');
+      document.querySelectorAll('.pc-sidebar .nav-link').forEach(b => {
+        b.classList.toggle('active', b.dataset.pane === paneId);
+      });
+      const [t, s] = titles[paneId];
+      document.getElementById('headerTitle').textContent = t;
+      document.querySelector('.page-subtitle').textContent = s;
+      document.getElementById('doctor-select-wrap').classList.toggle(
+        'd-none',
+        paneId !== 'availability-pane'
+      );
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('show');
+    }
+
+    document.querySelectorAll('.pc-sidebar .nav-link').forEach(btn => {
+      btn.addEventListener('click', () => setPane(btn.dataset.pane));
+    });
+
+    document.getElementById('sidebarToggle').addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+      backdrop.classList.toggle('show');
+    });
+    backdrop.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('show');
+    });
+  </script>
+</body>
+</html>

@@ -5,12 +5,216 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clínica Artigas — Dashboard</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <style>
-    .dash-wrap {
-      max-width: 1320px;
-      margin-top: 32px;
-      margin-bottom: 48px;
+    :root {
+      --da-sidebar-bg: #3f4d67;
+      --da-sidebar-color: #a9b7d0;
+      --da-sidebar-caption: #e8edf7;
+      --da-sidebar-active-bg: rgba(0, 0, 0, 0.12);
+      --da-primary: #04a9f5;
+      --da-heading: #1d2630;
+      --da-muted: #5b6b79;
+      --da-body-bg: #f4f7fa;
+      --da-card-shadow: 0 1px 20px 0 rgba(69, 90, 100, 0.08);
+      --da-sidebar-width: 200px;
+      --da-header-height: 70px;
+      --bs-primary: #04a9f5;
+      --bs-primary-rgb: 4, 169, 245;
+      --bs-link-color: #04a9f5;
+      --bs-success: #1de9b6;
+      --bs-danger: #f44236;
+      --bs-warning: #f4c22b;
+      --bs-info: #3ebfea;
     }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--da-body-bg);
+      color: var(--da-heading);
+      min-height: 100vh;
+    }
+
+    .pc-sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: var(--da-sidebar-width);
+      background: var(--da-sidebar-bg);
+      box-shadow: 1px 0 20px 0 #3f4d67;
+      z-index: 1020;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s ease;
+    }
+    .pc-sidebar .logo {
+      height: var(--da-header-height);
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0 0.85rem;
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      text-decoration: none;
+    }
+    .pc-sidebar .logo-mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, #04a9f5, #3ebfea);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 0.95rem;
+      flex-shrink: 0;
+    }
+    .pc-sidebar .caption {
+      padding: 1rem 0.85rem 0.35rem;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--da-sidebar-caption);
+      opacity: 0.85;
+    }
+    .pc-sidebar .nav {
+      flex: 1;
+      padding: 0.25rem 0.5rem 1rem;
+      overflow-y: auto;
+    }
+    .pc-sidebar .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.6rem 0.7rem;
+      margin-bottom: 0.15rem;
+      border-radius: 6px;
+      color: var(--da-sidebar-color);
+      font-size: 0.875rem;
+      text-decoration: none;
+      border: 0;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .pc-sidebar .nav-link i {
+      font-size: 1.15rem;
+      width: 1.35rem;
+      text-align: center;
+      opacity: 0.9;
+    }
+    .pc-sidebar .nav-link:hover {
+      color: #fff;
+      background: var(--da-sidebar-active-bg);
+    }
+    .pc-sidebar .nav-link.active {
+      color: #fff;
+      background: var(--da-sidebar-active-bg);
+      box-shadow: inset 3px 0 0 var(--da-primary);
+    }
+    .pc-sidebar .nav-link.active i { color: var(--da-primary); }
+
+    .pc-sidebar-footer {
+      margin-top: auto;
+      padding: 0.75rem 0.65rem 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .pc-sidebar-footer .btn-outline-secondary {
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      color: var(--da-sidebar-color);
+      border-color: rgba(169, 183, 208, 0.45);
+      background: transparent;
+    }
+    .pc-sidebar-footer .btn-outline-secondary:hover {
+      color: #fff;
+      background: rgba(0, 0, 0, 0.15);
+      border-color: rgba(169, 183, 208, 0.7);
+    }
+
+    .pc-container {
+      margin-left: var(--da-sidebar-width);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .pc-header {
+      position: sticky;
+      top: 0;
+      z-index: 1010;
+      min-height: var(--da-header-height);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #eef2f6;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.85rem 1.5rem;
+    }
+    #doctor-select-wrap .form-label {
+      display: block;
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+    }
+    .pc-header .page-title {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      line-height: 1.25;
+      color: var(--da-heading);
+    }
+    .pc-header .page-subtitle {
+      margin: 0.15rem 0 0;
+      font-size: 0.9rem;
+      color: var(--da-muted);
+    }
+    .pc-content {
+      padding: 1.5rem;
+      flex: 1;
+    }
+
+    .card-da {
+      background: #fff;
+      border: 0;
+      border-radius: 8px;
+      box-shadow: var(--da-card-shadow);
+    }
+    .card-da .card-header {
+      background: transparent;
+      border-bottom: 1px solid #f0f2f5;
+      padding: 1rem 1.25rem;
+      font-weight: 600;
+      color: var(--da-heading);
+    }
+    .card-da .card-body { padding: 1.25rem; }
+
+    .btn-primary {
+      --bs-btn-bg: var(--da-primary);
+      --bs-btn-border-color: var(--da-primary);
+      --bs-btn-hover-bg: #0398db;
+      --bs-btn-hover-border-color: #0398db;
+      --bs-btn-active-bg: #0288c7;
+      --bs-btn-active-border-color: #0288c7;
+    }
+    .form-control:focus,
+    .form-select:focus {
+      border-color: var(--da-primary);
+      box-shadow: 0 0 0 0.2rem rgba(4, 169, 245, 0.2);
+    }
+    .form-check-input:checked {
+      background-color: var(--da-primary);
+      border-color: var(--da-primary);
+    }
+
     .solicitudes-scroll {
       overflow-x: visible;
     }
@@ -19,32 +223,31 @@
       width: 100%;
       margin-bottom: 0;
       table-layout: fixed;
-      font-size: 0.9375rem;
+      font-size: 0.9rem;
     }
     .solicitudes-table thead th {
-      color: #6c757d;
+      color: var(--da-muted);
       font-weight: 500;
-      font-size: 0.875rem;
-      letter-spacing: 0.01em;
-      border-bottom-width: 1px;
-      padding: 0.5rem 0.5rem;
+      font-size: 0.8rem;
+      border-bottom: 1px solid #eef0f2;
+      padding: 0.65rem 0.5rem;
       background: #fff;
       white-space: nowrap;
     }
     .solicitudes-table tbody td {
-      padding: 0.5rem 0.5rem;
+      padding: 0.65rem 0.5rem;
       vertical-align: middle;
-      border-color: #eef0f2;
-      color: #212529;
+      border-color: #f0f2f5;
+      color: var(--da-heading);
       overflow-wrap: anywhere;
       line-height: 1.35;
     }
     .solicitudes-table tbody tr.day-group th {
-      background: #f8f9fa;
-      color: #495057;
+      background: #f8fafb;
+      color: var(--da-muted);
       font-weight: 600;
-      font-size: 0.9375rem;
-      padding: 0.5rem 0.55rem;
+      font-size: 0.85rem;
+      padding: 0.55rem 0.5rem;
       border-bottom: 1px solid #e9ecef;
     }
     .solicitudes-table .col-tipo { width: 11%; }
@@ -61,16 +264,17 @@
       display: inline-block;
       max-width: 100%;
     }
+
     .btn-abrir-chat {
       display: inline-block;
-      padding: 0.3rem 0.7rem;
-      font-size: 0.875rem;
+      padding: 0.28rem 0.7rem;
+      font-size: 0.8rem;
       font-weight: 500;
       line-height: 1.3;
-      color: #0d6efd;
+      color: var(--da-primary);
       background: #fff;
-      border: 1px solid #0d6efd;
-      border-radius: 0.3rem;
+      border: 1px solid var(--da-primary);
+      border-radius: 4px;
       text-decoration: none;
       white-space: nowrap;
       transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
@@ -78,8 +282,8 @@
     .btn-abrir-chat:hover,
     .btn-abrir-chat:focus {
       color: #fff;
-      background: #0d6efd;
-      border-color: #0d6efd;
+      background: var(--da-primary);
+      border-color: var(--da-primary);
     }
     .btn-abrir-chat.is-disabled {
       color: #adb5bd;
@@ -88,178 +292,284 @@
       pointer-events: none;
       cursor: default;
     }
+
+    .badge-turno { background: #1de9b6; color: #0a3d32; }
+    .badge-cancelar { background: #f44236; color: #fff; }
+    .badge-estudio { background: #04a9f5; color: #fff; }
+    .badge-reprogramar { background: #f4c22b; color: #5c4800; }
+
+    .week-nav {
+      display: inline-flex;
+      align-items: stretch;
+      border: 1px solid #dbe0e5;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .week-nav .btn {
+      border: 0;
+      border-radius: 0;
+      background: #fff;
+      color: var(--da-heading);
+      font-size: 0.8125rem;
+      padding: 0.35rem 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .week-nav .btn:hover {
+      background: #f3f5f7;
+      color: var(--da-primary);
+    }
+    .week-nav .week-label {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35rem 0.85rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--da-heading);
+      border-left: 1px solid #e8edf2;
+      border-right: 1px solid #e8edf2;
+      background: #fafbfc;
+      white-space: nowrap;
+    }
+
+    .shift-box {
+      border: 1px solid #e8edf2;
+      border-radius: 8px;
+      padding: 1rem;
+      background: #fafbfc;
+    }
+
+    .mobile-toggle {
+      display: none;
+      border: 0;
+      background: transparent;
+      color: var(--da-muted);
+      font-size: 1.35rem;
+      padding: 0.25rem;
+    }
+
+    @media (max-width: 991.98px) {
+      .pc-sidebar { transform: translateX(-100%); }
+      .pc-sidebar.open { transform: translateX(0); }
+      .pc-container { margin-left: 0; }
+      .mobile-toggle { display: inline-flex; }
+      .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(29, 38, 48, 0.45);
+        z-index: 1015;
+      }
+      .sidebar-backdrop.show { display: block; }
+    }
   </style>
 </head>
-<body class="bg-light">
-  <div class="container dash-wrap">
+<body>
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h4 class="mb-0">Clínica Artigas</h4>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <aside class="pc-sidebar" id="pcSidebar">
+    <a class="logo" href="/">
+      <span class="logo-mark"><i class="bi bi-eye"></i></span>
+      <span>Clínica Artigas</span>
+    </a>
+    <div class="caption">Dashboard</div>
+    <nav class="nav flex-column" role="tablist">
+      <button class="nav-link active" id="nav-solicitudes" data-pane="solicitudes-pane" type="button">
+        <i class="bi bi-inbox"></i> Solicitudes
+      </button>
+      <button class="nav-link" id="nav-horarios" data-pane="availability-pane" type="button">
+        <i class="bi bi-calendar3"></i> Horarios
+      </button>
+      <button class="nav-link" id="nav-clinica" data-pane="clinic-pane" type="button">
+        <i class="bi bi-building"></i> Clínica
+      </button>
+    </nav>
+    <div class="pc-sidebar-footer">
       <form method="POST" action="/logout" class="m-0">
-        <button type="submit" class="btn btn-sm btn-outline-secondary">Salir</button>
+        <button type="submit" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-box-arrow-right"></i> Salir
+        </button>
       </form>
     </div>
+  </aside>
 
-    <div class="mb-3">
-      <label class="form-label fw-medium">Médico</label>
-      <select id="doctor_id" class="form-select">
-        {% for d in doctors %}
-        <option value="{{ d.id }}">{{ d.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
+  <div class="pc-container">
+    <header class="pc-header">
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" class="mobile-toggle" id="sidebarToggle" aria-label="Menú">
+          <i class="bi bi-list"></i>
+        </button>
+        <div>
+          <h1 class="page-title" id="headerTitle">Solicitudes</h1>
+          <p class="page-subtitle mb-2" id="headerSubtitle">Pedidos del chatbot agrupados por día</p>
+          <div id="doctor-select-wrap" class="d-none">
+            <label class="form-label small text-muted mb-1" for="doctor_id">Médico</label>
+            <select id="doctor_id" class="form-select form-select-sm" style="min-width: 220px; max-width: 280px;">
+              {% for d in doctors %}
+              <option value="{{ d.id }}">{{ d.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+    </header>
 
-    <ul class="nav nav-tabs" id="dashboardTabs" role="tablist">
-      <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="availability-tab" data-bs-toggle="tab"
-          data-bs-target="#availability-pane" type="button" role="tab">
-          Horarios
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="solicitudes-tab" data-bs-toggle="tab"
-          data-bs-target="#solicitudes-pane" type="button" role="tab">
-          Solicitudes
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="clinic-tab" data-bs-toggle="tab"
-          data-bs-target="#clinic-pane" type="button" role="tab">
-          Clínica
-        </button>
-      </li>
-    </ul>
-
-    <div class="tab-content border border-top-0 rounded-bottom bg-white p-4 shadow-sm" id="dashboardTabsContent">
+    <main class="pc-content">
 
       <!-- HORARIOS -->
-      <div class="tab-pane fade show active" id="availability-pane" role="tabpanel">
-        <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="prev-week">Semana anterior</button>
-          <span class="fw-medium" id="week-label">Semana del —</span>
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="next-week">Semana siguiente</button>
-        </div>
-
-        <div id="availability-alert"></div>
-
-        <label class="form-label fw-medium">Seleccioná día(s)</label>
-        <div class="list-group mb-4" id="day-list">
-          {% for i in days_of_week %}
-          <label class="list-group-item d-flex justify-content-between align-items-center">
-            <span>
-              <input class="form-check-input me-2 day-check" type="checkbox" name="days" value="{{ i }}">
-              {{ day_names[i] }} <span id="day-date-{{ i }}" class="text-muted"></span>
-            </span>
-            <span id="schedule-{{ i }}" class="badge text-bg-light border text-muted fst-italic">Sin configurar</span>
-          </label>
-          {% endfor %}
-        </div>
-
-        <div class="mb-4">
-          <label class="form-label fw-medium">Turnos</label>
-
-          <div class="border rounded p-3 mb-3">
-            <div class="form-check mb-3">
-              <input class="form-check-input shift-enable" type="checkbox" id="shift_manana" data-shift="manana" checked>
-              <label class="form-check-label fw-medium" for="shift_manana">Turno mañana</label>
-            </div>
-            <div class="row g-2">
-              <div class="col-6">
-                <label class="form-label small mb-1" for="manana_start">Inicio</label>
-                <select id="manana_start" class="form-select shift-start" data-shift="manana"></select>
-              </div>
-              <div class="col-6">
-                <label class="form-label small mb-1" for="manana_end">Fin</label>
-                <select id="manana_end" class="form-select shift-end" data-shift="manana"></select>
-              </div>
+      <section class="pane d-none" id="availability-pane">
+        <div class="card card-da mb-3">
+          <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>Semana</span>
+            <div class="week-nav">
+              <button type="button" class="btn" id="prev-week" aria-label="Semana anterior">
+                <i class="bi bi-chevron-left"></i> Semana anterior
+              </button>
+              <span class="week-label" id="week-label">Semana del —</span>
+              <button type="button" class="btn" id="next-week" aria-label="Semana siguiente">
+                Semana siguiente <i class="bi bi-chevron-right"></i>
+              </button>
             </div>
           </div>
+          <div class="card-body">
+            <div id="availability-alert"></div>
 
-          <div class="border rounded p-3">
-            <div class="form-check mb-3">
-              <input class="form-check-input shift-enable" type="checkbox" id="shift_noche" data-shift="noche" checked>
-              <label class="form-check-label fw-medium" for="shift_noche">Turno noche</label>
+            <label class="form-label fw-medium">Seleccioná día(s)</label>
+            <div class="list-group mb-4" id="day-list">
+              {% for i in days_of_week %}
+              <label class="list-group-item d-flex justify-content-between align-items-center">
+                <span>
+                  <input class="form-check-input me-2 day-check" type="checkbox" name="days" value="{{ i }}">
+                  {{ day_names[i] }} <span id="day-date-{{ i }}" class="text-muted"></span>
+                </span>
+                <span id="schedule-{{ i }}" class="badge text-bg-light border text-muted fst-italic">Sin configurar</span>
+              </label>
+              {% endfor %}
             </div>
-            <div class="row g-2">
-              <div class="col-6">
-                <label class="form-label small mb-1" for="noche_start">Inicio</label>
-                <select id="noche_start" class="form-select shift-start" data-shift="noche"></select>
+
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <div class="shift-box">
+                  <div class="form-check mb-3">
+                    <input class="form-check-input shift-enable" type="checkbox" id="shift_manana" data-shift="manana" checked>
+                    <label class="form-check-label fw-medium" for="shift_manana">Turno mañana</label>
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <label class="form-label small mb-1" for="manana_start">Inicio</label>
+                      <select id="manana_start" class="form-select form-select-sm shift-start" data-shift="manana"></select>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small mb-1" for="manana_end">Fin</label>
+                      <select id="manana_end" class="form-select form-select-sm shift-end" data-shift="manana"></select>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="col-6">
-                <label class="form-label small mb-1" for="noche_end">Fin</label>
-                <select id="noche_end" class="form-select shift-end" data-shift="noche"></select>
+              <div class="col-md-6">
+                <div class="shift-box">
+                  <div class="form-check mb-3">
+                    <input class="form-check-input shift-enable" type="checkbox" id="shift_noche" data-shift="noche" checked>
+                    <label class="form-check-label fw-medium" for="shift_noche">Turno noche</label>
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <label class="form-label small mb-1" for="noche_start">Inicio</label>
+                      <select id="noche_start" class="form-select form-select-sm shift-start" data-shift="noche"></select>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small mb-1" for="noche_end">Fin</label>
+                      <select id="noche_end" class="form-select form-select-sm shift-end" data-shift="noche"></select>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-primary" id="save-hours">Guardar horarios</button>
+              <button type="button" class="btn btn-outline-danger" id="mark-unavailable">Marcar no disponible</button>
+            </div>
+            <p class="text-muted small mt-3 mb-0">
+              Para corregir un día, seleccionálo de nuevo, marcá turno mañana y/o noche, elegí inicio y fin (o no disponible) y guardá. Se sobrescribe.
+            </p>
           </div>
         </div>
-
-        <div class="d-grid gap-2">
-          <button type="button" class="btn btn-primary" id="save-hours">Guardar horarios</button>
-          <button type="button" class="btn btn-outline-danger" id="mark-unavailable">Marcar no disponible</button>
-        </div>
-        <p class="text-muted small mt-3 mb-0">
-          Para corregir un día, seleccionálo de nuevo, marcá turno mañana y/o noche, elegí inicio y fin (o no disponible) y guardá. Se sobrescribe.
-        </p>
-      </div>
+      </section>
 
       <!-- SOLICITUDES -->
-      <div class="tab-pane fade" id="solicitudes-pane" role="tabpanel">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <span class="text-muted small" id="solicitudes-status">Cargando...</span>
-          <button class="btn btn-sm btn-outline-secondary" id="refresh-btn" type="button">Actualizar</button>
+      <section class="pane" id="solicitudes-pane">
+        <div class="card card-da">
+          <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>Solicitudes</span>
+            <div class="d-flex align-items-center gap-2">
+              <span class="text-muted small" id="solicitudes-status">Cargando...</span>
+              <button class="btn btn-sm btn-light border" id="refresh-btn" type="button">Actualizar</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Etiquetas:
+              <span class="badge badge-turno">turno</span>
+              <span class="badge badge-cancelar">cancelar</span>
+              <span class="badge badge-estudio">estudio</span>
+              <span class="badge badge-reprogramar">reprogramar</span>
+              · agrupadas por el día en que se hizo la solicitud
+            </p>
+            <div class="solicitudes-scroll table-responsive">
+              <table class="table solicitudes-table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th class="col-tipo">Tipo</th>
+                    <th class="col-hora">Hora</th>
+                    <th class="col-paciente">Paciente</th>
+                    <th class="col-dni">DNI</th>
+                    <th class="col-tel">Teléfono</th>
+                    <th class="col-medico">Médico</th>
+                    <th class="col-detalle">Detalle</th>
+                    <th class="col-obra">Obra social</th>
+                    <th class="col-chat">Chat</th>
+                  </tr>
+                </thead>
+                <tbody id="solicitudes-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
-        <p class="text-muted small mb-3">
-          Etiquetas:
-          <span class="badge text-bg-success">turno</span>
-          <span class="badge text-bg-danger">cancelar</span>
-          <span class="badge text-bg-primary">estudio</span>
-          <span class="badge text-bg-warning">reprogramar</span>
-          · agrupadas por el día en que se hizo la solicitud
-        </p>
-        <div class="solicitudes-scroll">
-          <table class="table solicitudes-table align-middle">
-            <thead>
-              <tr>
-                <th class="col-tipo">Tipo</th>
-                <th class="col-hora">Hora</th>
-                <th class="col-paciente">Paciente</th>
-                <th class="col-dni">DNI</th>
-                <th class="col-tel">Teléfono</th>
-                <th class="col-medico">Médico</th>
-                <th class="col-detalle">Detalle</th>
-                <th class="col-obra">Obra social</th>
-                <th class="col-chat">Chat</th>
-              </tr>
-            </thead>
-            <tbody id="solicitudes-tbody"></tbody>
-          </table>
-        </div>
-      </div>
+      </section>
 
       <!-- CLINICA -->
-      <div class="tab-pane fade" id="clinic-pane" role="tabpanel">
-        <div id="clinic-alert"></div>
-        <div class="mb-3">
-          <label class="form-label">Dirección</label>
-          <input type="text" class="form-control" id="clinic-address">
+      <section class="pane d-none" id="clinic-pane">
+        <div class="card card-da">
+          <div class="card-header">Datos de la clínica</div>
+          <div class="card-body" style="max-width: 640px;">
+            <div id="clinic-alert"></div>
+            <div class="mb-3">
+              <label class="form-label" for="clinic-address">Dirección</label>
+              <input type="text" class="form-control" id="clinic-address">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="clinic-hours">Horario de la clínica</label>
+              <input type="text" class="form-control" id="clinic-hours">
+              <div class="form-text">Se usa cuando el paciente elige “Mi médico de cabecera”.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="welcome-text">Texto de bienvenida</label>
+              <textarea class="form-control" id="welcome-text" rows="2"></textarea>
+            </div>
+            <div class="mb-4">
+              <label class="form-label" for="obras-sociales">Obras sociales (una por línea)</label>
+              <textarea class="form-control" id="obras-sociales" rows="8"></textarea>
+            </div>
+            <button type="button" class="btn btn-primary" id="save-clinic">Guardar datos de clínica</button>
+          </div>
         </div>
-        <div class="mb-3">
-          <label class="form-label">Horario de la clínica</label>
-          <input type="text" class="form-control" id="clinic-hours">
-          <div class="form-text">Se usa cuando el paciente elige “Mi médico de cabecera”.</div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Texto de bienvenida</label>
-          <textarea class="form-control" id="welcome-text" rows="2"></textarea>
-        </div>
-        <div class="mb-4">
-          <label class="form-label">Obras sociales (una por línea)</label>
-          <textarea class="form-control" id="obras-sociales" rows="8"></textarea>
-        </div>
-        <button type="button" class="btn btn-primary w-100" id="save-clinic">Guardar datos de clínica</button>
-      </div>
+      </section>
 
-    </div>
+    </main>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -267,6 +577,57 @@
     const allTimes = {{ all_times_json | safe }};
     const shiftDefaults = { manana: ['09:00', '12:00'], noche: ['16:00', '19:00'] };
     let weekStart = new Date('{{ week_start }}T00:00:00');
+
+    const paneTitles = {
+      'availability-pane': ['Horarios', 'Disponibilidad semanal por médico'],
+      'solicitudes-pane': ['Solicitudes', 'Pedidos del chatbot agrupados por día'],
+      'clinic-pane': ['Clínica', 'Dirección, horarios y obras sociales']
+    };
+
+    const sidebar = document.getElementById('pcSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    let solicitudesLoaded = false;
+
+    function setPane(paneId) {
+      document.querySelectorAll('.pane').forEach(p => p.classList.add('d-none'));
+      document.getElementById(paneId).classList.remove('d-none');
+      document.querySelectorAll('.pc-sidebar .nav-link').forEach(b => {
+        b.classList.toggle('active', b.dataset.pane === paneId);
+      });
+      const [t, s] = paneTitles[paneId];
+      document.getElementById('headerTitle').textContent = t;
+      document.getElementById('headerSubtitle').textContent = s;
+      document.getElementById('doctor-select-wrap').classList.toggle(
+        'd-none',
+        paneId !== 'availability-pane'
+      );
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('show');
+
+      if (paneId === 'solicitudes-pane' && !solicitudesLoaded) {
+        solicitudesLoaded = true;
+        loadSolicitudes();
+      }
+      if (paneId === 'clinic-pane') {
+        loadClinic();
+      }
+      if (paneId === 'availability-pane') {
+        loadAvailability();
+      }
+    }
+
+    document.querySelectorAll('.pc-sidebar .nav-link').forEach(btn => {
+      btn.addEventListener('click', () => setPane(btn.dataset.pane));
+    });
+
+    document.getElementById('sidebarToggle').addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+      backdrop.classList.toggle('show');
+    });
+    backdrop.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('show');
+    });
 
     function toISODate(d) {
       const y = d.getFullYear();
@@ -510,10 +871,10 @@
     function tipoBadge(tipo) {
       const t = tipo || 'turno';
       const cls = {
-        turno: 'text-bg-success',
-        cancelar: 'text-bg-danger',
-        estudio: 'text-bg-primary',
-        reprogramar: 'text-bg-warning'
+        turno: 'badge-turno',
+        cancelar: 'badge-cancelar',
+        estudio: 'badge-estudio',
+        reprogramar: 'badge-reprogramar'
       }[t] || 'text-bg-secondary';
       return `<span class="badge ${cls}">${escapeHtml(t)}</span>`;
     }
@@ -567,13 +928,6 @@
     }
 
     document.getElementById('refresh-btn').addEventListener('click', loadSolicitudes);
-    let solicitudesLoaded = false;
-    document.getElementById('solicitudes-tab').addEventListener('shown.bs.tab', () => {
-      if (!solicitudesLoaded) {
-        solicitudesLoaded = true;
-        loadSolicitudes();
-      }
-    });
 
     async function loadClinic() {
       const res = await fetch('/api/clinic-settings');
@@ -585,8 +939,6 @@
       const obras = Array.isArray(data.obras_sociales) ? data.obras_sociales.join('\n') : '';
       document.getElementById('obras-sociales').value = obras;
     }
-
-    document.getElementById('clinic-tab').addEventListener('shown.bs.tab', loadClinic);
 
     document.getElementById('save-clinic').addEventListener('click', async () => {
       const obras = document.getElementById('obras-sociales').value
@@ -610,7 +962,8 @@
     });
 
     initShiftSelects();
-    loadAvailability();
+    solicitudesLoaded = true;
+    loadSolicitudes();
   </script>
 </body>
 </html>
