@@ -1,7 +1,5 @@
-"""
-Idempotent: add Día/hora del turno + Nota al paciente + WhatsApp send outcome
-for Confirmación desde el panel. Safe to re-run on live VPS.
-"""
+-- Idempotent: add Día/hora del turno + Nota al paciente + WhatsApp send outcome
+-- for Confirmación desde el panel. Safe to re-run on live VPS.
 SET NAMES utf8mb4;
 
 SET @has_appointment := (
