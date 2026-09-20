@@ -43,6 +43,9 @@ def _row(
         "tipo": tipo,
         "appointment_at": appointment_at,
         "nota_paciente": nota_paciente,
+        "whatsapp_send_status": None,
+        "whatsapp_send_channel": None,
+        "whatsapp_nota_omitted": 0,
     }
 
 
@@ -79,8 +82,15 @@ def client(store, monkeypatch):
     monkeypatch.setattr(dash_app, "fetch_solicitud", fake_fetch)
     monkeypatch.setattr(dash_app, "list_solicitudes_rows", fake_list)
     monkeypatch.setattr(dash_app, "save_solicitud_confirmacion", fake_save)
-    # Avoid real MySQL on index/doctors
     monkeypatch.setattr(dash_app, "get_db", lambda: MagicMock())
+
+    from chatwoot_send import SendResult
+
+    monkeypatch.setattr(
+        dash_app,
+        "send_confirmacion",
+        lambda *a, **k: SendResult(channel="freeform", nota_omitted=False),
+    )
 
     with TestClient(dash_app.app) as c:
         r = c.post(

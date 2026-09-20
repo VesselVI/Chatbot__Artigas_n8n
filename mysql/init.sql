@@ -50,6 +50,9 @@ CREATE TABLE IF NOT EXISTS turno_solicitudes (
   horario_preferido VARCHAR(255) DEFAULT NULL,
   appointment_at DATETIME NULL DEFAULT NULL,
   nota_paciente TEXT NULL,
+  whatsapp_send_status VARCHAR(20) NULL DEFAULT NULL,
+  whatsapp_send_channel VARCHAR(20) NULL DEFAULT NULL,
+  whatsapp_nota_omitted TINYINT(1) NOT NULL DEFAULT 0,
   status VARCHAR(40) NOT NULL DEFAULT 'pending',
   conversation_id VARCHAR(64) DEFAULT NULL,
   tipo ENUM('turno','cancelar','estudio','reprogramar','solicitud') NOT NULL DEFAULT 'turno'

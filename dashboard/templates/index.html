@@ -300,6 +300,50 @@
     .badge-solicitud { background: #3ebfea; color: #0a2a33; }
     .badge-confirmado { background: #2ca87f; color: #fff; }
     .badge-estado-reprogramado { background: #4680ff; color: #fff; }
+    .fallo-enviar {
+      color: #f44236;
+      font-weight: 600;
+      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .fallo-enviar .bang {
+      display: inline-flex;
+      width: 1.1rem;
+      height: 1.1rem;
+      border-radius: 50%;
+      background: #f44236;
+      color: #fff;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .nota-omitida-warn {
+      color: #b8860b;
+      font-size: 0.75rem;
+    }
+    .btn-reenviar, .btn-editar-reenviar {
+      display: inline-block;
+      padding: 0.28rem 0.55rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      line-height: 1.3;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 0.25rem;
+    }
+    .btn-reenviar {
+      color: #fff;
+      background: #f44236;
+      border: 1px solid #f44236;
+    }
+    .btn-editar-reenviar {
+      color: #4680ff;
+      background: #fff;
+      border: 1px solid #4680ff;
+    }
     .solicitudes-table .col-estado { width: 10%; }
     .solicitudes-table .col-acciones { width: 12%; text-align: right; white-space: nowrap; }
     .btn-confirmar {
@@ -538,6 +582,7 @@
               <span class="badge badge-solicitud">solicitud</span>
               · estado:
               <span class="badge badge-confirmado">Confirmado</span>
+              <span class="badge badge-estado-reprogramado">Reprogramado</span>
               · agrupadas por el día en que se hizo la solicitud
             </p>
             <div class="solicitudes-scroll table-responsive">
@@ -940,13 +985,22 @@
     }
 
     function statusBadge(b) {
+      let html = '';
       if (!b.status_badge) {
-        return `<span class="text-muted small">pendiente</span>`;
+        html = `<span class="text-muted small">pendiente</span>`;
+      } else {
+        const cls = b.status_badge === 'Reprogramado'
+          ? 'badge-estado-reprogramado'
+          : 'badge-confirmado';
+        html = `<span class="badge ${cls}">${escapeHtml(b.status_badge)}</span>`;
       }
-      const cls = b.status_badge === 'Reprogramado'
-        ? 'badge-estado-reprogramado'
-        : 'badge-confirmado';
-      return `<span class="badge ${cls}">${escapeHtml(b.status_badge)}</span>`;
+      if (b.fallo_al_enviar) {
+        html += ` <span class="fallo-enviar" title="Fallo al enviar"><span class="bang">!</span> Fallo al enviar</span>`;
+      }
+      if (b.whatsapp_nota_omitted) {
+        html += ` <span class="nota-omitida-warn" title="Nota omitida en utility">nota omitida</span>`;
+      }
+      return html;
     }
 
     function chatAction(b) {
@@ -957,8 +1011,17 @@
     }
 
     function confirmAction(b) {
-      if (!b.can_confirm) return '';
-      return `<button type="button" class="btn-confirmar" data-confirm-id="${b.id}">Confirmar</button>`;
+      const parts = [];
+      if (b.can_confirm) {
+        parts.push(`<button type="button" class="btn-confirmar" data-confirm-id="${b.id}">Confirmar</button>`);
+      }
+      if (b.can_edit_resend) {
+        parts.push(`<button type="button" class="btn-editar-reenviar" data-edit-id="${b.id}">Editar y reenviar</button>`);
+      }
+      if (b.can_reenviar) {
+        parts.push(`<button type="button" class="btn-reenviar" data-reenviar-id="${b.id}">Reenviar</button>`);
+      }
+      return parts.join(' ');
     }
 
     function detalleCell(b) {
@@ -993,9 +1056,19 @@
 
     let confirmModal;
     let confirmDraft = null;
+    let solicitudesCache = [];
 
-    function openConfirmModal(b) {
+    function findSolicitud(id) {
+      return solicitudesCache.find(s => s.id === id) || null;
+    }
+
+    function openConfirmModal(b, { edit } = { edit: false }) {
       confirmDraft = b;
+      const title = b.tipo === 'reprogramar'
+        ? (edit ? 'Editar reprogramación' : 'Confirmación de reprogramación')
+        : (edit ? 'Editar y reenviar' : 'Confirmación de turno');
+      document.getElementById('confirmModalLabel').textContent = title;
+      document.getElementById('confirm-submit').textContent = edit ? 'Guardar y reenviar' : 'Confirmar';
       document.getElementById('confirm-id').value = b.id;
       document.getElementById('confirm-nombre').value = (b.nombre && b.nombre !== '-') ? b.nombre : '';
       document.getElementById('confirm-medico').value = (b.medico && b.medico !== '-') ? b.medico : '';
@@ -1006,6 +1079,46 @@
         confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
       }
       confirmModal.show();
+    }
+
+    function bindSolicitudActions(data) {
+      solicitudesCache = data.solicitudes || (data.dias || []).flatMap(d => d.solicitudes || []);
+      const tbody = document.getElementById('solicitudes-tbody');
+      tbody.querySelectorAll('[data-confirm-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const flat = findSolicitud(Number(btn.getAttribute('data-confirm-id')));
+          if (flat) openConfirmModal(flat, { edit: false });
+        });
+      });
+      tbody.querySelectorAll('[data-edit-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const flat = findSolicitud(Number(btn.getAttribute('data-edit-id')));
+          if (flat) openConfirmModal(flat, { edit: true });
+        });
+      });
+      tbody.querySelectorAll('[data-reenviar-id]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-reenviar-id');
+          btn.disabled = true;
+          try {
+            const res = await fetch('/api/solicitudes/' + encodeURIComponent(id) + '/reenviar', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: '{}'
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'No se pudo reenviar');
+            if (data.whatsapp_warning) {
+              alert(data.whatsapp_warning);
+            }
+            await loadSolicitudes();
+          } catch (err) {
+            alert(err.message || 'Error al reenviar');
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
     }
 
     async function loadSolicitudes() {
@@ -1019,6 +1132,7 @@
         const groups = data.dias || [];
         if (!groups.length) {
           tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-3">Sin solicitudes</td></tr>';
+          solicitudesCache = [];
         } else {
           tbody.innerHTML = groups.map(g => `
             <tr class="day-group">
@@ -1026,14 +1140,7 @@
             </tr>
             ${(g.solicitudes || []).map(solicitudRow).join('')}
           `).join('');
-          tbody.querySelectorAll('[data-confirm-id]').forEach(btn => {
-            btn.addEventListener('click', () => {
-              const id = Number(btn.getAttribute('data-confirm-id'));
-              const flat = (data.solicitudes || []).find(s => s.id === id)
-                || (data.dias || []).flatMap(d => d.solicitudes || []).find(s => s.id === id);
-              if (flat) openConfirmModal(flat);
-            });
-          });
+          bindSolicitudActions(data);
         }
         statusEl.textContent = 'Actualizado ' + new Date().toLocaleTimeString();
       } catch (err) {
@@ -1063,7 +1170,16 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'No se pudo confirmar');
-        if (confirmModal) confirmModal.hide();
+        if (data.whatsapp_warning) {
+          alertEl.innerHTML = `<div class="alert alert-warning py-2">${escapeHtml(data.whatsapp_warning)}</div>`;
+          // Still close after short delay if sent, or keep open if failed
+        }
+        if (data.whatsapp_send_status === 'failed') {
+          alertEl.innerHTML = `<div class="alert alert-danger py-2">Fallo al enviar: ${escapeHtml(data.whatsapp_warning || 'error')}</div>`;
+        }
+        if (confirmModal && data.whatsapp_send_status !== 'failed') {
+          confirmModal.hide();
+        }
         await loadSolicitudes();
       } catch (err) {
         alertEl.innerHTML = `<div class="alert alert-danger py-2">${escapeHtml(err.message || 'Error')}</div>`;

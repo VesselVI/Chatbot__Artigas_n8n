@@ -18,6 +18,8 @@ from confirmacion import (
     status_badge_label,
     validate_confirm_payload,
 )
+from chatwoot_send import ChatwootSendError, send_confirmacion
+from mensajes import build_outbound_message, format_dia_hora_display
 
 DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 DAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
@@ -407,14 +409,25 @@ def fetch_solicitud(solicitud_id: int) -> dict[str, Any] | None:
         has_tipo = _column_exists(cur, "turno_solicitudes", "tipo")
         has_appointment = _column_exists(cur, "turno_solicitudes", "appointment_at")
         has_nota = _column_exists(cur, "turno_solicitudes", "nota_paciente")
+        has_send = _column_exists(cur, "turno_solicitudes", "whatsapp_send_status")
         tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
         appointment_sql = "appointment_at" if has_appointment else "NULL AS appointment_at"
         nota_sql = "nota_paciente" if has_nota else "NULL AS nota_paciente"
+        if has_send:
+            send_sql = (
+                "whatsapp_send_status, whatsapp_send_channel, whatsapp_nota_omitted"
+            )
+        else:
+            send_sql = (
+                "NULL AS whatsapp_send_status, NULL AS whatsapp_send_channel, "
+                "0 AS whatsapp_nota_omitted"
+            )
         cur.execute(
             f"""
             SELECT id, created_at, phone, nombre, dni, obra_social,
                    telefono_contacto, medico, horario_preferido, status,
-                   conversation_id, {tipo_sql}, {appointment_sql}, {nota_sql}
+                   conversation_id, {tipo_sql}, {appointment_sql}, {nota_sql},
+                   {send_sql}
             FROM turno_solicitudes
             WHERE id = %s
             """,
@@ -432,14 +445,25 @@ def list_solicitudes_rows() -> list[dict[str, Any]]:
         has_tipo = _column_exists(cur, "turno_solicitudes", "tipo")
         has_appointment = _column_exists(cur, "turno_solicitudes", "appointment_at")
         has_nota = _column_exists(cur, "turno_solicitudes", "nota_paciente")
+        has_send = _column_exists(cur, "turno_solicitudes", "whatsapp_send_status")
         tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
         appointment_sql = "appointment_at" if has_appointment else "NULL AS appointment_at"
         nota_sql = "nota_paciente" if has_nota else "NULL AS nota_paciente"
+        if has_send:
+            send_sql = (
+                "whatsapp_send_status, whatsapp_send_channel, whatsapp_nota_omitted"
+            )
+        else:
+            send_sql = (
+                "NULL AS whatsapp_send_status, NULL AS whatsapp_send_channel, "
+                "0 AS whatsapp_nota_omitted"
+            )
         cur.execute(
             f"""
             SELECT id, created_at, phone, nombre, dni, obra_social,
                    telefono_contacto, medico, horario_preferido, status,
-                   conversation_id, {tipo_sql}, {appointment_sql}, {nota_sql}
+                   conversation_id, {tipo_sql}, {appointment_sql}, {nota_sql},
+                   {send_sql}
             FROM turno_solicitudes
             ORDER BY created_at DESC
             LIMIT 200
@@ -456,6 +480,7 @@ def save_solicitud_confirmacion(solicitud_id: int, fields: dict[str, Any]) -> No
         cur = conn.cursor(dictionary=True)
         has_appointment = _column_exists(cur, "turno_solicitudes", "appointment_at")
         has_nota = _column_exists(cur, "turno_solicitudes", "nota_paciente")
+        has_send = _column_exists(cur, "turno_solicitudes", "whatsapp_send_status")
         sets = [
             "nombre = %s",
             "medico = %s",
@@ -466,12 +491,22 @@ def save_solicitud_confirmacion(solicitud_id: int, fields: dict[str, Any]) -> No
             fields["medico"],
             fields["status"],
         ]
-        if has_appointment:
+        if has_appointment and "appointment_at" in fields:
             sets.append("appointment_at = %s")
             params.append(fields["appointment_at"])
-        if has_nota:
+        if has_nota and "nota_paciente" in fields:
             sets.append("nota_paciente = %s")
             params.append(fields["nota_paciente"])
+        if has_send:
+            if "whatsapp_send_status" in fields:
+                sets.append("whatsapp_send_status = %s")
+                params.append(fields["whatsapp_send_status"])
+            if "whatsapp_send_channel" in fields:
+                sets.append("whatsapp_send_channel = %s")
+                params.append(fields["whatsapp_send_channel"])
+            if "whatsapp_nota_omitted" in fields:
+                sets.append("whatsapp_nota_omitted = %s")
+                params.append(1 if fields["whatsapp_nota_omitted"] else 0)
         params.append(solicitud_id)
         cur.execute(
             f"UPDATE turno_solicitudes SET {', '.join(sets)} WHERE id = %s",
@@ -517,6 +552,11 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
     else:
         nota = str(nota)
     detalle = appointment_at or (r.get("horario_preferido") or "-")
+    send_status = str(r.get("whatsapp_send_status") or "").strip().lower() or None
+    send_channel = str(r.get("whatsapp_send_channel") or "").strip().lower() or None
+    nota_omitted = bool(int(r.get("whatsapp_nota_omitted") or 0))
+    is_confirmed = status.lower() == CONFIRMED_STATUS
+    can_confirm = status.lower() == "pending" and tipo in ("turno", "reprogramar")
     return {
         "id": r["id"],
         "tipo": tipo,
@@ -535,7 +575,13 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
         "nota_paciente": nota,
         "status": status,
         "status_badge": status_badge_label(status, tipo),
-        "can_confirm": status.lower() == "pending" and tipo == "turno",
+        "can_confirm": can_confirm,
+        "can_edit_resend": is_confirmed and send_status == "sent",
+        "can_reenviar": is_confirmed and send_status == "failed",
+        "whatsapp_send_status": send_status,
+        "whatsapp_send_channel": send_channel,
+        "whatsapp_nota_omitted": nota_omitted,
+        "fallo_al_enviar": send_status == "failed",
         "conversation_id": r.get("conversation_id") or None,
         "chat_url": chatwoot_conversation_url(r.get("conversation_id")),
         "detalle": detalle if isinstance(detalle, str) else str(detalle),
@@ -588,7 +634,10 @@ async def api_confirm_solicitud(request: Request, solicitud_id: int):
         )
     try:
         payload = validate_confirm_payload(body if isinstance(body, dict) else {})
-        row = assert_confirmable(fetch_solicitud(solicitud_id))
+        existing = fetch_solicitud(solicitud_id)
+        was_confirmed = str((existing or {}).get("status") or "").lower() == CONFIRMED_STATUS
+        row = assert_confirmable(existing, allow_confirmed=was_confirmed)
+        tipo = normalize_tipo(row.get("tipo"))
         fields = {
             "nombre": payload["nombre"],
             "medico": payload["medico"],
@@ -596,8 +645,35 @@ async def api_confirm_solicitud(request: Request, solicitud_id: int):
             "nota_paciente": payload["nota_paciente"],
             "status": CONFIRMED_STATUS,
         }
+        # Persist first (even if WhatsApp later fails).
         save_solicitud_confirmacion(solicitud_id, fields)
-        tipo = normalize_tipo(row.get("tipo"))
+
+        message = build_outbound_message(
+            tipo,
+            nombre=payload["nombre"],
+            medico=payload["medico"],
+            appointment_at=payload["appointment_at"],
+            nota_paciente=payload["nota_paciente"],
+            include_nota=True,
+        )
+        send_outcome = _attempt_whatsapp_send(
+            row.get("conversation_id"),
+            tipo=tipo,
+            message=message,
+            nombre=payload["nombre"],
+            medico=payload["medico"],
+            appointment_at=payload["appointment_at"],
+            nota_paciente=payload["nota_paciente"],
+        )
+        save_solicitud_confirmacion(
+            solicitud_id,
+            {
+                **fields,
+                "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+                "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+                "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+            },
+        )
         return {
             "ok": True,
             "id": solicitud_id,
@@ -607,8 +683,13 @@ async def api_confirm_solicitud(request: Request, solicitud_id: int):
             "nota_paciente": payload["nota_paciente"],
             "nombre": payload["nombre"],
             "medico": payload["medico"],
-            # WhatsApp send is ticket #3 — stub for now
-            "whatsapp_sent": False,
+            "whatsapp_sent": send_outcome["whatsapp_send_status"] == "sent",
+            "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+            "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+            "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+            "whatsapp_warning": send_outcome.get("whatsapp_warning"),
+            "message_preview": message,
+            "edited": was_confirmed,
         }
     except ConfirmError as e:
         status = 404 if e.code == "not_found" else 400
@@ -616,6 +697,131 @@ async def api_confirm_solicitud(request: Request, solicitud_id: int):
             {"ok": False, "error": str(e), "code": e.code},
             status_code=status,
         )
+
+
+@app.post("/api/solicitudes/{solicitud_id}/reenviar")
+@login_required
+async def api_reenviar_solicitud(request: Request, solicitud_id: int):
+    """Reenviar same stored payload after Fallo al enviar (no field edit)."""
+    row = fetch_solicitud(solicitud_id)
+    if not row:
+        return JSONResponse(
+            {"ok": False, "error": "Solicitud no encontrada.", "code": "not_found"},
+            status_code=404,
+        )
+    if str(row.get("status") or "").lower() != CONFIRMED_STATUS:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "Solo se reenvía un turno confirmado.",
+                "code": "not_confirmed",
+            },
+            status_code=400,
+        )
+    if str(row.get("whatsapp_send_status") or "").lower() != "failed":
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "Reenviar solo aplica tras Fallo al enviar.",
+                "code": "not_failed",
+            },
+            status_code=400,
+        )
+    tipo = normalize_tipo(row.get("tipo"))
+    appointment_at = row.get("appointment_at")
+    if not appointment_at:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "Falta Día/hora del turno.",
+                "code": "missing_appointment_at",
+            },
+            status_code=400,
+        )
+    nombre = str(row.get("nombre") or "").strip()
+    medico = str(row.get("medico") or "").strip()
+    nota = str(row.get("nota_paciente") or "").strip()
+    message = build_outbound_message(
+        tipo,
+        nombre=nombre,
+        medico=medico,
+        appointment_at=appointment_at,
+        nota_paciente=nota,
+        include_nota=True,
+    )
+    send_outcome = _attempt_whatsapp_send(
+        row.get("conversation_id"),
+        tipo=tipo,
+        message=message,
+        nombre=nombre,
+        medico=medico,
+        appointment_at=appointment_at,
+        nota_paciente=nota,
+    )
+    save_solicitud_confirmacion(
+        solicitud_id,
+        {
+            "nombre": nombre,
+            "medico": medico,
+            "status": CONFIRMED_STATUS,
+            "appointment_at": appointment_at,
+            "nota_paciente": nota,
+            "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+            "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+            "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+        },
+    )
+    return {
+        "ok": True,
+        "id": solicitud_id,
+        "whatsapp_sent": send_outcome["whatsapp_send_status"] == "sent",
+        "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+        "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+        "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+        "whatsapp_warning": send_outcome.get("whatsapp_warning"),
+        "message_preview": message,
+    }
+
+
+def _attempt_whatsapp_send(
+    conversation_id: Any,
+    *,
+    tipo: str,
+    message: str,
+    nombre: str,
+    medico: str,
+    appointment_at: Any,
+    nota_paciente: str,
+) -> dict[str, Any]:
+    """Persist-independent send attempt. Never raises — returns status fields."""
+    warning = None
+    try:
+        result = send_confirmacion(
+            conversation_id,
+            freeform_content=message,
+            tipo=tipo,
+            nombre=nombre,
+            medico=medico,
+            dia_hora_display=format_dia_hora_display(appointment_at),
+            nota_paciente=nota_paciente,
+        )
+        if result.nota_omitted and (nota_paciente or "").strip():
+            warning = (
+                "Ventana cerrada: se envió plantilla utility sin la Nota al paciente."
+            )
+        return {
+            "whatsapp_send_status": "sent",
+            "whatsapp_send_channel": result.channel,
+            "whatsapp_nota_omitted": result.nota_omitted,
+            "whatsapp_warning": warning,
+        }
+    except ChatwootSendError as e:
+        return {
+            "whatsapp_send_status": "failed",
+            "whatsapp_send_channel": None,
+            "whatsapp_nota_omitted": False,
+            "whatsapp_warning": str(e),
+        }
 
 
 @app.get("/api/clinic-settings")

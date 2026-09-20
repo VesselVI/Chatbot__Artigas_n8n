@@ -15,12 +15,58 @@ A patient ophthalmology appointment (or the patient's request for one). Distinct
 _Avoid_: Cita, consulta (except in patient-facing copy that already uses those words), appointment
 
 **Turno solicitado**:
-A turno request the bot has accepted and queued as a solicitud; día/hora not yet assigned by Secretaría.
-_Avoid_: Turno confirmado (at this stage), booking complete
+A turno request the bot has accepted and queued as a solicitud; the paciente waits until Secretaría assigns día/hora via Confirmación desde el panel.
+_Avoid_: Turno confirmado (at this stage), booking complete, horario preferido
 
 **Turno confirmado**:
-A turno whose día/hora Secretaría has communicated to the paciente.
-_Avoid_: Turno solicitado, confirmed booking (at bot ack alone)
+A turno whose Día/hora del turno Secretaría has assigned on the solicitud via Confirmación desde el panel (`status=confirmed`). WhatsApp is attempted on submit; persistence does not wait on delivery.
+_Avoid_: Turno solicitado, confirmed booking (at bot ack / Recepción de solicitud alone)
+
+**Confirmación desde el panel**:
+Secretaría opens a form on a pending solicitud (`tipo` turno or reprogramar), edits prefilled nombre/médico, sets Día/hora del turno (free datetime), and may add a Nota al paciente; on submit the solicitud becomes confirmed and WhatsApp is sent. **Editar y reenviar** always saves and resends. If Chatwoot/WhatsApp send fails, the row shows a red **!** with **Fallo al enviar** and **Reenviar** (same payload). When the utility fallback runs, Secretaría is warned that the Nota al paciente was omitted. UI badge: **Confirmado** (turno) or **Reprogramado** (reprogramar).
+_Avoid_: Confirmación de turno (alone, when meaning Recepción de solicitud), one-click with no form, immutable-after-confirm, save-without-send on edit
+
+**Mensaje de confirmación**:
+Patient-facing WhatsApp body after Confirmación desde el panel when `tipo=turno` (free-form). Shape:
+
+```
+✅ TURNO CONFIRMADO
+
+Nombre: …
+Médico: …
+Día y hora: …
+Nota: …   (line omitted when empty)
+
+Te esperamos unos minutos antes del horario. Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver.
+```
+
+Utility template maps the same fields except Nota (omitted; warn Secretaría).
+_Avoid_: Confirmación turno (clara), Recepción de solicitud, Mensaje de reprogramación
+
+**Mensaje de reprogramación**:
+Patient-facing WhatsApp body after Confirmación desde el panel when `tipo=reprogramar` (free-form). Shape:
+
+```
+✅ TURNO REPROGRAMADO
+
+Nombre: …
+Médico: …
+Nuevo día y hora: …
+Nota: …   (line omitted when empty)
+
+Su turno anterior fue cancelado. Agende este nuevo horario. Escribí menú para volver.
+```
+
+Same utility rules as Mensaje de confirmación (no Nota on template; warn Secretaría).
+_Avoid_: Mensaje de confirmación, Recepción de solicitud
+
+**Fallo al enviar**:
+Panel warning after Confirmación desde el panel when Chatwoot/WhatsApp rejects or fails the outbound confirmation; paired with **Reenviar**. Distinct from a successful confirm that still needs a content fix (**Editar y reenviar**).
+_Avoid_: Error genérico, failed booking, turno no confirmado (the solicitud is already confirmed in DB)
+
+**Nota al paciente**:
+Free-text Secretaría writes in Confirmación desde el panel; persisted on the solicitud. On free-form send, shown as a `Nota:` line in the Mensaje de confirmación (line omitted when empty). If the Meta customer-service window is closed and the utility template is used, the note is omitted from that send and Secretaría sees an explicit warning.
+_Avoid_: Note, comentario, Ficha para Secretaría (private; never patient-facing)
 
 **Turno de agenda**:
 A doctor availability window on a given day — mañana or noche — with optional start/end times, managed in the dashboard.
@@ -35,8 +81,12 @@ Which Turnos de agenda a médico has for a given week in the dashboard.
 _Avoid_: Horario de clínica, slots (in domain prose)
 
 **Horario preferido**:
-What the solicitud records about when the paciente wanted to come; today often "A confirmar por secretaría" until Secretaría sets the real slot.
-_Avoid_: Disponibilidad, día/hora (as if the bot had already booked it)
+Deprecated in the booking process: the bot no longer asks the paciente for a preferred slot. Día/hora exist only after Confirmación desde el panel. Legacy DB column may still hold a placeholder until removed; do not treat it as a real appointment time.
+_Avoid_: Disponibilidad, día/hora del turno, appointment time
+
+**Día/hora del turno**:
+The appointment datetime Secretaría assigns in Confirmación desde el panel; stored as a structured field on the solicitud (not free-text preference).
+_Avoid_: Horario preferido, Disponibilidad, Turno de agenda (those are doctor windows, not the patient's slot)
 
 **Cancelación de solicitud**:
 Aborting an in-progress booking flow before a completed new-appointment solicitud; may still leave a cancel-labelled solicitud with partial data for secretaries.
@@ -47,7 +97,7 @@ A patient's request to cancel an existing appointment (typically after confirmin
 _Avoid_: Cancelación de solicitud, salir, menú
 
 **Reprogramación**:
-A patient's request to change day/time of an existing turno; secretaries handle the actual reschedule.
+A patient's request to change day/time of an existing turno; secretaries handle the actual reschedule (including cancelling the prior slot in the CRM/agenda when needed). Confirmación desde el panel sends the Mensaje de reprogramación; the line “Su turno anterior fue cancelado” is an ops promise, not something this system verifies in DrApp.
 _Avoid_: Cambio de turno (unless clarifying copy), reschedule (in domain prose)
 
 **Solicitud de estudio**:

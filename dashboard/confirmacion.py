@@ -70,8 +70,10 @@ def validate_confirm_payload(body: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def assert_confirmable(row: dict[str, Any] | None) -> dict[str, Any]:
-    """Ensure the solicitud row may be confirmed. Returns the row."""
+def assert_confirmable(
+    row: dict[str, Any] | None, *, allow_confirmed: bool = False
+) -> dict[str, Any]:
+    """Ensure the solicitud row may be confirmed (or edited if allow_confirmed)."""
     if not row:
         raise ConfirmError("Solicitud no encontrada.", code="not_found")
     tipo = normalize_tipo(row.get("tipo"))
@@ -81,7 +83,11 @@ def assert_confirmable(row: dict[str, Any] | None) -> dict[str, Any]:
             code="ineligible_tipo",
         )
     status = str(row.get("status") or PENDING_STATUS).strip().lower()
-    if status == CONFIRMED_STATUS:
-        # Ticket #2: first confirm only; edit path is a later ticket.
+    if status == CONFIRMED_STATUS and not allow_confirmed:
         raise ConfirmError("La solicitud ya está confirmada.", code="already_confirmed")
+    if status not in (PENDING_STATUS, CONFIRMED_STATUS):
+        raise ConfirmError(
+            f"Estado «{status}» no admite confirmación.",
+            code="invalid_status",
+        )
     return row
