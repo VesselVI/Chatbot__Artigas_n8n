@@ -10,6 +10,15 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
+from confirmacion import (
+    CONFIRMED_STATUS,
+    ConfirmError,
+    assert_confirmable,
+    normalize_tipo,
+    status_badge_label,
+    validate_confirm_payload,
+)
+
 DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 DAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
@@ -378,11 +387,159 @@ def parse_solicitud_dt(value: Any) -> datetime | None:
     return None
 
 
-def normalize_tipo(value: Any) -> str:
-    tipo = str(value or "turno").strip().lower()
-    if tipo not in ("turno", "cancelar", "estudio", "reprogramar", "solicitud"):
-        return "turno"
-    return tipo
+def _column_exists(cur, table: str, column: str) -> bool:
+    cur.execute(
+        """
+        SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+          AND COLUMN_NAME = %s
+        """,
+        (table, column),
+    )
+    return int((cur.fetchone() or {}).get("n") or 0) > 0
+
+
+def fetch_solicitud(solicitud_id: int) -> dict[str, Any] | None:
+    conn = get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        has_tipo = _column_exists(cur, "turno_solicitudes", "tipo")
+        has_appointment = _column_exists(cur, "turno_solicitudes", "appointment_at")
+        has_nota = _column_exists(cur, "turno_solicitudes", "nota_paciente")
+        tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
+        appointment_sql = "appointment_at" if has_appointment else "NULL AS appointment_at"
+        nota_sql = "nota_paciente" if has_nota else "NULL AS nota_paciente"
+        cur.execute(
+            f"""
+            SELECT id, created_at, phone, nombre, dni, obra_social,
+                   telefono_contacto, medico, horario_preferido, status,
+                   conversation_id, {tipo_sql}, {appointment_sql}, {nota_sql}
+            FROM turno_solicitudes
+            WHERE id = %s
+            """,
+            (solicitud_id,),
+        )
+        return cur.fetchone()
+    finally:
+        conn.close()
+
+
+def list_solicitudes_rows() -> list[dict[str, Any]]:
+    conn = get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        has_tipo = _column_exists(cur, "turno_solicitudes", "tipo")
+        has_appointment = _column_exists(cur, "turno_solicitudes", "appointment_at")
+        has_nota = _column_exists(cur, "turno_solicitudes", "nota_paciente")
+        tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
+        appointment_sql = "appointment_at" if has_appointment else "NULL AS appointment_at"
+        nota_sql = "nota_paciente" if has_nota else "NULL AS nota_paciente"
+        cur.execute(
+            f"""
+            SELECT id, created_at, phone, nombre, dni, obra_social,
+                   telefono_contacto, medico, horario_preferido, status,
+                   conversation_id, {tipo_sql}, {appointment_sql}, {nota_sql}
+            FROM turno_solicitudes
+            ORDER BY created_at DESC
+            LIMIT 200
+            """
+        )
+        return list(cur.fetchall() or [])
+    finally:
+        conn.close()
+
+
+def save_solicitud_confirmacion(solicitud_id: int, fields: dict[str, Any]) -> None:
+    conn = get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        has_appointment = _column_exists(cur, "turno_solicitudes", "appointment_at")
+        has_nota = _column_exists(cur, "turno_solicitudes", "nota_paciente")
+        sets = [
+            "nombre = %s",
+            "medico = %s",
+            "status = %s",
+        ]
+        params: list[Any] = [
+            fields["nombre"],
+            fields["medico"],
+            fields["status"],
+        ]
+        if has_appointment:
+            sets.append("appointment_at = %s")
+            params.append(fields["appointment_at"])
+        if has_nota:
+            sets.append("nota_paciente = %s")
+            params.append(fields["nota_paciente"])
+        params.append(solicitud_id)
+        cur.execute(
+            f"UPDATE turno_solicitudes SET {', '.join(sets)} WHERE id = %s",
+            tuple(params),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _format_appointment_at(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%dT%H:%M")
+    s = str(value).strip()
+    if not s:
+        return None
+    dt = parse_solicitud_dt(value)
+    if dt:
+        return dt.strftime("%Y-%m-%dT%H:%M")
+    return s
+
+
+def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
+    created = parse_solicitud_dt(r.get("created_at"))
+    if created:
+        created_s = created.strftime("%d/%m/%Y %H:%M")
+        hora = created.strftime("%H:%M")
+        dia = created.date().isoformat()
+        dia_label = f"{DAY_NAMES[created.weekday()]} {created.strftime('%d/%m/%Y')}"
+    else:
+        created_s = str(r.get("created_at") or "-")
+        hora = "-"
+        dia = ""
+        dia_label = "Sin fecha"
+    tipo = normalize_tipo(r.get("tipo"))
+    status = str(r.get("status") or "pending")
+    appointment_at = _format_appointment_at(r.get("appointment_at"))
+    nota = r.get("nota_paciente")
+    if nota is None:
+        nota = ""
+    else:
+        nota = str(nota)
+    detalle = appointment_at or (r.get("horario_preferido") or "-")
+    return {
+        "id": r["id"],
+        "tipo": tipo,
+        "created_at": created_s,
+        "hora": hora,
+        "dia": dia,
+        "dia_label": dia_label,
+        "phone": r["phone"],
+        "nombre": r.get("nombre") or "-",
+        "dni": r.get("dni") or "-",
+        "obra_social": r.get("obra_social") or "-",
+        "telefono_contacto": r.get("telefono_contacto") or "-",
+        "medico": r.get("medico") or "-",
+        "horario_preferido": r.get("horario_preferido") or "-",
+        "appointment_at": appointment_at,
+        "nota_paciente": nota,
+        "status": status,
+        "status_badge": status_badge_label(status, tipo),
+        "can_confirm": status.lower() == "pending" and tipo == "turno",
+        "conversation_id": r.get("conversation_id") or None,
+        "chat_url": chatwoot_conversation_url(r.get("conversation_id")),
+        "detalle": detalle if isinstance(detalle, str) else str(detalle),
+    }
 
 
 def chatwoot_conversation_url(conversation_id: Any) -> str | None:
@@ -399,66 +556,8 @@ def chatwoot_conversation_url(conversation_id: Any) -> str | None:
 @app.get("/api/solicitudes")
 @login_required
 async def api_solicitudes(request: Request):
-    conn = get_db()
-    try:
-        cur = conn.cursor(dictionary=True)
-        cur.execute(
-            """
-            SELECT COUNT(*) AS n FROM information_schema.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = 'turno_solicitudes'
-              AND COLUMN_NAME = 'tipo'
-            """
-        )
-        has_tipo = int((cur.fetchone() or {}).get("n") or 0) > 0
-        tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
-        cur.execute(
-            f"""
-            SELECT id, created_at, phone, nombre, dni, obra_social,
-                   telefono_contacto, medico, horario_preferido, status,
-                   conversation_id, {tipo_sql}
-            FROM turno_solicitudes
-            ORDER BY created_at DESC
-            LIMIT 200
-            """
-        )
-        rows = cur.fetchall()
-    finally:
-        conn.close()
-
-    out = []
-    for r in rows:
-        created = parse_solicitud_dt(r["created_at"])
-        if created:
-            created_s = created.strftime("%d/%m/%Y %H:%M")
-            hora = created.strftime("%H:%M")
-            dia = created.date().isoformat()
-            dia_label = f"{DAY_NAMES[created.weekday()]} {created.strftime('%d/%m/%Y')}"
-        else:
-            created_s = str(r["created_at"] or "-")
-            hora = "-"
-            dia = ""
-            dia_label = "Sin fecha"
-        out.append(
-            {
-                "id": r["id"],
-                "tipo": normalize_tipo(r.get("tipo")),
-                "created_at": created_s,
-                "hora": hora,
-                "dia": dia,
-                "dia_label": dia_label,
-                "phone": r["phone"],
-                "nombre": r["nombre"] or "-",
-                "dni": r["dni"] or "-",
-                "obra_social": r["obra_social"] or "-",
-                "telefono_contacto": r["telefono_contacto"] or "-",
-                "medico": r["medico"] or "-",
-                "horario_preferido": r["horario_preferido"] or "-",
-                "status": r["status"],
-                "conversation_id": r.get("conversation_id") or None,
-                "chat_url": chatwoot_conversation_url(r.get("conversation_id")),
-            }
-        )
+    rows = list_solicitudes_rows()
+    out = [serialize_solicitud(r) for r in rows]
 
     dias = []
     by_day: dict[str, dict] = {}
@@ -475,6 +574,48 @@ async def api_solicitudes(request: Request):
         by_day[key]["solicitudes"].append(item)
 
     return {"solicitudes": out, "dias": dias}
+
+
+@app.post("/api/solicitudes/{solicitud_id}/confirm")
+@login_required
+async def api_confirm_solicitud(request: Request, solicitud_id: int):
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Cuerpo inválido.", "code": "invalid_body"},
+            status_code=400,
+        )
+    try:
+        payload = validate_confirm_payload(body if isinstance(body, dict) else {})
+        row = assert_confirmable(fetch_solicitud(solicitud_id))
+        fields = {
+            "nombre": payload["nombre"],
+            "medico": payload["medico"],
+            "appointment_at": payload["appointment_at"],
+            "nota_paciente": payload["nota_paciente"],
+            "status": CONFIRMED_STATUS,
+        }
+        save_solicitud_confirmacion(solicitud_id, fields)
+        tipo = normalize_tipo(row.get("tipo"))
+        return {
+            "ok": True,
+            "id": solicitud_id,
+            "status": CONFIRMED_STATUS,
+            "status_badge": status_badge_label(CONFIRMED_STATUS, tipo),
+            "appointment_at": payload["appointment_at"].strftime("%Y-%m-%dT%H:%M"),
+            "nota_paciente": payload["nota_paciente"],
+            "nombre": payload["nombre"],
+            "medico": payload["medico"],
+            # WhatsApp send is ticket #3 — stub for now
+            "whatsapp_sent": False,
+        }
+    except ConfirmError as e:
+        status = 404 if e.code == "not_found" else 400
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code},
+            status_code=status,
+        )
 
 
 @app.get("/api/clinic-settings")

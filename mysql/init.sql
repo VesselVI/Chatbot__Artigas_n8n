@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS turno_solicitudes (
   telefono_contacto VARCHAR(40) DEFAULT NULL,
   medico VARCHAR(120) DEFAULT NULL,
   horario_preferido VARCHAR(255) DEFAULT NULL,
+  appointment_at DATETIME NULL DEFAULT NULL,
+  nota_paciente TEXT NULL,
   status VARCHAR(40) NOT NULL DEFAULT 'pending',
   conversation_id VARCHAR(64) DEFAULT NULL,
   tipo ENUM('turno','cancelar','estudio','reprogramar','solicitud') NOT NULL DEFAULT 'turno'
