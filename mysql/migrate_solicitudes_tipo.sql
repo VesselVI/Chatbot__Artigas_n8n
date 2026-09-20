@@ -11,7 +11,7 @@ SET @has_tipo := (
 
 SET @sql := IF(
   @has_tipo = 0,
-  'ALTER TABLE turno_solicitudes ADD COLUMN tipo ENUM(''turno'',''cancelar'',''estudio'',''reprogramar'') NOT NULL DEFAULT ''turno'' AFTER conversation_id',
+  'ALTER TABLE turno_solicitudes ADD COLUMN tipo ENUM(''turno'',''cancelar'',''estudio'',''reprogramar'',''solicitud'') NOT NULL DEFAULT ''turno'' AFTER conversation_id',
   'SELECT 1'
 );
 PREPARE stmt FROM @sql;
@@ -20,7 +20,7 @@ DEALLOCATE PREPARE stmt;
 
 SET @sql := IF(
   @has_tipo = 1,
-  'ALTER TABLE turno_solicitudes MODIFY COLUMN tipo ENUM(''turno'',''cancelar'',''estudio'',''reprogramar'') NOT NULL DEFAULT ''turno''',
+  'ALTER TABLE turno_solicitudes MODIFY COLUMN tipo ENUM(''turno'',''cancelar'',''estudio'',''reprogramar'',''solicitud'') NOT NULL DEFAULT ''turno''',
   'SELECT 1'
 );
 PREPARE stmt FROM @sql;

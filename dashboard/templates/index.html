@@ -297,6 +297,7 @@
     .badge-cancelar { background: #f44236; color: #fff; }
     .badge-estudio { background: #04a9f5; color: #fff; }
     .badge-reprogramar { background: #f4c22b; color: #5c4800; }
+    .badge-solicitud { background: #3ebfea; color: #0a2a33; }
 
     .week-nav {
       display: inline-flex;
@@ -517,6 +518,7 @@
               <span class="badge badge-cancelar">cancelar</span>
               <span class="badge badge-estudio">estudio</span>
               <span class="badge badge-reprogramar">reprogramar</span>
+              <span class="badge badge-solicitud">solicitud</span>
               · agrupadas por el día en que se hizo la solicitud
             </p>
             <div class="solicitudes-scroll table-responsive">
@@ -874,7 +876,8 @@
         turno: 'badge-turno',
         cancelar: 'badge-cancelar',
         estudio: 'badge-estudio',
-        reprogramar: 'badge-reprogramar'
+        reprogramar: 'badge-reprogramar',
+        solicitud: 'badge-solicitud'
       }[t] || 'text-bg-secondary';
       return `<span class="badge ${cls}">${escapeHtml(t)}</span>`;
     }

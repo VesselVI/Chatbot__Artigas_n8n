@@ -125,8 +125,8 @@ that the pages call.
 
 - **Horarios** — pick a doctor, move week by week, set morning and evening shifts in 30 minute steps,
   or mark days unavailable.
-- **Solicitudes** — requests from the bot grouped by day, labelled `turno`, `cancelar`, `estudio` or
-  `reprogramar`, each linking back to its Chatwoot conversation.
+- **Solicitudes** — requests from the bot grouped by day, labelled `turno`, `cancelar`, `estudio`,
+  `reprogramar` or `solicitud`, each linking back to its Chatwoot conversation.
 - **Clínica** — address, opening hours, welcome text and the obras sociales list.
 
 It also serves the public privacy policy that Meta requires before a WhatsApp app can go live.
@@ -150,13 +150,16 @@ dashboard/   FastAPI app, templates, Dockerfile
 mysql/       schema, migrations, test-data wipe
 n8n/         exported workflows and import notes
 scripts/     deployment, backup and test scripts
-docs/adr/    architecture decision records
+docs/adr/       architecture decision records
+docs/features/  shipped feature plans and cutovers
+docs/deployment/ production runbook
+docs/commercial/ client pricing (gitignored patterns)
 ```
 
 ## Running it
 
 Deployment, WhatsApp Cloud API setup, the production cutover runbook and backups are in
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+[docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md).
 
 Configuration is entirely environment driven; see [`.env.example`](.env.example). No credentials,
 tokens or phone numbers are stored in this repository.
