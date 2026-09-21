@@ -3,367 +3,1006 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#e8eef2">
   <title>Clínica Artigas — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <style>
+
     :root {
-      --da-sidebar-bg: #3f4d67;
-      --da-sidebar-color: #a9b7d0;
-      --da-sidebar-caption: #e8edf7;
-      --da-sidebar-active-bg: rgba(0, 0, 0, 0.12);
-      --da-primary: #04a9f5;
-      --da-heading: #1d2630;
-      --da-muted: #5b6b79;
-      --da-body-bg: #f4f7fa;
-      --da-card-shadow: 0 1px 20px 0 rgba(69, 90, 100, 0.08);
-      --da-sidebar-width: 200px;
-      --da-header-height: 70px;
-      --bs-primary: #04a9f5;
-      --bs-primary-rgb: 4, 169, 245;
-      --bs-link-color: #04a9f5;
-      --bs-success: #1de9b6;
-      --bs-danger: #f44236;
-      --bs-warning: #f4c22b;
-      --bs-info: #3ebfea;
+      /* Clinical ops: cool paper, one teal accent */
+      --ink: #1a2430;
+      --muted: #5a6b7c;
+      --paper: #e8eef2;
+      --surface: #ffffff;
+      --accent: #0e7c8b;
+      --accent-soft: #d8eef1;
+      --sidebar: #1e2a38;
+      --sidebar-text: #9aadc0;
+      --sidebar-caption: #c5d4e2;
+      --border: #d3dce4;
+      --border-soft: #e4ebf0;
+      --row-hover: #e4ebf1;
+      --day-bg: #eef3f6;
+      --danger: #b42318;
+      --warn: #8a6500;
+      --ok: #1a7a4c;
+      --sidebar-width: 10.5rem;
+      --header-h: 4rem;
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      --press: 140ms;
+      --hover: 160ms;
+      --focus-ring: 0 0 0 3px rgba(14, 124, 139, 0.28);
+      color-scheme: light;
     }
 
     * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      font-family: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: var(--da-body-bg);
-      color: var(--da-heading);
-      min-height: 100vh;
+      font-family: Figtree, system-ui, sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100dvh;
+      font-size: 14px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
     }
 
+    .skip-link {
+      position: absolute;
+      left: 0.75rem;
+      top: -3rem;
+      z-index: 2000;
+      padding: 0.5rem 0.85rem;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.8125rem;
+      border-radius: 6px;
+      text-decoration: none;
+    }
+    .skip-link:focus {
+      top: 0.75rem;
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+    /* —— Sidebar —— */
     .pc-sidebar {
       position: fixed;
       inset: 0 auto 0 0;
-      width: var(--da-sidebar-width);
-      background: var(--da-sidebar-bg);
-      box-shadow: 1px 0 20px 0 #3f4d67;
+      width: var(--sidebar-width);
+      background: var(--sidebar);
       z-index: 1020;
       display: flex;
       flex-direction: column;
-      transition: transform 0.2s ease;
     }
     .pc-sidebar .logo {
-      height: var(--da-header-height);
+      height: var(--header-h);
       display: flex;
       align-items: center;
-      gap: 0.55rem;
-      padding: 0 0.85rem;
+      gap: 0.5rem;
+      padding: 0 0.75rem;
       color: #fff;
       font-weight: 600;
-      font-size: 0.95rem;
-      letter-spacing: 0.02em;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 0.8125rem;
+      letter-spacing: -0.01em;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
       text-decoration: none;
     }
+    .pc-sidebar .logo:focus-visible {
+      outline: none;
+      box-shadow: inset 0 0 0 2px var(--accent);
+    }
     .pc-sidebar .logo-mark {
-      width: 30px;
-      height: 30px;
-      border-radius: 7px;
-      background: linear-gradient(135deg, #04a9f5, #3ebfea);
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 6px;
+      background: var(--accent);
       display: grid;
       place-items: center;
       color: #fff;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       flex-shrink: 0;
     }
     .pc-sidebar .caption {
-      padding: 1rem 0.85rem 0.35rem;
+      padding: 1.15rem 1rem 0.4rem;
       font-size: 0.65rem;
-      text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: var(--da-sidebar-caption);
-      opacity: 0.85;
+      text-transform: uppercase;
+      color: var(--sidebar-caption);
+      opacity: 0.75;
+      font-weight: 600;
     }
     .pc-sidebar .nav {
       flex: 1;
-      padding: 0.25rem 0.5rem 1rem;
-      overflow-y: auto;
+      padding: 0.25rem 0.55rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
     }
     .pc-sidebar .nav-link {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
-      padding: 0.6rem 0.7rem;
-      margin-bottom: 0.15rem;
-      border-radius: 6px;
-      color: var(--da-sidebar-color);
-      font-size: 0.875rem;
-      text-decoration: none;
+      gap: 0.5rem;
+      padding: 0.5rem 0.55rem;
+      border-radius: 7px;
+      color: var(--sidebar-text);
+      font-size: 0.8125rem;
+      font-weight: 500;
       border: 0;
       background: transparent;
       width: 100%;
       text-align: left;
       cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
+      touch-action: manipulation;
+      transition:
+        background-color var(--hover) var(--ease-out),
+        color var(--hover) var(--ease-out);
     }
     .pc-sidebar .nav-link i {
-      font-size: 1.15rem;
-      width: 1.35rem;
+      font-size: 1.1rem;
+      width: 1.25rem;
       text-align: center;
       opacity: 0.9;
     }
-    .pc-sidebar .nav-link:hover {
+    @media (hover: hover) and (pointer: fine) {
+      .pc-sidebar .nav-link:hover {
+        color: #fff;
+        background: rgba(0, 0, 0, 0.18);
+      }
+    }
+    .pc-sidebar .nav-link:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
       color: #fff;
-      background: var(--da-sidebar-active-bg);
     }
     .pc-sidebar .nav-link.active {
       color: #fff;
-      background: var(--da-sidebar-active-bg);
-      box-shadow: inset 3px 0 0 var(--da-primary);
+      background: rgba(0, 0, 0, 0.22);
+      box-shadow: inset 3px 0 0 var(--accent);
     }
-    .pc-sidebar .nav-link.active i { color: var(--da-primary); }
-
+    .pc-sidebar .nav-link.active i { color: #5ec8d6; }
     .pc-sidebar-footer {
       margin-top: auto;
-      padding: 0.75rem 0.65rem 1rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 0.75rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
     }
-    .pc-sidebar-footer .btn-outline-secondary {
+    .btn-salir {
       width: 100%;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 0.4rem;
-      color: var(--da-sidebar-color);
-      border-color: rgba(169, 183, 208, 0.45);
+      padding: 0.45rem 0.65rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      font-family: inherit;
+      color: var(--sidebar-text);
       background: transparent;
+      border: 1px solid rgba(154, 173, 192, 0.4);
+      border-radius: 6px;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition:
+        background-color var(--hover) var(--ease-out),
+        color var(--hover) var(--ease-out),
+        border-color var(--hover) var(--ease-out),
+        transform var(--press) var(--ease-out);
     }
-    .pc-sidebar-footer .btn-outline-secondary:hover {
-      color: #fff;
-      background: rgba(0, 0, 0, 0.15);
-      border-color: rgba(169, 183, 208, 0.7);
+    @media (hover: hover) and (pointer: fine) {
+      .btn-salir:hover {
+        color: #fff;
+        background: rgba(0, 0, 0, 0.18);
+        border-color: rgba(154, 173, 192, 0.65);
+      }
+    }
+    .btn-salir:active { transform: scale(0.97); }
+    .btn-salir:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
     }
 
+    /* —— Shell —— */
     .pc-container {
-      margin-left: var(--da-sidebar-width);
-      min-height: 100vh;
+      margin-left: var(--sidebar-width);
+      width: calc(100% - var(--sidebar-width));
+      max-width: calc(100vw - var(--sidebar-width));
+      min-width: 0;
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
+      overflow-x: hidden;
     }
     .pc-header {
       position: sticky;
       top: 0;
       z-index: 1010;
-      min-height: var(--da-header-height);
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(8px);
-      border-bottom: 1px solid #eef2f6;
+      min-height: var(--header-h);
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
-      padding: 0.85rem 1.5rem;
+      padding: 0.65rem 1.1rem;
+      flex-wrap: wrap;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .page-title-block { flex: 1 1 12rem; min-width: 0; }
+    .page-title {
+      margin: 0;
+      font-size: 1.4rem;
+      font-weight: 650;
+      letter-spacing: -0.025em;
+      text-wrap: balance;
+      color: var(--ink);
+    }
+    .page-subtitle {
+      margin: 0.15rem 0 0;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      text-wrap: pretty;
+    }
+    .pc-content {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      gap: 0.85rem;
+      padding: 1rem 1.1rem 1.5rem;
+      min-width: 0;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    /* —— Search —— */
+    .search-bar {
+      display: flex;
+      align-items: stretch;
+      flex: 1 1 16rem;
+      min-width: 0;
+      max-width: 100%;
+      width: min(26rem, 100%);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--surface);
+      transition:
+        border-color var(--hover) var(--ease-out),
+        box-shadow var(--hover) var(--ease-out);
+    }
+    .search-bar:focus-within {
+      border-color: var(--accent);
+      box-shadow: var(--focus-ring);
+    }
+    .search-bar .search-icon {
+      display: grid;
+      place-items: center;
+      width: 2.4rem;
+      color: var(--muted);
+      background: #f5f8fa;
+      border-right: 1px solid var(--border-soft);
+    }
+    .search-bar input {
+      flex: 1;
+      border: 0;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.85rem;
+      font-family: inherit;
+      outline: none;
+      min-width: 0;
+      background: transparent;
+      color: var(--ink);
+    }
+    .search-bar input::placeholder { color: #8a9aab; }
+    .search-clear {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 0 0.65rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition:
+        color var(--hover) var(--ease-out),
+        transform var(--press) var(--ease-out);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .search-clear:hover { color: var(--ink); }
+    }
+    .search-clear:active { transform: scale(0.97); }
+    .search-clear:focus-visible {
+      outline: none;
+      color: var(--accent);
+    }
+
+    /* —— Card —— */
+    .card-da {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow:
+        0 1px 1px rgba(30, 42, 56, 0.03),
+        0 8px 24px rgba(30, 42, 56, 0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      max-width: 100%;
+      flex: 1 1 auto;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 1.15rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      letter-spacing: -0.01em;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .status-pill {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .btn-refresh {
+      font-size: 0.775rem;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 6px;
+      color: var(--ink);
+      cursor: pointer;
+      touch-action: manipulation;
+      transition:
+        border-color var(--hover) var(--ease-out),
+        color var(--hover) var(--ease-out),
+        background-color var(--hover) var(--ease-out),
+        transform var(--press) var(--ease-out);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-refresh:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-soft);
+      }
+    }
+    .btn-refresh:active { transform: scale(0.97); }
+    .btn-refresh:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+    /* —— Legend —— */
+    .legend-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.45rem 0.75rem;
+      padding: 0.7rem 1.15rem;
+      background: #f5f8fa;
+      border-bottom: 1px solid var(--border-soft);
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .legend-label {
+      font-weight: 600;
+      font-size: 0.6875rem;
+      color: #7a8b9a;
+      letter-spacing: 0.02em;
+    }
+    .legend-sep {
+      width: 1px;
+      height: 1rem;
+      background: var(--border);
+    }
+
+    /* —— Badges —— */
+    .badge-tipo,
+    .badge-estado {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.4rem;
+      border-radius: 5px;
+      font-size: 0.68rem;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+      line-height: 1.2;
+      white-space: nowrap;
+      border: 1px solid transparent;
+      vertical-align: middle;
+      max-width: 100%;
+      box-sizing: border-box;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .badge-tipo { text-transform: lowercase; }
+    .badge-tipo::before,
+    .badge-estado::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: currentColor;
+    }
+
+    /*
+      Badge palette — clinical triage chips (ops scan, not marketing).
+      Tokens (ink anchors): ocean #0b6e74 · navy #1a4f8c · violet #5c3d9a
+                            forest #176b42 · rose #9b2d6e · slate = --muted
+      (+ --danger / --warn for cancelar / reprogramar)
+      Tipo = cool action hues · Estado = outcome hues only.
+      Soft fills ≈14% ink-on-white; borders ≈35% — visible on white cells,
+      ink stays dark enough for small-text WCAG AA.
+    */
+    .badge-turno { background: #e1f3f4; color: #0b6e74; border-color: #8bc8cd; }
+    .badge-cancelar { background: #fceceb; color: var(--danger); border-color: #e8a8a1; }
+    .badge-estudio { background: #e6eef8; color: #1a4f8c; border-color: #9bb4d6; }
+    .badge-reprogramar { background: #fff6e4; color: var(--warn); border-color: #e5d08a; }
+    .badge-solicitud { background: #f0ebf8; color: #5c3d9a; border-color: #c4b3e0; }
+    .badge-confirmado { background: #e6f5ec; color: #176b42; border-color: #9bcfb0; }
+    .badge-estado-reprogramado { background: #f9e8f1; color: #9b2d6e; border-color: #e0a8c4; }
+    .badge-pendiente { background: #f2f4f6; color: var(--muted); border-color: #cfd6dd; }
+    .badge-pendiente::before { opacity: 0.45; }
+
+    .estado-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+      min-width: 0;
+    }
+    .fallo-enviar {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: var(--danger);
+      font-weight: 600;
+      font-size: 0.6875rem;
+    }
+    .fallo-enviar .bang {
+      display: inline-flex;
+      width: 1rem;
+      height: 1rem;
+      border-radius: 50%;
+      background: var(--danger);
+      color: #fff;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 700;
+    }
+    .nota-omitida-warn {
+      color: var(--warn);
+      font-size: 0.6875rem;
+      font-weight: 500;
+    }
+
+    /* —— Table —— */
+    .solicitudes-scroll {
+      overflow-x: hidden;
+      overflow-y: visible;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .solicitudes-table {
+      width: 100%;
+      min-width: 0;
+      margin: 0;
+      border-collapse: separate;
+      border-spacing: 0;
+      table-layout: fixed;
+      font-size: 0.78rem;
+    }
+    .solicitudes-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #f5f8fa;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.625rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      padding: 0.55rem 0.45rem;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      text-align: left;
+    }
+    .solicitudes-table thead th + th,
+    .solicitudes-table tbody td + td {
+      border-left: 1px solid var(--border-soft);
+    }
+    .solicitudes-table tbody td {
+      padding: 0.5rem 0.45rem;
+      vertical-align: middle;
+      border-bottom: 1px solid var(--border-soft);
+      color: var(--ink);
+      background: var(--surface);
+      overflow: hidden;
+      line-height: 1.3;
+      transition: background-color 120ms var(--ease-out);
+    }
+    .solicitudes-table tbody td.col-acciones,
+    .solicitudes-table tbody td.col-chat {
+      overflow: visible;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .solicitudes-table tbody tr.solicitud-row:hover td {
+        background: var(--row-hover);
+      }
+    }
+    .solicitudes-table tbody tr.day-group th {
+      background: var(--day-bg);
+      color: var(--ink);
+      font-weight: 650;
+      font-size: 0.8125rem;
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      text-align: left;
+      letter-spacing: -0.01em;
+    }
+    .day-count {
+      display: inline-block;
+      margin-left: 0.5rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .col-tipo { width: 8%; }
+    .col-hora { width: 4.5%; }
+    .col-paciente { width: 11%; }
+    .col-dni { width: 8%; }
+    .col-tel { width: 9%; }
+    .col-medico { width: 10%; }
+    .col-detalle { width: 11%; }
+    .col-obra { width: 7%; }
+    .col-estado { width: 12%; }
+    .col-acciones {
+      width: 5.5%;
+      text-align: center;
+      white-space: nowrap;
+      overflow: visible;
+    }
+    .col-chat {
+      width: 5%;
+      text-align: center;
+      white-space: nowrap;
+      overflow: visible;
+    }
+    .col-paciente,
+    .col-medico,
+    .col-detalle,
+    .col-obra {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .cell-mono {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.75rem;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: #334155;
+      white-space: nowrap;
+    }
+    .cell-paciente { font-weight: 600; letter-spacing: -0.01em; }
+
+    .acciones-strip {
+      display: inline-flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3rem;
+      min-height: 1.85rem;
+      position: relative;
+      z-index: 1;
+    }
+    .solicitud-row:hover .acciones-strip,
+    .solicitud-row:focus-within .acciones-strip {
+      z-index: 5;
+    }
+    .acciones-empty {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      font-weight: 500;
+      user-select: none;
+    }
+
+    /* —— Action icons + bubble tip (option B) —— */
+    .btn-abrir-chat,
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 0.35rem;
+      min-width: 1.85rem;
+      min-height: 1.85rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      font-family: inherit;
+      line-height: 1;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      text-decoration: none;
+      touch-action: manipulation;
+      transition:
+        background-color var(--hover) var(--ease-out),
+        border-color var(--hover) var(--ease-out),
+        color var(--hover) var(--ease-out),
+        transform var(--press) var(--ease-out);
+    }
+    .btn-action .btn-ico {
+      width: 0.95rem;
+      height: 0.95rem;
+      display: block;
+      flex-shrink: 0;
+    }
+    .btn-action .btn-tip {
+      position: absolute;
+      bottom: calc(100% + 0.45rem);
+      left: 50%;
+      transform: translateX(-50%) translateY(0.2rem);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      z-index: 40;
+      padding: 0.35rem 0.55rem;
+      border-radius: 6px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      line-height: 1.2;
+      white-space: nowrap;
+      box-shadow: 0 6px 16px rgba(26, 36, 48, 0.2);
+      transition:
+        opacity 160ms var(--ease-out),
+        transform 160ms var(--ease-out),
+        visibility 0s linear 160ms;
+    }
+    .btn-action .btn-tip::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: var(--ink);
+    }
+    /* Last action in a pair: tip opens left so it stays clear of Chat */
+    .acciones-strip .btn-action:last-child:not(:only-child) .btn-tip {
+      left: auto;
+      right: 0;
+      transform: translateX(0) translateY(0.2rem);
+    }
+    .acciones-strip .btn-action:last-child:not(:only-child) .btn-tip::after {
+      left: auto;
+      right: 0.65rem;
+      transform: none;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-action:hover .btn-tip,
+      .btn-action:focus-visible .btn-tip {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+        transition:
+          opacity 160ms var(--ease-out),
+          transform 160ms var(--ease-out),
+          visibility 0s linear 0s;
+      }
+      .acciones-strip .btn-action:last-child:not(:only-child):hover .btn-tip,
+      .acciones-strip .btn-action:last-child:not(:only-child):focus-visible .btn-tip {
+        transform: translateX(0) translateY(0);
+      }
+    }
+    .btn-abrir-chat:active,
+    .btn-action:active {
+      transform: scale(0.97);
+    }
+    .btn-abrir-chat:focus-visible,
+    .btn-action:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+    .btn-abrir-chat {
+      color: var(--accent);
+      background: var(--surface);
+      border: 1px solid #9ecfe8;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-abrir-chat:hover {
+        color: #fff;
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+    }
+    .btn-abrir-chat.is-disabled {
+      color: #94a3b8;
+      border-color: #e2e8f0;
+      background: #f8fafc;
+      pointer-events: none;
+      cursor: default;
+    }
+    .btn-abrir-chat .btn-ico {
+      width: 0.95rem;
+      height: 0.95rem;
+      display: block;
+    }
+    .btn-abrir-chat .btn-tip {
+      position: absolute;
+      bottom: calc(100% + 0.45rem);
+      left: 50%;
+      transform: translateX(-50%) translateY(0.2rem);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      z-index: 40;
+      padding: 0.35rem 0.55rem;
+      border-radius: 6px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      line-height: 1.2;
+      white-space: nowrap;
+      box-shadow: 0 6px 16px rgba(26, 36, 48, 0.2);
+      transition:
+        opacity 160ms var(--ease-out),
+        transform 160ms var(--ease-out),
+        visibility 0s linear 160ms;
+    }
+    .btn-abrir-chat .btn-tip::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: var(--ink);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-abrir-chat:hover .btn-tip,
+      .btn-abrir-chat:focus-visible .btn-tip {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+        transition:
+          opacity 160ms var(--ease-out),
+          transform 160ms var(--ease-out),
+          visibility 0s linear 0s;
+      }
+    }
+
+    .btn-confirmar {
+      color: #fff;
+      background: var(--ok);
+      border: 1px solid var(--ok);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-confirmar:hover { background: #156640; border-color: #156640; }
+    }
+
+    .btn-reenviar {
+      color: #fff;
+      background: var(--danger);
+      border: 1px solid var(--danger);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-reenviar:hover { background: #912018; border-color: #912018; }
+    }
+
+    .btn-editar-reenviar {
+      color: #2f5bd8;
+      background: var(--surface);
+      border: 1px solid #b3c4f5;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-editar-reenviar:hover { background: #eef2ff; }
+    }
+
+    .empty-filter {
+      display: none;
+      padding: 2.25rem 1rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.875rem;
+    }
+    .empty-filter.show { display: block; }
+    .empty-filter p { margin: 0 0 0.35rem; color: var(--ink); font-weight: 600; }
+    .empty-filter span { font-size: 0.8125rem; }
+
+    .mock-meta {
+      margin: 0;
+      font-size: 0.75rem;
+      color: var(--muted);
+      min-width: 0;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *,
+      *::before,
+      *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+      }
+    }
+  
+
+    /* —— Live dashboard extras (Bootstrap panes) —— */
+    :root {
+      --da-primary: var(--accent);
+      --da-heading: var(--ink);
+      --da-muted: var(--muted);
+      --da-body-bg: var(--paper);
+      --da-sidebar-width: var(--sidebar-width);
+      --da-header-height: var(--header-h);
+      --bs-primary: #0e7c8b;
+      --bs-primary-rgb: 14, 124, 139;
+      --bs-link-color: #0e7c8b;
+    }
+    .pc-sidebar { transition: transform 0.2s ease; }
+    .pc-sidebar .nav { overflow-y: auto; }
+    .pc-sidebar-footer .btn-outline-secondary,
+    .pc-sidebar-footer .btn-salir,
+    .btn-salir {
+      width: 100%;
+    }
+    .pc-sidebar-footer form .btn {
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--sidebar-text);
+      background: transparent;
+      border: 1px solid rgba(154, 173, 192, 0.4);
+      border-radius: 6px;
+    }
+    .pc-sidebar-footer form .btn:hover {
+      color: #fff;
+      background: rgba(0, 0, 0, 0.18);
+      border-color: rgba(154, 173, 192, 0.65);
     }
     #doctor-select-wrap .form-label {
       display: block;
       font-size: 0.75rem;
       letter-spacing: 0.02em;
     }
-    .pc-header .page-title {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: 600;
-      line-height: 1.25;
-      color: var(--da-heading);
+    .header-search-wrap {
+      display: none;
+      flex: 1 1 16rem;
+      min-width: 0;
+      max-width: 100%;
+      width: min(26rem, 100%);
     }
-    .pc-header .page-subtitle {
-      margin: 0.15rem 0 0;
-      font-size: 0.9rem;
-      color: var(--da-muted);
-    }
-    .pc-content {
-      padding: 1.5rem;
-      flex: 1;
-    }
+    .header-search-wrap.is-visible { display: block; }
+    .header-search-wrap .search-bar { width: 100%; max-width: 100%; }
 
     .card-da {
-      background: #fff;
-      border: 0;
-      border-radius: 8px;
-      box-shadow: var(--da-card-shadow);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 1px 1px rgba(30, 42, 56, 0.03), 0 8px 24px rgba(30, 42, 56, 0.05);
+      overflow: hidden;
     }
     .card-da .card-header {
-      background: transparent;
-      border-bottom: 1px solid #f0f2f5;
-      padding: 1rem 1.25rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 1.15rem;
       font-weight: 600;
-      color: var(--da-heading);
+      font-size: 0.9rem;
+      letter-spacing: -0.01em;
+      color: var(--ink);
     }
-    .card-da .card-body { padding: 1.25rem; }
+    .card-da .card-body { padding: 1.15rem; }
+    #solicitudes-pane .card-da .card-body { padding: 0; }
 
     .btn-primary {
-      --bs-btn-bg: var(--da-primary);
-      --bs-btn-border-color: var(--da-primary);
-      --bs-btn-hover-bg: #0398db;
-      --bs-btn-hover-border-color: #0398db;
-      --bs-btn-active-bg: #0288c7;
-      --bs-btn-active-border-color: #0288c7;
+      --bs-btn-bg: var(--accent);
+      --bs-btn-border-color: var(--accent);
+      --bs-btn-hover-bg: #0c6b78;
+      --bs-btn-hover-border-color: #0c6b78;
+      --bs-btn-active-bg: #0a5c68;
+      --bs-btn-active-border-color: #0a5c68;
     }
     .form-control:focus,
     .form-select:focus {
-      border-color: var(--da-primary);
-      box-shadow: 0 0 0 0.2rem rgba(4, 169, 245, 0.2);
+      border-color: var(--accent);
+      box-shadow: var(--focus-ring);
     }
     .form-check-input:checked {
-      background-color: var(--da-primary);
-      border-color: var(--da-primary);
+      background-color: var(--accent);
+      border-color: var(--accent);
     }
 
-    .solicitudes-scroll {
-      overflow-x: visible;
+    .status-pill {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
     }
-    .solicitudes-table {
-      --bs-table-bg: transparent;
-      width: 100%;
-      margin-bottom: 0;
-      table-layout: fixed;
-      font-size: 0.9rem;
-    }
-    .solicitudes-table thead th {
-      color: var(--da-muted);
-      font-weight: 500;
-      font-size: 0.8rem;
-      border-bottom: 1px solid #eef0f2;
-      padding: 0.65rem 0.5rem;
-      background: #fff;
-      white-space: nowrap;
-    }
-    .solicitudes-table tbody td {
-      padding: 0.65rem 0.5rem;
-      vertical-align: middle;
-      border-color: #f0f2f5;
-      color: var(--da-heading);
-      overflow-wrap: anywhere;
-      line-height: 1.35;
-    }
-    .solicitudes-table tbody tr.day-group th {
-      background: #f8fafb;
-      color: var(--da-muted);
+    .btn-refresh {
+      font-size: 0.775rem;
       font-weight: 600;
-      font-size: 0.85rem;
-      padding: 0.55rem 0.5rem;
-      border-bottom: 1px solid #e9ecef;
-    }
-    .solicitudes-table .col-tipo { width: 11%; }
-    .solicitudes-table .col-hora { width: 5%; white-space: nowrap; }
-    .solicitudes-table .col-paciente { width: 13%; font-weight: 600; }
-    .solicitudes-table .col-dni { width: 8%; }
-    .solicitudes-table .col-tel { width: 11%; }
-    .solicitudes-table .col-medico { width: 14%; }
-    .solicitudes-table .col-detalle { width: 19%; }
-    .solicitudes-table .col-obra { width: 7%; }
-    .solicitudes-table .col-chat { width: 12%; text-align: right; white-space: nowrap; }
-    .solicitudes-table .col-tipo .badge {
-      white-space: nowrap;
-      display: inline-block;
-      max-width: 100%;
-    }
-
-    .btn-abrir-chat {
-      display: inline-block;
-      padding: 0.28rem 0.7rem;
-      font-size: 0.8rem;
-      font-weight: 500;
-      line-height: 1.3;
-      color: var(--da-primary);
-      background: #fff;
-      border: 1px solid var(--da-primary);
-      border-radius: 4px;
-      text-decoration: none;
-      white-space: nowrap;
-      transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-    }
-    .btn-abrir-chat:hover,
-    .btn-abrir-chat:focus {
-      color: #fff;
-      background: var(--da-primary);
-      border-color: var(--da-primary);
-    }
-    .btn-abrir-chat.is-disabled {
-      color: #adb5bd;
-      border-color: #dee2e6;
-      background: #f8f9fa;
-      pointer-events: none;
-      cursor: default;
-    }
-
-    .badge-turno { background: #1de9b6; color: #0a3d32; }
-    .badge-cancelar { background: #f44236; color: #fff; }
-    .badge-estudio { background: #04a9f5; color: #fff; }
-    .badge-reprogramar { background: #f4c22b; color: #5c4800; }
-    .badge-solicitud { background: #3ebfea; color: #0a2a33; }
-    .badge-confirmado { background: #2ca87f; color: #fff; }
-    .badge-estado-reprogramado { background: #4680ff; color: #fff; }
-    .fallo-enviar {
-      color: #f44236;
-      font-weight: 600;
-      font-size: 0.8rem;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-    }
-    .fallo-enviar .bang {
-      display: inline-flex;
-      width: 1.1rem;
-      height: 1.1rem;
-      border-radius: 50%;
-      background: #f44236;
-      color: #fff;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
-    .nota-omitida-warn {
-      color: #b8860b;
-      font-size: 0.75rem;
-    }
-    .btn-reenviar, .btn-editar-reenviar {
-      display: inline-block;
-      padding: 0.28rem 0.55rem;
-      font-size: 0.75rem;
-      font-weight: 500;
-      line-height: 1.3;
-      border-radius: 4px;
+      font-family: inherit;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 6px;
+      color: var(--ink);
       cursor: pointer;
-      margin-left: 0.25rem;
+      touch-action: manipulation;
+      transition:
+        border-color var(--hover) var(--ease-out),
+        color var(--hover) var(--ease-out),
+        background-color var(--hover) var(--ease-out),
+        transform var(--press) var(--ease-out);
     }
-    .btn-reenviar {
-      color: #fff;
-      background: #f44236;
-      border: 1px solid #f44236;
+    @media (hover: hover) and (pointer: fine) {
+      .btn-refresh:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-soft);
+      }
     }
-    .btn-editar-reenviar {
-      color: #4680ff;
-      background: #fff;
-      border: 1px solid #4680ff;
+    .btn-refresh:active { transform: scale(0.97); }
+    .btn-refresh:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
     }
-    .solicitudes-table .col-estado { width: 10%; }
-    .solicitudes-table .col-acciones { width: 12%; text-align: right; white-space: nowrap; }
-    .btn-confirmar {
-      display: inline-block;
-      padding: 0.28rem 0.7rem;
-      font-size: 0.8rem;
-      font-weight: 500;
-      line-height: 1.3;
-      color: #fff;
-      background: #2ca87f;
-      border: 1px solid #2ca87f;
-      border-radius: 4px;
-      cursor: pointer;
+    .empty-filter {
+      display: none;
+      padding: 2.25rem 1rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.875rem;
     }
-    .btn-confirmar:hover { background: #248f6c; border-color: #248f6c; color: #fff; }
+    .empty-filter.show { display: block; }
+    .empty-filter p { margin: 0 0 0.35rem; color: var(--ink); font-weight: 600; }
 
     .week-nav {
       display: inline-flex;
       align-items: stretch;
-      border: 1px solid #dbe0e5;
+      border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
       background: #fff;
@@ -372,7 +1011,7 @@
       border: 0;
       border-radius: 0;
       background: #fff;
-      color: var(--da-heading);
+      color: var(--ink);
       font-size: 0.8125rem;
       padding: 0.35rem 0.75rem;
       display: inline-flex;
@@ -381,7 +1020,7 @@
     }
     .week-nav .btn:hover {
       background: #f3f5f7;
-      color: var(--da-primary);
+      color: var(--accent);
     }
     .week-nav .week-label {
       display: inline-flex;
@@ -389,46 +1028,54 @@
       padding: 0.35rem 0.85rem;
       font-size: 0.8125rem;
       font-weight: 600;
-      color: var(--da-heading);
-      border-left: 1px solid #e8edf2;
-      border-right: 1px solid #e8edf2;
+      color: var(--ink);
+      border-left: 1px solid var(--border-soft);
+      border-right: 1px solid var(--border-soft);
       background: #fafbfc;
       white-space: nowrap;
     }
-
     .shift-box {
-      border: 1px solid #e8edf2;
+      border: 1px solid var(--border-soft);
       border-radius: 8px;
       padding: 1rem;
       background: #fafbfc;
     }
-
     .mobile-toggle {
       display: none;
       border: 0;
       background: transparent;
-      color: var(--da-muted);
+      color: var(--muted);
       font-size: 1.35rem;
       padding: 0.25rem;
     }
-
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(29, 38, 48, 0.45);
+      z-index: 1015;
+    }
+    .sidebar-backdrop.show { display: block; }
     @media (max-width: 991.98px) {
       .pc-sidebar { transform: translateX(-100%); }
       .pc-sidebar.open { transform: translateX(0); }
-      .pc-container { margin-left: 0; }
-      .mobile-toggle { display: inline-flex; }
-      .sidebar-backdrop {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(29, 38, 48, 0.45);
-        z-index: 1015;
+      .pc-container {
+        margin-left: 0;
+        width: 100%;
+        max-width: 100vw;
       }
-      .sidebar-backdrop.show { display: block; }
+      .mobile-toggle { display: inline-flex; }
     }
+    /* Bootstrap table reset inside solicitudes */
+    .solicitudes-table.table > :not(caption) > * > * {
+      background: transparent;
+      box-shadow: none;
+    }
+
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Saltar al contenido</a>
 
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
@@ -437,7 +1084,7 @@
       <span class="logo-mark"><i class="bi bi-eye"></i></span>
       <span>Clínica Artigas</span>
     </a>
-    <div class="caption">Dashboard</div>
+    <div class="caption">Panel</div>
     <nav class="nav flex-column" role="tablist">
       <button class="nav-link active" id="nav-solicitudes" data-pane="solicitudes-pane" type="button">
         <i class="bi bi-inbox"></i> Solicitudes
@@ -460,14 +1107,14 @@
 
   <div class="pc-container">
     <header class="pc-header">
-      <div class="d-flex align-items-center gap-2">
+      <div class="d-flex align-items-center gap-2 page-title-block">
         <button type="button" class="mobile-toggle" id="sidebarToggle" aria-label="Menú">
           <i class="bi bi-list"></i>
         </button>
         <div>
           <h1 class="page-title" id="headerTitle">Solicitudes</h1>
-          <p class="page-subtitle mb-2" id="headerSubtitle">Pedidos del chatbot agrupados por día</p>
-          <div id="doctor-select-wrap" class="d-none">
+          <p class="page-subtitle mb-0" id="headerSubtitle">Pedidos del chatbot agrupados por día</p>
+          <div id="doctor-select-wrap" class="d-none mt-2">
             <label class="form-label small text-muted mb-1" for="doctor_id">Médico</label>
             <select id="doctor_id" class="form-select form-select-sm" style="min-width: 220px; max-width: 280px;">
               {% for d in doctors %}
@@ -477,9 +1124,28 @@
           </div>
         </div>
       </div>
+      <div class="header-search-wrap is-visible" id="headerSearchWrap">
+        <div class="search-bar" role="search">
+          <span class="search-icon" aria-hidden="true"><i class="bi bi-search"></i></span>
+          <input
+            type="search"
+            id="solicitudes-search"
+            name="q"
+            placeholder="Ej. María Gómez o 114567…"
+            autocomplete="off"
+            spellcheck="false"
+            inputmode="search"
+            aria-label="Buscar por paciente o teléfono"
+            aria-controls="solicitudes-tbody"
+          >
+          <button type="button" class="search-clear" id="search-clear" aria-label="Limpiar búsqueda">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
     </header>
 
-    <main class="pc-content">
+    <main class="pc-content" id="main-content">
 
       <!-- HORARIOS -->
       <section class="pane d-none" id="availability-pane">
@@ -566,44 +1232,47 @@
       <section class="pane" id="solicitudes-pane">
         <div class="card card-da">
           <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <span>Solicitudes</span>
-            <div class="d-flex align-items-center gap-2">
-              <span class="text-muted small" id="solicitudes-status">Cargando...</span>
-              <button class="btn btn-sm btn-light border" id="refresh-btn" type="button">Actualizar</button>
+            <span>Cola de solicitudes</span>
+            <div class="d-flex align-items-center gap-2 header-actions">
+              <span class="status-pill" id="solicitudes-status" aria-live="polite">Cargando…</span>
+              <button class="btn-refresh" id="refresh-btn" type="button">Actualizar</button>
             </div>
           </div>
-          <div class="card-body">
-            <p class="text-muted small mb-3">
-              Etiquetas:
-              <span class="badge badge-turno">turno</span>
-              <span class="badge badge-cancelar">cancelar</span>
-              <span class="badge badge-estudio">estudio</span>
-              <span class="badge badge-reprogramar">reprogramar</span>
-              <span class="badge badge-solicitud">solicitud</span>
-              · estado:
-              <span class="badge badge-confirmado">Confirmado</span>
-              <span class="badge badge-estado-reprogramado">Reprogramado</span>
-              · agrupadas por el día en que se hizo la solicitud
-            </p>
-            <div class="solicitudes-scroll table-responsive">
-              <table class="table solicitudes-table align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th class="col-tipo">Tipo</th>
-                    <th class="col-estado">Estado</th>
-                    <th class="col-hora">Hora</th>
-                    <th class="col-paciente">Paciente</th>
-                    <th class="col-dni">DNI</th>
-                    <th class="col-tel">Teléfono</th>
-                    <th class="col-medico">Médico</th>
-                    <th class="col-detalle">Detalle</th>
-                    <th class="col-obra">Obra social</th>
-                    <th class="col-acciones">Acciones</th>
-                    <th class="col-chat">Chat</th>
-                  </tr>
-                </thead>
-                <tbody id="solicitudes-tbody"></tbody>
-              </table>
+          <div class="legend-bar" aria-label="Leyenda de etiquetas">
+            <span class="legend-label">Tipo</span>
+            <span class="badge-tipo badge-turno">turno</span>
+            <span class="badge-tipo badge-cancelar">cancelar</span>
+            <span class="badge-tipo badge-estudio">estudio</span>
+            <span class="badge-tipo badge-reprogramar">reprogramar</span>
+            <span class="badge-tipo badge-solicitud">solicitud</span>
+            <span class="legend-sep" aria-hidden="true"></span>
+            <span class="legend-label">Estado</span>
+            <span class="badge-estado badge-pendiente">pendiente</span>
+            <span class="badge-estado badge-confirmado">Confirmado</span>
+            <span class="badge-estado badge-estado-reprogramado">Reprogramado</span>
+          </div>
+          <div class="solicitudes-scroll" tabindex="0" aria-label="Tabla de solicitudes">
+            <table class="solicitudes-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="col-tipo">Tipo</th>
+                  <th scope="col" class="col-hora">Hora</th>
+                  <th scope="col" class="col-paciente">Paciente</th>
+                  <th scope="col" class="col-dni">DNI</th>
+                  <th scope="col" class="col-tel">Teléfono</th>
+                  <th scope="col" class="col-medico">Médico</th>
+                  <th scope="col" class="col-detalle">Detalle</th>
+                  <th scope="col" class="col-obra">Obra social</th>
+                  <th scope="col" class="col-estado">Estado</th>
+                  <th scope="col" class="col-acciones">Acciones</th>
+                  <th scope="col" class="col-chat">Chat</th>
+                </tr>
+              </thead>
+              <tbody id="solicitudes-tbody"></tbody>
+            </table>
+            <div class="empty-filter" id="empty-filter" role="status">
+              <p>Sin coincidencias</p>
+              <span>Probá otro nombre o teléfono, o limpiá la búsqueda.</span>
             </div>
           </div>
         </div>
@@ -705,6 +1374,14 @@
         'd-none',
         paneId !== 'availability-pane'
       );
+      document.getElementById('headerSearchWrap').classList.toggle(
+        'is-visible',
+        paneId === 'solicitudes-pane'
+      );
+      document.querySelectorAll('.pc-sidebar .nav-link').forEach(b => {
+        if (b.dataset.pane === paneId) b.setAttribute('aria-current', 'page');
+        else b.removeAttribute('aria-current');
+      });
       sidebar.classList.remove('open');
       backdrop.classList.remove('show');
 
@@ -972,6 +1649,13 @@
       }
     });
 
+    const ICO = {
+      calendarCheck: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>',
+      send: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>',
+      squarePen: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg>',
+      messages: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>'
+    };
+
     function tipoBadge(tipo) {
       const t = tipo || 'turno';
       const cls = {
@@ -980,48 +1664,51 @@
         estudio: 'badge-estudio',
         reprogramar: 'badge-reprogramar',
         solicitud: 'badge-solicitud'
-      }[t] || 'text-bg-secondary';
-      return `<span class="badge ${cls}">${escapeHtml(t)}</span>`;
+      }[t] || 'badge-pendiente';
+      return `<span class="badge-tipo ${cls}">${escapeHtml(t)}</span>`;
     }
 
     function statusBadge(b) {
       let html = '';
       if (!b.status_badge) {
-        html = `<span class="text-muted small">pendiente</span>`;
+        html = `<span class="badge-estado badge-pendiente">pendiente</span>`;
       } else {
         const cls = b.status_badge === 'Reprogramado'
           ? 'badge-estado-reprogramado'
           : 'badge-confirmado';
-        html = `<span class="badge ${cls}">${escapeHtml(b.status_badge)}</span>`;
+        html = `<span class="badge-estado ${cls}">${escapeHtml(b.status_badge)}</span>`;
       }
       if (b.fallo_al_enviar) {
-        html += ` <span class="fallo-enviar" title="Fallo al enviar"><span class="bang">!</span> Fallo al enviar</span>`;
+        html += `<span class="fallo-enviar" title="Fallo al enviar"><span class="bang" aria-hidden="true">!</span> Fallo al enviar</span>`;
       }
       if (b.whatsapp_nota_omitted) {
-        html += ` <span class="nota-omitida-warn" title="Nota omitida en utility">nota omitida</span>`;
+        html += `<span class="nota-omitida-warn" title="Nota omitida en utility">nota omitida</span>`;
       }
-      return html;
+      return `<div class="estado-cell">${html}</div>`;
     }
 
     function chatAction(b) {
       if (b.chat_url) {
-        return `<a class="btn-abrir-chat" href="${escapeHtml(b.chat_url)}" target="chatwoot" rel="noopener">Abrir Chat</a>`;
+        return `<a class="btn-abrir-chat" href="${escapeHtml(b.chat_url)}" target="chatwoot" rel="noopener" aria-label="Abrir Chat">${ICO.messages}<span class="btn-tip" aria-hidden="true">Abrir Chat</span></a>`;
       }
-      return `<span class="btn-abrir-chat is-disabled" title="Sin conversación vinculada">Abrir Chat</span>`;
+      return `<span class="btn-abrir-chat is-disabled" aria-label="Sin conversación vinculada" title="Sin conversación vinculada">${ICO.messages}</span>`;
     }
 
     function confirmAction(b) {
       const parts = [];
       if (b.can_confirm) {
-        parts.push(`<button type="button" class="btn-confirmar" data-confirm-id="${b.id}">Confirmar</button>`);
-      }
-      if (b.can_edit_resend) {
-        parts.push(`<button type="button" class="btn-editar-reenviar" data-edit-id="${b.id}">Editar y reenviar</button>`);
+        parts.push(`<button type="button" class="btn-action btn-confirmar" data-confirm-id="${b.id}" aria-label="Confirmar turno">${ICO.calendarCheck}<span class="btn-tip" aria-hidden="true">Confirmar turno</span></button>`);
       }
       if (b.can_reenviar) {
-        parts.push(`<button type="button" class="btn-reenviar" data-reenviar-id="${b.id}">Reenviar</button>`);
+        parts.push(`<button type="button" class="btn-action btn-reenviar" data-reenviar-id="${b.id}" aria-label="Reenviar">${ICO.send}<span class="btn-tip" aria-hidden="true">Reenviar</span></button>`);
       }
-      return parts.join(' ');
+      if (b.can_edit_resend) {
+        parts.push(`<button type="button" class="btn-action btn-editar-reenviar" data-edit-id="${b.id}" aria-label="Editar y reenviar">${ICO.squarePen}<span class="btn-tip" aria-hidden="true">Editar y reenviar</span></button>`);
+      }
+      if (!parts.length) {
+        return `<div class="acciones-strip"><span class="acciones-empty" aria-hidden="true">—</span></div>`;
+      }
+      return `<div class="acciones-strip">${parts.join('')}</div>`;
     }
 
     function detalleCell(b) {
@@ -1038,17 +1725,19 @@
     }
 
     function solicitudRow(b) {
+      const nombre = b.nombre || '';
+      const tel = b.telefono_contacto || b.phone || '';
       return `
-            <tr>
+            <tr class="solicitud-row" data-nombre="${escapeHtml(nombre)}" data-tel="${escapeHtml(tel)}">
               <td class="col-tipo">${tipoBadge(b.tipo)}</td>
-              <td class="col-estado">${statusBadge(b)}</td>
-              <td class="col-hora">${escapeHtml(b.hora || '-')}</td>
-              <td class="col-paciente">${escapeHtml(b.nombre)}</td>
-              <td class="col-dni">${escapeHtml(b.dni || '-')}</td>
-              <td class="col-tel">${escapeHtml(b.telefono_contacto || b.phone)}</td>
+              <td class="col-hora cell-mono">${escapeHtml(b.hora || '-')}</td>
+              <td class="col-paciente cell-paciente">${escapeHtml(nombre)}</td>
+              <td class="col-dni cell-mono">${escapeHtml(b.dni || '-')}</td>
+              <td class="col-tel cell-mono">${escapeHtml(tel)}</td>
               <td class="col-medico">${escapeHtml(b.medico)}</td>
               <td class="col-detalle">${detalleCell(b)}</td>
               <td class="col-obra">${escapeHtml(b.obra_social)}</td>
+              <td class="col-estado">${statusBadge(b)}</td>
               <td class="col-acciones">${confirmAction(b)}</td>
               <td class="col-chat">${chatAction(b)}</td>
             </tr>`;
@@ -1057,6 +1746,7 @@
     let confirmModal;
     let confirmDraft = null;
     let solicitudesCache = [];
+    let solicitudesGroups = [];
 
     function findSolicitud(id) {
       return solicitudesCache.find(s => s.id === id) || null;
@@ -1121,35 +1811,136 @@
       });
     }
 
+    function normSearch(s) {
+      return (s || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function digitsOnly(s) {
+      return (s || '').replace(/\D+/g, '');
+    }
+
+    function applySolicitudesFilter() {
+      const input = document.getElementById('solicitudes-search');
+      const statusEl = document.getElementById('solicitudes-status');
+      const emptyEl = document.getElementById('empty-filter');
+      if (!input) return;
+      const q = input.value.trim();
+      const qNorm = normSearch(q);
+      const qDigits = digitsOnly(q);
+      const rows = Array.from(document.querySelectorAll('#solicitudes-tbody .solicitud-row'));
+      const dayGroups = Array.from(document.querySelectorAll('#solicitudes-tbody .day-group'));
+      const counts = {};
+      let visible = 0;
+
+      rows.forEach(row => {
+        const day = row.dataset.day || '';
+        counts[day] = counts[day] || 0;
+        if (!qNorm && !qDigits) {
+          row.hidden = false;
+          counts[day]++;
+          visible++;
+          return;
+        }
+        const name = normSearch(row.dataset.nombre);
+        const tel = normSearch(row.dataset.tel);
+        const telDigits = digitsOnly(row.dataset.tel);
+        const matchName = qNorm && name.includes(qNorm);
+        const matchTel =
+          (qNorm && tel.includes(qNorm)) ||
+          (qDigits.length >= 3 && telDigits.includes(qDigits));
+        const show = matchName || matchTel;
+        row.hidden = !show;
+        if (show) {
+          counts[day]++;
+          visible++;
+        }
+      });
+
+      dayGroups.forEach(group => {
+        const day = group.dataset.day || '';
+        const n = counts[day] || 0;
+        group.hidden = n === 0;
+        const badge = group.querySelector('[data-day-count]');
+        if (badge) badge.textContent = String(n);
+      });
+
+      if (emptyEl) emptyEl.classList.toggle('show', rows.length > 0 && visible === 0);
+      if (statusEl && rows.length) {
+        const base = statusEl.dataset.updatedAt
+          ? ' · ' + statusEl.dataset.updatedAt
+          : '';
+        statusEl.textContent = q
+          ? `${visible} coincidencia${visible === 1 ? '' : 's'}${base}`
+          : `${visible} solicitud${visible === 1 ? '' : 'es'}${base}`;
+      }
+    }
+
+    function renderSolicitudesGroups(groups, data) {
+      const tbody = document.getElementById('solicitudes-tbody');
+      const emptyEl = document.getElementById('empty-filter');
+      if (!groups.length) {
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-3">Sin solicitudes</td></tr>';
+        solicitudesCache = [];
+        if (emptyEl) emptyEl.classList.remove('show');
+        return;
+      }
+      tbody.innerHTML = groups.map((g, gi) => {
+        const dayKey = 'd' + gi;
+        const count = (g.solicitudes || []).length;
+        const rows = (g.solicitudes || []).map(b => {
+          // inject day key into row via temp replace
+          return solicitudRow(b).replace(
+            'class="solicitud-row"',
+            `class="solicitud-row" data-day="${dayKey}"`
+          );
+        }).join('');
+        return `
+            <tr class="day-group" data-day="${dayKey}">
+              <th scope="colgroup" colspan="11">${escapeHtml(g.label)} <span class="day-count" data-day-count="${dayKey}">${count}</span></th>
+            </tr>
+            ${rows}`;
+      }).join('');
+      bindSolicitudActions(data);
+      applySolicitudesFilter();
+    }
+
     async function loadSolicitudes() {
       const statusEl = document.getElementById('solicitudes-status');
       const tbody = document.getElementById('solicitudes-tbody');
-      statusEl.textContent = 'Cargando...';
+      statusEl.textContent = 'Cargando…';
+      delete statusEl.dataset.updatedAt;
       try {
         const res = await fetch('/api/solicitudes');
         if (!res.ok) throw new Error('fail');
         const data = await res.json();
         const groups = data.dias || [];
-        if (!groups.length) {
-          tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-3">Sin solicitudes</td></tr>';
-          solicitudesCache = [];
-        } else {
-          tbody.innerHTML = groups.map(g => `
-            <tr class="day-group">
-              <th colspan="11">${escapeHtml(g.label)}</th>
-            </tr>
-            ${(g.solicitudes || []).map(solicitudRow).join('')}
-          `).join('');
-          bindSolicitudActions(data);
-        }
-        statusEl.textContent = 'Actualizado ' + new Date().toLocaleTimeString();
+        solicitudesGroups = groups;
+        renderSolicitudesGroups(groups, data);
+        const stamp = 'Actualizado ' + new Date().toLocaleTimeString();
+        statusEl.dataset.updatedAt = stamp;
+        applySolicitudesFilter();
+        if (!(groups.length)) statusEl.textContent = stamp;
       } catch (err) {
         statusEl.textContent = 'No se pudieron cargar.';
         tbody.innerHTML = '<tr><td colspan="11" class="text-center text-danger py-3">Error</td></tr>';
+        document.getElementById('empty-filter')?.classList.remove('show');
       }
     }
 
     document.getElementById('refresh-btn').addEventListener('click', loadSolicitudes);
+    document.getElementById('solicitudes-search').addEventListener('input', applySolicitudesFilter);
+    document.getElementById('search-clear').addEventListener('click', () => {
+      const input = document.getElementById('solicitudes-search');
+      input.value = '';
+      input.focus();
+      applySolicitudesFilter();
+    });
 
     document.getElementById('confirm-submit').addEventListener('click', async () => {
       const id = document.getElementById('confirm-id').value;
