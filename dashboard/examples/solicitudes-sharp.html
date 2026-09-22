@@ -334,7 +334,8 @@
       box-shadow:
         0 1px 1px rgba(30, 42, 56, 0.03),
         0 8px 24px rgba(30, 42, 56, 0.05);
-      overflow: hidden;
+      /* Visible so Abrir Chat / Acciones tips are not clipped */
+      overflow: visible;
       display: flex;
       flex-direction: column;
       min-width: 0;
@@ -516,10 +517,10 @@
 
     /* —— Table —— */
     .solicitudes-scroll {
-      overflow-x: hidden;
-      overflow-y: visible;
+      overflow: visible;
       max-width: 100%;
       min-width: 0;
+      padding-top: 0.15rem;
     }
     .solicitudes-table {
       width: 100%;
@@ -817,12 +818,13 @@
     .btn-abrir-chat .btn-tip {
       position: absolute;
       bottom: calc(100% + 0.45rem);
-      left: 50%;
-      transform: translateX(-50%) translateY(0.2rem);
+      left: auto;
+      right: 0;
+      transform: translateX(0) translateY(0.2rem);
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
-      z-index: 40;
+      z-index: 60;
       padding: 0.35rem 0.55rem;
       border-radius: 6px;
       background: var(--ink);
@@ -842,8 +844,9 @@
       content: "";
       position: absolute;
       top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
+      left: auto;
+      right: 0.65rem;
+      transform: none;
       border: 5px solid transparent;
       border-top-color: var(--ink);
     }
@@ -852,12 +855,19 @@
       .btn-abrir-chat:focus-visible .btn-tip {
         opacity: 1;
         visibility: visible;
-        transform: translateX(-50%) translateY(0);
+        transform: translateX(0) translateY(0);
         transition:
           opacity 160ms var(--ease-out),
           transform 160ms var(--ease-out),
           visibility 0s linear 0s;
       }
+    }
+    .solicitud-row:hover .col-chat,
+    .solicitud-row:focus-within .col-chat,
+    .col-chat:hover,
+    .col-chat:focus-within {
+      position: relative;
+      z-index: 35;
     }
 
     .btn-confirmar {
