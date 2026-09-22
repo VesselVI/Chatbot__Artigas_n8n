@@ -168,3 +168,26 @@ def test_confirm_not_found(client):
         },
     )
     assert res.status_code == 404
+
+
+def test_list_solicitudes_omits_cleared_rows(client, store):
+    """Regression: Actualizar / wipe must not keep deleted phone-test rows."""
+    before = client.get("/api/solicitudes")
+    assert before.status_code == 200
+    assert len(before.json()["solicitudes"]) == 2
+
+    store.rows.clear()
+
+    after = client.get("/api/solicitudes")
+    assert after.status_code == 200
+    body = after.json()
+    assert body["solicitudes"] == []
+    assert body["dias"] == []
+    assert "no-store" in (after.headers.get("cache-control") or "").lower()
+
+
+def test_list_solicitudes_sends_no_store(client):
+    res = client.get("/api/solicitudes")
+    assert res.status_code == 200
+    cc = (res.headers.get("cache-control") or "").lower()
+    assert "no-store" in cc

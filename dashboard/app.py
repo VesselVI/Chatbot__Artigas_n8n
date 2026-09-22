@@ -619,7 +619,13 @@ async def api_solicitudes(request: Request):
             dias.append(group)
         by_day[key]["solicitudes"].append(item)
 
-    return {"solicitudes": out, "dias": dias}
+    return JSONResponse(
+        {"solicitudes": out, "dias": dias},
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+        },
+    )
 
 
 @app.post("/api/solicitudes/{solicitud_id}/confirm")

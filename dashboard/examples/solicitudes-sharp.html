@@ -423,8 +423,8 @@
     .badge-estado {
       display: inline-flex;
       align-items: center;
-      gap: 0.3rem;
-      padding: 0.2rem 0.4rem;
+      gap: 0.25rem;
+      padding: 0.15rem 0.35rem;
       border-radius: 5px;
       font-size: 0.68rem;
       font-weight: 650;
@@ -471,17 +471,29 @@
     .estado-cell {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 0.25rem;
-      min-width: 0;
+      align-items: center;
+      justify-content: center;
+      gap: 0.2rem;
+      width: max-content;
+      max-width: 100%;
+      margin-inline: auto;
+    }
+    .col-tipo .badge-tipo,
+    .estado-cell .badge-estado {
+      max-width: none;
+      overflow: visible;
+      text-overflow: clip;
     }
     .fallo-enviar {
       display: inline-flex;
       align-items: center;
-      gap: 0.3rem;
+      justify-content: center;
+      gap: 0.25rem;
       color: var(--danger);
       font-weight: 600;
-      font-size: 0.6875rem;
+      font-size: 0.625rem;
+      white-space: nowrap;
+      line-height: 1.2;
     }
     .fallo-enviar .bang {
       display: inline-flex;
@@ -499,6 +511,7 @@
       color: var(--warn);
       font-size: 0.6875rem;
       font-weight: 500;
+      text-align: center;
     }
 
     /* —— Table —— */
@@ -547,7 +560,10 @@
       transition: background-color 120ms var(--ease-out);
     }
     .solicitudes-table tbody td.col-acciones,
-    .solicitudes-table tbody td.col-chat {
+    .solicitudes-table tbody td.col-chat,
+    .solicitudes-table tbody td.col-detalle,
+    .solicitudes-table tbody td.col-estado,
+    .solicitudes-table tbody td.col-tipo {
       overflow: visible;
     }
     @media (hover: hover) and (pointer: fine) {
@@ -579,34 +595,58 @@
       font-variant-numeric: tabular-nums;
     }
 
-    .col-tipo { width: 8%; }
-    .col-hora { width: 4.5%; }
-    .col-paciente { width: 11%; }
-    .col-dni { width: 8%; }
-    .col-tel { width: 9%; }
-    .col-medico { width: 10%; }
-    .col-detalle { width: 11%; }
-    .col-obra { width: 7%; }
-    .col-estado { width: 12%; }
+    /* Fixed rem widths on badge/action cols so leftover % does not inflate them. */
+    .solicitudes-table col.c-tipo { width: 5.4rem; }
+    .solicitudes-table col.c-hora { width: 3.25rem; }
+    .solicitudes-table col.c-paciente { width: 11%; }
+    .solicitudes-table col.c-dni { width: 5.75rem; }
+    .solicitudes-table col.c-tel { width: 6.75rem; }
+    .solicitudes-table col.c-medico { width: 9%; }
+    .solicitudes-table col.c-detalle { width: auto; }
+    .solicitudes-table col.c-obra { width: 6.5rem; }
+    .solicitudes-table col.c-estado { width: 6.35rem; }
+    .solicitudes-table col.c-acciones { width: 4.75rem; }
+    .solicitudes-table col.c-chat { width: 3.1rem; }
+
+    .col-tipo,
+    .col-estado {
+      text-align: center;
+      overflow: visible;
+      vertical-align: middle;
+    }
+    .col-tipo { white-space: nowrap; }
+    .col-estado { white-space: normal; }
+    .solicitudes-table thead th.col-tipo,
+    .solicitudes-table thead th.col-estado,
+    .solicitudes-table tbody td.col-tipo,
+    .solicitudes-table tbody td.col-estado {
+      padding: 0.35rem 0.2rem;
+      text-align: center;
+    }
+    .col-hora { text-align: left; }
     .col-acciones {
-      width: 5.5%;
       text-align: center;
       white-space: nowrap;
       overflow: visible;
     }
     .col-chat {
-      width: 5%;
       text-align: center;
       white-space: nowrap;
       overflow: visible;
     }
     .col-paciente,
     .col-medico,
-    .col-detalle,
     .col-obra {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .col-detalle {
+      white-space: normal;
+      overflow: visible;
+      word-break: break-word;
+      line-height: 1.35;
+      vertical-align: middle;
     }
 
     .cell-mono {
@@ -936,7 +976,7 @@
         <div class="card-header">
           <span>Cola de solicitudes</span>
           <div class="header-actions">
-            <span class="status-pill" id="filter-status" aria-live="polite">6 solicitudes</span>
+            <span class="status-pill" id="filter-status" aria-live="polite">7 solicitudes</span>
             <button class="btn-refresh" type="button" id="refresh-btn">Actualizar</button>
           </div>
         </div>
@@ -957,6 +997,19 @@
 
         <div class="solicitudes-scroll" tabindex="0" aria-label="Tabla de solicitudes">
           <table class="solicitudes-table">
+            <colgroup>
+              <col class="c-tipo">
+              <col class="c-hora">
+              <col class="c-paciente">
+              <col class="c-dni">
+              <col class="c-tel">
+              <col class="c-medico">
+              <col class="c-detalle">
+              <col class="c-obra">
+              <col class="c-estado">
+              <col class="c-acciones">
+              <col class="c-chat">
+            </colgroup>
             <thead>
               <tr>
                 <th scope="col" class="col-tipo">Tipo</th>
@@ -975,7 +1028,7 @@
             <tbody id="solicitudes-tbody">
 
               <tr class="day-group" data-day="hoy">
-                <th scope="colgroup" colspan="11">Hoy — lunes 21/09/2026 <span class="day-count" data-day-count="hoy">4</span></th>
+                <th scope="colgroup" colspan="11">Hoy — lunes 21/09/2026 <span class="day-count" data-day-count="hoy">5</span></th>
               </tr>
               <tr class="solicitud-row" data-day="hoy" data-nombre="María Gómez" data-tel="11 4567-8901">
                 <td class="col-tipo"><span class="badge-tipo badge-turno">turno</span></td>
@@ -984,7 +1037,7 @@
                 <td class="col-dni cell-mono">28.451.902</td>
                 <td class="col-tel cell-mono">11 4567-8901</td>
                 <td class="col-medico">Dr. Artigas</td>
-                <td class="col-detalle">Mañana preferida</td>
+                <td class="col-detalle">Mañana preferida — cualquier horario entre 9 y 12, idealmente con Dr. Artigas si hay lugar</td>
                 <td class="col-obra">OSDE</td>
                 <td class="col-estado">
                   <div class="estado-cell"><span class="badge-estado badge-pendiente">pendiente</span></div>
@@ -1039,7 +1092,7 @@
                 <td class="col-dni cell-mono">40.887.221</td>
                 <td class="col-tel cell-mono">11 9988-1122</td>
                 <td class="col-medico">Dr. Artigas</td>
-                <td class="col-detalle">Cancelar turno del jueves</td>
+                <td class="col-detalle">Cancelar turno del jueves 25/09 a las 16:00 — no puede asistir por viaje laboral de última hora</td>
                 <td class="col-obra">PAMI</td>
                 <td class="col-estado">
                   <div class="estado-cell"><span class="badge-estado badge-pendiente">pendiente</span></div>
@@ -1061,7 +1114,7 @@
                 <td class="col-dni cell-mono">22.009.334</td>
                 <td class="col-tel cell-mono">11 5555-0101</td>
                 <td class="col-medico">Dra. Martínez</td>
-                <td class="col-detalle cell-mono">25/09/2026 16:00</td>
+                <td class="col-detalle">Solicitud de reprogramación del turno del viernes 26/09 10:30 — pedir tarde la semana siguiente, preferentemente después de las 17 hs</td>
                 <td class="col-obra">Galeno</td>
                 <td class="col-estado">
                   <div class="estado-cell">
@@ -1089,6 +1142,38 @@
                 </td>
                 <td class="col-chat">
                   <a class="btn-abrir-chat" href="#chat-luis" aria-label="Abrir Chat">
+                    <svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/>
+                      <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>
+                    </svg>
+                    <span class="btn-tip" aria-hidden="true">Abrir Chat</span>
+                  </a>
+                </td>
+              </tr>
+              <tr class="solicitud-row" data-day="hoy" data-nombre="Patricia Molina" data-tel="381 622-4165">
+                <td class="col-tipo"><span class="badge-tipo badge-turno">turno</span></td>
+                <td class="col-hora cell-mono">14:48</td>
+                <td class="col-paciente cell-paciente">Patricia Molina</td>
+                <td class="col-dni cell-mono">27.334.110</td>
+                <td class="col-tel cell-mono">381 622-4165</td>
+                <td class="col-medico">Dr. Artigas</td>
+                <td class="col-detalle">A confirmar por secretaría. Paciente escribió: “Necesito turno para control de presión ocular y campo visual completo, preferentemente la próxima semana en la mañana porque trabajo de tarde; si no hay con Artigas acepto con otro médico de la clínica”</td>
+                <td class="col-obra">Particular / Sin Obra Social</td>
+                <td class="col-estado">
+                  <div class="estado-cell"><span class="badge-estado badge-pendiente">pendiente</span></div>
+                </td>
+                <td class="col-acciones">
+                  <div class="acciones-strip">
+                    <button type="button" class="btn-action btn-confirmar" aria-label="Confirmar turno">
+                      <svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>
+                      </svg>
+                      <span class="btn-tip" aria-hidden="true">Confirmar turno</span>
+                    </button>
+                  </div>
+                </td>
+                <td class="col-chat">
+                  <a class="btn-abrir-chat" href="#chat-patricia" aria-label="Abrir Chat">
                     <svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/>
                       <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>
@@ -1134,7 +1219,7 @@
                 <td class="col-dni cell-mono">18.223.901</td>
                 <td class="col-tel cell-mono">11 2222-8899</td>
                 <td class="col-medico">Dra. López</td>
-                <td class="col-detalle">Tarde / después de las 17</td>
+                <td class="col-detalle">Tarde / después de las 17 — A confirmar por secretaría. Paciente pidió recordatorio por WhatsApp el día anterior</td>
                 <td class="col-obra">Medicus</td>
                 <td class="col-estado">
                   <div class="estado-cell"><span class="badge-estado badge-pendiente">pendiente</span></div>

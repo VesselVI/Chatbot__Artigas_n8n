@@ -386,6 +386,10 @@
       }
     }
     .btn-refresh:active { transform: scale(0.97); }
+    .btn-refresh:disabled {
+      opacity: 0.55;
+      cursor: wait;
+    }
     .btn-refresh:focus-visible {
       outline: none;
       box-shadow: var(--focus-ring);
@@ -420,8 +424,8 @@
     .badge-estado {
       display: inline-flex;
       align-items: center;
-      gap: 0.3rem;
-      padding: 0.2rem 0.4rem;
+      gap: 0.25rem;
+      padding: 0.15rem 0.35rem;
       border-radius: 5px;
       font-size: 0.68rem;
       font-weight: 650;
@@ -468,17 +472,29 @@
     .estado-cell {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 0.25rem;
-      min-width: 0;
+      align-items: center;
+      justify-content: center;
+      gap: 0.2rem;
+      width: max-content;
+      max-width: 100%;
+      margin-inline: auto;
+    }
+    .col-tipo .badge-tipo,
+    .estado-cell .badge-estado {
+      max-width: none;
+      overflow: visible;
+      text-overflow: clip;
     }
     .fallo-enviar {
       display: inline-flex;
       align-items: center;
-      gap: 0.3rem;
+      justify-content: center;
+      gap: 0.25rem;
       color: var(--danger);
       font-weight: 600;
-      font-size: 0.6875rem;
+      font-size: 0.625rem;
+      white-space: nowrap;
+      line-height: 1.2;
     }
     .fallo-enviar .bang {
       display: inline-flex;
@@ -496,6 +512,7 @@
       color: var(--warn);
       font-size: 0.6875rem;
       font-weight: 500;
+      text-align: center;
     }
 
     /* —— Table —— */
@@ -544,7 +561,10 @@
       transition: background-color 120ms var(--ease-out);
     }
     .solicitudes-table tbody td.col-acciones,
-    .solicitudes-table tbody td.col-chat {
+    .solicitudes-table tbody td.col-chat,
+    .solicitudes-table tbody td.col-detalle,
+    .solicitudes-table tbody td.col-estado,
+    .solicitudes-table tbody td.col-tipo {
       overflow: visible;
     }
     @media (hover: hover) and (pointer: fine) {
@@ -576,34 +596,58 @@
       font-variant-numeric: tabular-nums;
     }
 
-    .col-tipo { width: 8%; }
-    .col-hora { width: 4.5%; }
-    .col-paciente { width: 11%; }
-    .col-dni { width: 8%; }
-    .col-tel { width: 9%; }
-    .col-medico { width: 10%; }
-    .col-detalle { width: 11%; }
-    .col-obra { width: 7%; }
-    .col-estado { width: 12%; }
+    /* Fixed rem widths on badge/action cols so leftover % does not inflate them. */
+    .solicitudes-table col.c-tipo { width: 5.4rem; }
+    .solicitudes-table col.c-hora { width: 3.25rem; }
+    .solicitudes-table col.c-paciente { width: 11%; }
+    .solicitudes-table col.c-dni { width: 5.75rem; }
+    .solicitudes-table col.c-tel { width: 6.75rem; }
+    .solicitudes-table col.c-medico { width: 9%; }
+    .solicitudes-table col.c-detalle { width: auto; }
+    .solicitudes-table col.c-obra { width: 6.5rem; }
+    .solicitudes-table col.c-estado { width: 6.35rem; }
+    .solicitudes-table col.c-acciones { width: 4.75rem; }
+    .solicitudes-table col.c-chat { width: 3.1rem; }
+
+    .col-tipo,
+    .col-estado {
+      text-align: center;
+      overflow: visible;
+      vertical-align: middle;
+    }
+    .col-tipo { white-space: nowrap; }
+    .col-estado { white-space: normal; }
+    .solicitudes-table thead th.col-tipo,
+    .solicitudes-table thead th.col-estado,
+    .solicitudes-table tbody td.col-tipo,
+    .solicitudes-table tbody td.col-estado {
+      padding: 0.35rem 0.2rem;
+      text-align: center;
+    }
+    .col-hora { text-align: left; }
     .col-acciones {
-      width: 5.5%;
       text-align: center;
       white-space: nowrap;
       overflow: visible;
     }
     .col-chat {
-      width: 5%;
       text-align: center;
       white-space: nowrap;
       overflow: visible;
     }
     .col-paciente,
     .col-medico,
-    .col-detalle,
     .col-obra {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .col-detalle {
+      white-space: normal;
+      overflow: visible;
+      word-break: break-word;
+      line-height: 1.35;
+      vertical-align: middle;
     }
 
     .cell-mono {
@@ -985,6 +1029,10 @@
       }
     }
     .btn-refresh:active { transform: scale(0.97); }
+    .btn-refresh:disabled {
+      opacity: 0.55;
+      cursor: wait;
+    }
     .btn-refresh:focus-visible {
       outline: none;
       box-shadow: var(--focus-ring);
@@ -1253,6 +1301,19 @@
           </div>
           <div class="solicitudes-scroll" tabindex="0" aria-label="Tabla de solicitudes">
             <table class="solicitudes-table">
+              <colgroup>
+                <col class="c-tipo">
+                <col class="c-hora">
+                <col class="c-paciente">
+                <col class="c-dni">
+                <col class="c-tel">
+                <col class="c-medico">
+                <col class="c-detalle">
+                <col class="c-obra">
+                <col class="c-estado">
+                <col class="c-acciones">
+                <col class="c-chat">
+              </colgroup>
               <thead>
                 <tr>
                   <th scope="col" class="col-tipo">Tipo</th>
@@ -1913,10 +1974,16 @@
     async function loadSolicitudes() {
       const statusEl = document.getElementById('solicitudes-status');
       const tbody = document.getElementById('solicitudes-tbody');
+      const refreshBtn = document.getElementById('refresh-btn');
       statusEl.textContent = 'Cargando…';
       delete statusEl.dataset.updatedAt;
+      if (refreshBtn) refreshBtn.disabled = true;
       try {
-        const res = await fetch('/api/solicitudes');
+        // Bust any intermediary/browser GET cache so Actualizar reflects DB wipes.
+        const res = await fetch('/api/solicitudes?_=' + Date.now(), {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }
+        });
         if (!res.ok) throw new Error('fail');
         const data = await res.json();
         const groups = data.dias || [];
@@ -1925,15 +1992,19 @@
         const stamp = 'Actualizado ' + new Date().toLocaleTimeString();
         statusEl.dataset.updatedAt = stamp;
         applySolicitudesFilter();
-        if (!(groups.length)) statusEl.textContent = stamp;
+        if (!(groups.length)) statusEl.textContent = 'Sin solicitudes · ' + stamp;
       } catch (err) {
         statusEl.textContent = 'No se pudieron cargar.';
         tbody.innerHTML = '<tr><td colspan="11" class="text-center text-danger py-3">Error</td></tr>';
         document.getElementById('empty-filter')?.classList.remove('show');
+      } finally {
+        if (refreshBtn) refreshBtn.disabled = false;
       }
     }
 
-    document.getElementById('refresh-btn').addEventListener('click', loadSolicitudes);
+    document.getElementById('refresh-btn').addEventListener('click', () => {
+      loadSolicitudes();
+    });
     document.getElementById('solicitudes-search').addEventListener('input', applySolicitudesFilter);
     document.getElementById('search-clear').addEventListener('click', () => {
       const input = document.getElementById('solicitudes-search');
