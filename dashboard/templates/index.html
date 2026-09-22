@@ -596,15 +596,16 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* Fixed rem widths on badge/action cols so leftover % does not inflate them. */
+    /* Fixed rem widths on badge/action cols so leftover % does not inflate them.
+       Paciente absorbs remainder; Detalle is capped so short cells are not a void. */
     .solicitudes-table col.c-tipo { width: 5.4rem; }
     .solicitudes-table col.c-hora { width: 3.25rem; }
-    .solicitudes-table col.c-paciente { width: 11%; }
+    .solicitudes-table col.c-paciente { width: auto; }
     .solicitudes-table col.c-dni { width: 5.75rem; }
     .solicitudes-table col.c-tel { width: 6.75rem; }
-    .solicitudes-table col.c-medico { width: 9%; }
-    .solicitudes-table col.c-detalle { width: auto; }
-    .solicitudes-table col.c-obra { width: 6.5rem; }
+    .solicitudes-table col.c-medico { width: 8.25rem; }
+    .solicitudes-table col.c-detalle { width: 12.5rem; }
+    .solicitudes-table col.c-obra { width: 7.25rem; }
     .solicitudes-table col.c-estado { width: 6.35rem; }
     .solicitudes-table col.c-acciones { width: 4.75rem; }
     .solicitudes-table col.c-chat { width: 3.1rem; }
