@@ -2073,7 +2073,9 @@
           : `Día: ${formatDisplayDate(date)} — Por orden de llegada`;
       }
       const lines = [
-        isReprog ? '✅ TURNO REPROGRAMADO' : '✅ TURNO CONFIRMADO',
+        mode === 'orden'
+          ? '👤 INFORMACION DEL TURNO'
+          : (isReprog ? '✅ TURNO REPROGRAMADO' : '✅ TURNO CONFIRMADO'),
         '',
         `Nombre: ${nombre}`,
         `Médico: ${medico}`,

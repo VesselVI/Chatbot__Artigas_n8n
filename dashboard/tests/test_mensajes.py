@@ -58,6 +58,8 @@ def test_mensaje_confirmacion_por_orden_de_llegada():
         appointment_at=datetime(2026, 9, 23, 0, 0),
         por_orden_de_llegada=True,
     )
+    assert text.startswith("👤 INFORMACION DEL TURNO")
+    assert "✅ TURNO CONFIRMADO" not in text
     assert "Día: 23/09/2026 — Por orden de llegada" in text
     assert "Día y hora:" not in text
     assert "por orden de llegada" in text.lower()

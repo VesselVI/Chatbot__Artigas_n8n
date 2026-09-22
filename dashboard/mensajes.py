@@ -37,19 +37,21 @@ def build_mensaje_confirmacion(
     por_orden_de_llegada: bool = False,
 ) -> str:
     if por_orden_de_llegada:
+        title = "👤 INFORMACION DEL TURNO"
         dia_line = f"Día: {format_dia_hora_display(appointment_at, por_orden_de_llegada=True)}"
         footer = (
             "Presentate el día indicado; te atenderán por orden de llegada. "
             "Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver."
         )
     else:
+        title = "✅ TURNO CONFIRMADO"
         dia_line = f"Día y hora: {format_dia_hora_display(appointment_at)}"
         footer = (
             "Te esperamos unos minutos antes del horario. "
             "Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver."
         )
     lines = [
-        "✅ TURNO CONFIRMADO",
+        title,
         "",
         f"Nombre: {nombre}",
         f"Médico: {medico}",
@@ -72,6 +74,7 @@ def build_mensaje_reprogramacion(
     por_orden_de_llegada: bool = False,
 ) -> str:
     if por_orden_de_llegada:
+        title = "👤 INFORMACION DEL TURNO"
         dia_line = (
             f"Nuevo día: {format_dia_hora_display(appointment_at, por_orden_de_llegada=True)}"
         )
@@ -80,13 +83,14 @@ def build_mensaje_reprogramacion(
             "te atenderán por orden de llegada. Escribí menú para volver."
         )
     else:
+        title = "✅ TURNO REPROGRAMADO"
         dia_line = f"Nuevo día y hora: {format_dia_hora_display(appointment_at)}"
         footer = (
             "Su turno anterior fue cancelado. Agende este nuevo horario. "
             "Escribí menú para volver."
         )
     lines = [
-        "✅ TURNO REPROGRAMADO",
+        title,
         "",
         f"Nombre: {nombre}",
         f"Médico: {medico}",

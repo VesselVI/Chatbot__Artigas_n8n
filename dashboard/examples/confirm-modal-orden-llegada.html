@@ -529,7 +529,7 @@
         }
 
         const lines = [
-          '✅ TURNO CONFIRMADO',
+          mode === 'orden' ? '👤 INFORMACION DEL TURNO' : '✅ TURNO CONFIRMADO',
           '',
           `Nombre: ${nombre}`,
           `Médico: ${medico}`,
