@@ -261,6 +261,11 @@
       max-width: 100%;
       overflow-x: hidden;
     }
+    /* Let Abrir Chat tip extend past the right edge while Solicitudes is open */
+    .pc-container:has(#solicitudes-pane:not(.d-none)),
+    .pc-content:has(#solicitudes-pane:not(.d-none)) {
+      overflow-x: visible;
+    }
 
     /* —— Search —— */
     .search-bar {
@@ -520,8 +525,9 @@
       overflow: visible;
       max-width: 100%;
       min-width: 0;
-      /* Room for hover tips above the first data row */
+      /* Room for hover tips above the first row and past the Chat column */
       padding-top: 0.15rem;
+      padding-right: 1.35rem;
     }
     .solicitudes-table {
       width: 100%;
@@ -819,10 +825,8 @@
     .btn-abrir-chat .btn-tip {
       position: absolute;
       bottom: calc(100% + 0.45rem);
-      /* Anchor right so the tip grows left into the table, not off-screen */
-      left: auto;
-      right: 0;
-      transform: translateX(0) translateY(0.2rem);
+      left: 50%;
+      transform: translateX(-50%) translateY(0.2rem);
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
@@ -846,9 +850,8 @@
       content: "";
       position: absolute;
       top: 100%;
-      left: auto;
-      right: 0.65rem;
-      transform: none;
+      left: 50%;
+      transform: translateX(-50%);
       border: 5px solid transparent;
       border-top-color: var(--ink);
     }
@@ -857,7 +860,7 @@
       .btn-abrir-chat:focus-visible .btn-tip {
         opacity: 1;
         visibility: visible;
-        transform: translateX(0) translateY(0);
+        transform: translateX(-50%) translateY(0);
         transition:
           opacity 160ms var(--ease-out),
           transform 160ms var(--ease-out),
