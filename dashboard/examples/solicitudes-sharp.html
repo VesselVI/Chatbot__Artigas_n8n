@@ -479,7 +479,11 @@
       max-width: 100%;
       margin-inline: auto;
     }
-    .col-tipo .badge-tipo,
+    .col-tipo .badge-tipo {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .estado-cell .badge-estado {
       max-width: none;
       overflow: visible;
@@ -564,8 +568,7 @@
     .solicitudes-table tbody td.col-acciones,
     .solicitudes-table tbody td.col-chat,
     .solicitudes-table tbody td.col-detalle,
-    .solicitudes-table tbody td.col-estado,
-    .solicitudes-table tbody td.col-tipo {
+    .solicitudes-table tbody td.col-estado {
       overflow: visible;
     }
     @media (hover: hover) and (pointer: fine) {
@@ -599,7 +602,7 @@
 
     /* Fixed rem widths on badge/action cols so leftover % does not inflate them.
        Paciente absorbs remainder; Detalle is capped so short cells are not a void. */
-    .solicitudes-table col.c-tipo { width: 5.4rem; }
+    .solicitudes-table col.c-tipo { width: 6.9rem; }
     .solicitudes-table col.c-hora { width: 3.25rem; }
     .solicitudes-table col.c-paciente { width: auto; }
     .solicitudes-table col.c-dni { width: 7.25rem; }
@@ -614,11 +617,10 @@
     .col-tipo,
     .col-estado {
       text-align: center;
-      overflow: visible;
       vertical-align: middle;
     }
-    .col-tipo { white-space: nowrap; }
-    .col-estado { white-space: normal; }
+    .col-tipo { white-space: nowrap; overflow: hidden; }
+    .col-estado { white-space: normal; overflow: visible; }
     .solicitudes-table thead th.col-tipo,
     .solicitudes-table thead th.col-estado,
     .solicitudes-table tbody td.col-tipo,
@@ -1047,9 +1049,52 @@
               <tr class="day-group" data-day="hoy">
                 <th scope="colgroup" colspan="11">Hoy — lunes 21/09/2026 <span class="day-count" data-day-count="hoy">5</span></th>
               </tr>
+              <tr class="solicitud-row" data-day="hoy" data-nombre="Luis Pérez" data-tel="11 5555-0101">
+                <td class="col-tipo"><span class="badge-tipo badge-reprogramar">reprogramar</span></td>
+                <td class="col-hora cell-mono">09:14</td>
+                <td class="col-paciente cell-paciente">Luis Pérez</td>
+                <td class="col-dni cell-mono">22.009.334</td>
+                <td class="col-tel cell-mono">11 5555-0101</td>
+                <td class="col-medico">Dra. Martínez</td>
+                <td class="col-detalle">Solicitud de reprogramación del turno del viernes 26/09 10:30 — pedir tarde la semana siguiente</td>
+                <td class="col-obra">Galeno</td>
+                <td class="col-estado">
+                  <div class="estado-cell">
+                    <span class="badge-estado badge-estado-reprogramado">Reprogramado</span>
+                    <span class="fallo-enviar"><span class="bang" aria-hidden="true">!</span> Fallo al enviar</span>
+                  </div>
+                </td>
+                <td class="col-acciones">
+                  <div class="acciones-strip">
+                    <button type="button" class="btn-action btn-reenviar" aria-label="Reenviar">
+                      <svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/>
+                        <path d="m21.854 2.147-10.94 10.939"/>
+                      </svg>
+                      <span class="btn-tip" aria-hidden="true">Reenviar</span>
+                    </button>
+                    <button type="button" class="btn-action btn-editar-reenviar" aria-label="Editar y reenviar">
+                      <svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
+                      </svg>
+                      <span class="btn-tip" aria-hidden="true">Editar y reenviar</span>
+                    </button>
+                  </div>
+                </td>
+                <td class="col-chat">
+                  <a class="btn-abrir-chat" href="#chat-luis" aria-label="Abrir Chat">
+                    <svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/>
+                      <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>
+                    </svg>
+                    <span class="btn-tip" aria-hidden="true">Abrir Chat</span>
+                  </a>
+                </td>
+              </tr>
               <tr class="solicitud-row" data-day="hoy" data-nombre="María Gómez" data-tel="11 4567-8901">
                 <td class="col-tipo"><span class="badge-tipo badge-turno">turno</span></td>
-                <td class="col-hora cell-mono">09:14</td>
+                <td class="col-hora cell-mono">09:40</td>
                 <td class="col-paciente cell-paciente">María Gómez</td>
                 <td class="col-dni cell-mono">28.451.902</td>
                 <td class="col-tel cell-mono">11 4567-8901</td>
@@ -1122,49 +1167,6 @@
                       <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>
                     </svg>
                   </span>
-                </td>
-              </tr>
-              <tr class="solicitud-row" data-day="hoy" data-nombre="Luis Pérez" data-tel="11 5555-0101">
-                <td class="col-tipo"><span class="badge-tipo badge-reprogramar">reprogramar</span></td>
-                <td class="col-hora cell-mono">12:05</td>
-                <td class="col-paciente cell-paciente">Luis Pérez</td>
-                <td class="col-dni cell-mono">22.009.334</td>
-                <td class="col-tel cell-mono">11 5555-0101</td>
-                <td class="col-medico">Dra. Martínez</td>
-                <td class="col-detalle">Solicitud de reprogramación del turno del viernes 26/09 10:30 — pedir tarde la semana siguiente, preferentemente después de las 17 hs</td>
-                <td class="col-obra">Galeno</td>
-                <td class="col-estado">
-                  <div class="estado-cell">
-                    <span class="badge-estado badge-estado-reprogramado">Reprogramado</span>
-                    <span class="fallo-enviar"><span class="bang" aria-hidden="true">!</span> Fallo al enviar</span>
-                  </div>
-                </td>
-                <td class="col-acciones">
-                  <div class="acciones-strip">
-                    <button type="button" class="btn-action btn-reenviar" aria-label="Reenviar">
-                      <svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/>
-                        <path d="m21.854 2.147-10.94 10.939"/>
-                      </svg>
-                      <span class="btn-tip" aria-hidden="true">Reenviar</span>
-                    </button>
-                    <button type="button" class="btn-action btn-editar-reenviar" aria-label="Editar y reenviar">
-                      <svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
-                      </svg>
-                      <span class="btn-tip" aria-hidden="true">Editar y reenviar</span>
-                    </button>
-                  </div>
-                </td>
-                <td class="col-chat">
-                  <a class="btn-abrir-chat" href="#chat-luis" aria-label="Abrir Chat">
-                    <svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/>
-                      <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>
-                    </svg>
-                    <span class="btn-tip" aria-hidden="true">Abrir Chat</span>
-                  </a>
                 </td>
               </tr>
               <tr class="solicitud-row" data-day="hoy" data-nombre="Patricia Molina" data-tel="381 622-4165">

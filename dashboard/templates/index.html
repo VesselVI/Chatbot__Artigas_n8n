@@ -484,7 +484,11 @@
       max-width: 100%;
       margin-inline: auto;
     }
-    .col-tipo .badge-tipo,
+    .col-tipo .badge-tipo {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .estado-cell .badge-estado {
       max-width: none;
       overflow: visible;
@@ -570,8 +574,7 @@
     .solicitudes-table tbody td.col-acciones,
     .solicitudes-table tbody td.col-chat,
     .solicitudes-table tbody td.col-detalle,
-    .solicitudes-table tbody td.col-estado,
-    .solicitudes-table tbody td.col-tipo {
+    .solicitudes-table tbody td.col-estado {
       overflow: visible;
     }
     @media (hover: hover) and (pointer: fine) {
@@ -605,7 +608,7 @@
 
     /* Fixed rem widths on badge/action cols so leftover % does not inflate them.
        Paciente absorbs remainder; Detalle is capped so short cells are not a void. */
-    .solicitudes-table col.c-tipo { width: 5.4rem; }
+    .solicitudes-table col.c-tipo { width: 6.9rem; }
     .solicitudes-table col.c-hora { width: 3.25rem; }
     .solicitudes-table col.c-paciente { width: auto; }
     .solicitudes-table col.c-dni { width: 7.25rem; }
@@ -620,11 +623,10 @@
     .col-tipo,
     .col-estado {
       text-align: center;
-      overflow: visible;
       vertical-align: middle;
     }
-    .col-tipo { white-space: nowrap; }
-    .col-estado { white-space: normal; }
+    .col-tipo { white-space: nowrap; overflow: hidden; }
+    .col-estado { white-space: normal; overflow: visible; }
     .solicitudes-table thead th.col-tipo,
     .solicitudes-table thead th.col-estado,
     .solicitudes-table tbody td.col-tipo,
