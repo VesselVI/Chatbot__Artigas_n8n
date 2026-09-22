@@ -409,10 +409,16 @@ def fetch_solicitud(solicitud_id: int) -> dict[str, Any] | None:
         has_tipo = _column_exists(cur, "turno_solicitudes", "tipo")
         has_appointment = _column_exists(cur, "turno_solicitudes", "appointment_at")
         has_nota = _column_exists(cur, "turno_solicitudes", "nota_paciente")
+        has_orden = _column_exists(cur, "turno_solicitudes", "por_orden_de_llegada")
         has_send = _column_exists(cur, "turno_solicitudes", "whatsapp_send_status")
         tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
         appointment_sql = "appointment_at" if has_appointment else "NULL AS appointment_at"
         nota_sql = "nota_paciente" if has_nota else "NULL AS nota_paciente"
+        orden_sql = (
+            "por_orden_de_llegada"
+            if has_orden
+            else "0 AS por_orden_de_llegada"
+        )
         if has_send:
             send_sql = (
                 "whatsapp_send_status, whatsapp_send_channel, whatsapp_nota_omitted"
@@ -426,8 +432,8 @@ def fetch_solicitud(solicitud_id: int) -> dict[str, Any] | None:
             f"""
             SELECT id, created_at, phone, nombre, dni, obra_social,
                    telefono_contacto, medico, horario_preferido, status,
-                   conversation_id, {tipo_sql}, {appointment_sql}, {nota_sql},
-                   {send_sql}
+                   conversation_id, {tipo_sql}, {appointment_sql}, {orden_sql},
+                   {nota_sql}, {send_sql}
             FROM turno_solicitudes
             WHERE id = %s
             """,
@@ -445,10 +451,16 @@ def list_solicitudes_rows() -> list[dict[str, Any]]:
         has_tipo = _column_exists(cur, "turno_solicitudes", "tipo")
         has_appointment = _column_exists(cur, "turno_solicitudes", "appointment_at")
         has_nota = _column_exists(cur, "turno_solicitudes", "nota_paciente")
+        has_orden = _column_exists(cur, "turno_solicitudes", "por_orden_de_llegada")
         has_send = _column_exists(cur, "turno_solicitudes", "whatsapp_send_status")
         tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
         appointment_sql = "appointment_at" if has_appointment else "NULL AS appointment_at"
         nota_sql = "nota_paciente" if has_nota else "NULL AS nota_paciente"
+        orden_sql = (
+            "por_orden_de_llegada"
+            if has_orden
+            else "0 AS por_orden_de_llegada"
+        )
         if has_send:
             send_sql = (
                 "whatsapp_send_status, whatsapp_send_channel, whatsapp_nota_omitted"
@@ -462,8 +474,8 @@ def list_solicitudes_rows() -> list[dict[str, Any]]:
             f"""
             SELECT id, created_at, phone, nombre, dni, obra_social,
                    telefono_contacto, medico, horario_preferido, status,
-                   conversation_id, {tipo_sql}, {appointment_sql}, {nota_sql},
-                   {send_sql}
+                   conversation_id, {tipo_sql}, {appointment_sql}, {orden_sql},
+                   {nota_sql}, {send_sql}
             FROM turno_solicitudes
             ORDER BY created_at DESC
             LIMIT 200
@@ -480,6 +492,7 @@ def save_solicitud_confirmacion(solicitud_id: int, fields: dict[str, Any]) -> No
         cur = conn.cursor(dictionary=True)
         has_appointment = _column_exists(cur, "turno_solicitudes", "appointment_at")
         has_nota = _column_exists(cur, "turno_solicitudes", "nota_paciente")
+        has_orden = _column_exists(cur, "turno_solicitudes", "por_orden_de_llegada")
         has_send = _column_exists(cur, "turno_solicitudes", "whatsapp_send_status")
         sets = [
             "nombre = %s",
@@ -494,6 +507,9 @@ def save_solicitud_confirmacion(solicitud_id: int, fields: dict[str, Any]) -> No
         if has_appointment and "appointment_at" in fields:
             sets.append("appointment_at = %s")
             params.append(fields["appointment_at"])
+        if has_orden and "por_orden_de_llegada" in fields:
+            sets.append("por_orden_de_llegada = %s")
+            params.append(1 if fields["por_orden_de_llegada"] else 0)
         if has_nota and "nota_paciente" in fields:
             sets.append("nota_paciente = %s")
             params.append(fields["nota_paciente"])
@@ -546,17 +562,24 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
     tipo = normalize_tipo(r.get("tipo"))
     status = str(r.get("status") or "pending")
     appointment_at = _format_appointment_at(r.get("appointment_at"))
+    por_orden = bool(int(r.get("por_orden_de_llegada") or 0))
     nota = r.get("nota_paciente")
     if nota is None:
         nota = ""
     else:
         nota = str(nota)
-    detalle = appointment_at or (r.get("horario_preferido") or "-")
+    if appointment_at:
+        detalle = format_dia_hora_display(
+            r.get("appointment_at"), por_orden_de_llegada=por_orden
+        )
+    else:
+        detalle = r.get("horario_preferido") or "-"
     send_status = str(r.get("whatsapp_send_status") or "").strip().lower() or None
     send_channel = str(r.get("whatsapp_send_channel") or "").strip().lower() or None
     nota_omitted = bool(int(r.get("whatsapp_nota_omitted") or 0))
     is_confirmed = status.lower() == CONFIRMED_STATUS
     can_confirm = status.lower() == "pending" and tipo in ("turno", "reprogramar")
+    appointment_date = appointment_at[:10] if appointment_at and len(appointment_at) >= 10 else None
     return {
         "id": r["id"],
         "tipo": tipo,
@@ -572,6 +595,8 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
         "medico": r.get("medico") or "-",
         "horario_preferido": r.get("horario_preferido") or "-",
         "appointment_at": appointment_at,
+        "appointment_date": appointment_date,
+        "por_orden_de_llegada": por_orden,
         "nota_paciente": nota,
         "status": status,
         "status_badge": status_badge_label(status, tipo),
@@ -648,6 +673,7 @@ async def api_confirm_solicitud(request: Request, solicitud_id: int):
             "nombre": payload["nombre"],
             "medico": payload["medico"],
             "appointment_at": payload["appointment_at"],
+            "por_orden_de_llegada": payload["por_orden_de_llegada"],
             "nota_paciente": payload["nota_paciente"],
             "status": CONFIRMED_STATUS,
         }
@@ -661,6 +687,7 @@ async def api_confirm_solicitud(request: Request, solicitud_id: int):
             appointment_at=payload["appointment_at"],
             nota_paciente=payload["nota_paciente"],
             include_nota=True,
+            por_orden_de_llegada=payload["por_orden_de_llegada"],
         )
         send_outcome = _attempt_whatsapp_send(
             row.get("conversation_id"),
@@ -670,6 +697,7 @@ async def api_confirm_solicitud(request: Request, solicitud_id: int):
             medico=payload["medico"],
             appointment_at=payload["appointment_at"],
             nota_paciente=payload["nota_paciente"],
+            por_orden_de_llegada=payload["por_orden_de_llegada"],
         )
         save_solicitud_confirmacion(
             solicitud_id,
@@ -686,6 +714,7 @@ async def api_confirm_solicitud(request: Request, solicitud_id: int):
             "status": CONFIRMED_STATUS,
             "status_badge": status_badge_label(CONFIRMED_STATUS, tipo),
             "appointment_at": payload["appointment_at"].strftime("%Y-%m-%dT%H:%M"),
+            "por_orden_de_llegada": payload["por_orden_de_llegada"],
             "nota_paciente": payload["nota_paciente"],
             "nombre": payload["nombre"],
             "medico": payload["medico"],
@@ -747,6 +776,7 @@ async def api_reenviar_solicitud(request: Request, solicitud_id: int):
     nombre = str(row.get("nombre") or "").strip()
     medico = str(row.get("medico") or "").strip()
     nota = str(row.get("nota_paciente") or "").strip()
+    por_orden = bool(int(row.get("por_orden_de_llegada") or 0))
     message = build_outbound_message(
         tipo,
         nombre=nombre,
@@ -754,6 +784,7 @@ async def api_reenviar_solicitud(request: Request, solicitud_id: int):
         appointment_at=appointment_at,
         nota_paciente=nota,
         include_nota=True,
+        por_orden_de_llegada=por_orden,
     )
     send_outcome = _attempt_whatsapp_send(
         row.get("conversation_id"),
@@ -763,6 +794,7 @@ async def api_reenviar_solicitud(request: Request, solicitud_id: int):
         medico=medico,
         appointment_at=appointment_at,
         nota_paciente=nota,
+        por_orden_de_llegada=por_orden,
     )
     save_solicitud_confirmacion(
         solicitud_id,
@@ -771,6 +803,7 @@ async def api_reenviar_solicitud(request: Request, solicitud_id: int):
             "medico": medico,
             "status": CONFIRMED_STATUS,
             "appointment_at": appointment_at,
+            "por_orden_de_llegada": por_orden,
             "nota_paciente": nota,
             "whatsapp_send_status": send_outcome["whatsapp_send_status"],
             "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
@@ -798,6 +831,7 @@ def _attempt_whatsapp_send(
     medico: str,
     appointment_at: Any,
     nota_paciente: str,
+    por_orden_de_llegada: bool = False,
 ) -> dict[str, Any]:
     """Persist-independent send attempt. Never raises — returns status fields."""
     warning = None
@@ -808,7 +842,9 @@ def _attempt_whatsapp_send(
             tipo=tipo,
             nombre=nombre,
             medico=medico,
-            dia_hora_display=format_dia_hora_display(appointment_at),
+            dia_hora_display=format_dia_hora_display(
+                appointment_at, por_orden_de_llegada=por_orden_de_llegada
+            ),
             nota_paciente=nota_paciente,
         )
         if result.nota_omitted and (nota_paciente or "").strip():

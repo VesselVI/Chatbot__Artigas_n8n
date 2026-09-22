@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS turno_solicitudes (
   medico VARCHAR(120) DEFAULT NULL,
   horario_preferido VARCHAR(255) DEFAULT NULL,
   appointment_at DATETIME NULL DEFAULT NULL,
+  por_orden_de_llegada TINYINT(1) NOT NULL DEFAULT 0,
   nota_paciente TEXT NULL,
   whatsapp_send_status VARCHAR(20) NULL DEFAULT NULL,
   whatsapp_send_channel VARCHAR(20) NULL DEFAULT NULL,

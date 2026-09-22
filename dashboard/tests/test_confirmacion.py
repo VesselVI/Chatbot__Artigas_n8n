@@ -73,3 +73,29 @@ def test_assert_confirmable_rejects_already_confirmed():
     with pytest.raises(ConfirmError) as ei:
         assert_confirmable({"id": 1, "tipo": "turno", "status": "confirmed"})
     assert ei.value.code == "already_confirmed"
+
+
+def test_validate_confirm_payload_por_orden_de_llegada():
+    out = validate_confirm_payload(
+        {
+            "por_orden_de_llegada": True,
+            "appointment_date": "2026-09-23",
+            "nombre": "Ana Pérez",
+            "medico": "Adrian Artigas",
+        }
+    )
+    assert out["por_orden_de_llegada"] is True
+    assert out["appointment_at"] == datetime(2026, 9, 23, 0, 0)
+    assert out["nota_paciente"] == ""
+
+
+def test_validate_confirm_payload_orden_requires_date():
+    with pytest.raises(ConfirmError) as ei:
+        validate_confirm_payload(
+            {
+                "scheduling_mode": "por_orden_de_llegada",
+                "nombre": "Ana",
+                "medico": "X",
+            }
+        )
+    assert ei.value.code == "missing_appointment_date"

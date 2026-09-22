@@ -34,6 +34,15 @@ def status_badge_label(status: Any, tipo: Any) -> str | None:
     return "Confirmado"
 
 
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    s = str(value or "").strip().lower()
+    return s in {"1", "true", "yes", "si", "sí", "on"}
+
+
 def parse_appointment_at(value: Any) -> datetime:
     """Accept ISO datetime from the panel (local wall time, no tz required)."""
     if isinstance(value, datetime):
@@ -50,11 +59,47 @@ def parse_appointment_at(value: Any) -> datetime:
     raise ConfirmError("Día/hora del turno inválido.", code="invalid_appointment_at")
 
 
+def parse_appointment_date(value: Any) -> datetime:
+    """Accept YYYY-MM-DD (or datetime) and store as midnight local wall time."""
+    if isinstance(value, datetime):
+        return value.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    s = str(value or "").strip()
+    if not s:
+        raise ConfirmError("Falta el día del turno.", code="missing_appointment_date")
+    s = s.replace("Z", "").replace("T", " ")[:10]
+    try:
+        return datetime.strptime(s, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ConfirmError(
+            "Día del turno inválido.", code="invalid_appointment_date"
+        ) from exc
+
+
+def is_por_orden_de_llegada(body: dict[str, Any]) -> bool:
+    mode = str(body.get("scheduling_mode") or "").strip().lower()
+    if mode in ("por_orden_de_llegada", "orden"):
+        return True
+    if mode in ("hora_especifica", "hora"):
+        return False
+    return _truthy(body.get("por_orden_de_llegada"))
+
+
 def validate_confirm_payload(body: dict[str, Any]) -> dict[str, Any]:
     """Normalize body for Confirmación desde el panel. Raises ConfirmError."""
     if not isinstance(body, dict):
         raise ConfirmError("Cuerpo inválido.", code="invalid_body")
-    appointment_at = parse_appointment_at(body.get("appointment_at") or body.get("dia_hora"))
+    por_orden = is_por_orden_de_llegada(body)
+    if por_orden:
+        raw = (
+            body.get("appointment_date")
+            or body.get("appointment_at")
+            or body.get("dia_hora")
+        )
+        appointment_at = parse_appointment_date(raw)
+    else:
+        appointment_at = parse_appointment_at(
+            body.get("appointment_at") or body.get("dia_hora")
+        )
     nombre = str(body.get("nombre") or "").strip()
     medico = str(body.get("medico") or "").strip()
     if not nombre:
@@ -67,6 +112,7 @@ def validate_confirm_payload(body: dict[str, Any]) -> dict[str, Any]:
         "nombre": nombre,
         "medico": medico,
         "nota_paciente": nota,
+        "por_orden_de_llegada": por_orden,
     }
 
 

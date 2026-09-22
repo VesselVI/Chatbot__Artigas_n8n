@@ -191,3 +191,23 @@ def test_list_solicitudes_sends_no_store(client):
     assert res.status_code == 200
     cc = (res.headers.get("cache-control") or "").lower()
     assert "no-store" in cc
+
+
+def test_confirm_por_orden_de_llegada(client, store):
+    res = client.post(
+        "/api/solicitudes/1/confirm",
+        json={
+            "por_orden_de_llegada": True,
+            "appointment_date": "2026-09-23",
+            "nombre": "Ana Pérez",
+            "medico": "Adrian Artigas",
+            "nota_paciente": "",
+        },
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["ok"] is True
+    assert body["por_orden_de_llegada"] is True
+    assert store.get(1)["por_orden_de_llegada"] in (True, 1)
+    assert store.get(1)["appointment_at"] == datetime(2026, 9, 23, 0, 0)
+    assert "Por orden de llegada" in (body.get("message_preview") or "")

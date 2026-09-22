@@ -49,3 +49,15 @@ def test_outbound_picks_by_tipo():
         appointment_at=datetime(2026, 9, 22, 10, 0),
     )
     assert "TURNO REPROGRAMADO" in t
+
+
+def test_mensaje_confirmacion_por_orden_de_llegada():
+    text = build_mensaje_confirmacion(
+        nombre="Ana",
+        medico="Adrian Artigas",
+        appointment_at=datetime(2026, 9, 23, 0, 0),
+        por_orden_de_llegada=True,
+    )
+    assert "Día: 23/09/2026 — Por orden de llegada" in text
+    assert "Día y hora:" not in text
+    assert "por orden de llegada" in text.lower()

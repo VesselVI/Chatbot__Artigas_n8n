@@ -1027,6 +1027,128 @@
       border-color: var(--accent);
     }
 
+    /* Confirm modal — hora vs por orden de llegada */
+    .sched-fieldset {
+      margin: 0 0 1rem;
+      padding: 0;
+      border: 0;
+    }
+    .sched-legend {
+      font-weight: 600;
+      font-size: 0.8125rem;
+      margin-bottom: 0.45rem;
+      float: none;
+      width: 100%;
+    }
+    .sched-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    @media (max-width: 420px) {
+      .sched-options { grid-template-columns: 1fr; }
+    }
+    .sched-option {
+      position: relative;
+      margin: 0;
+    }
+    .sched-option input {
+      position: absolute;
+      opacity: 0;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      cursor: pointer;
+      z-index: 2;
+    }
+    .sched-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      padding: 0.7rem 0.8rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      transition:
+        border-color 160ms var(--ease-out),
+        background 160ms var(--ease-out),
+        box-shadow 160ms var(--ease-out);
+      min-height: 100%;
+    }
+    .sched-card strong {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .sched-card span {
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .sched-option input:hover + .sched-card {
+      border-color: #b8c8d2;
+    }
+    .sched-option input:checked + .sched-card {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      box-shadow: inset 0 0 0 1px var(--accent);
+    }
+    .sched-option input:focus-visible + .sched-card {
+      box-shadow: var(--focus-ring), inset 0 0 0 1px var(--accent);
+    }
+    .sched-fields {
+      display: grid;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .sched-fields.two-col {
+      grid-template-columns: 1fr 1fr;
+    }
+    @media (max-width: 420px) {
+      .sched-fields.two-col { grid-template-columns: 1fr; }
+    }
+    .sched-fields[hidden] { display: none !important; }
+    .orden-note {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+      padding: 0.65rem 0.75rem;
+      background: #f3f7f9;
+      border: 1px solid var(--border-soft);
+      border-radius: 7px;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .orden-note[hidden] { display: none !important; }
+    .orden-note i {
+      color: var(--accent);
+      margin-top: 0.1rem;
+      flex-shrink: 0;
+    }
+    .wa-preview-label {
+      font-weight: 600;
+      font-size: 0.8125rem;
+      margin-bottom: 0.4rem;
+    }
+    .wa-bubble {
+      background: #e7ffdb;
+      border: 1px solid #c8e6b8;
+      border-radius: 8px 8px 8px 2px;
+      padding: 0.75rem 0.85rem;
+      font-size: 0.8125rem;
+      white-space: pre-wrap;
+      color: var(--ink);
+      line-height: 1.4;
+      min-height: 6.5rem;
+    }
+    .wa-bubble.is-empty {
+      color: var(--muted);
+      background: #f5f7f9;
+      border-color: var(--border-soft);
+      font-style: italic;
+    }
+
     .status-pill {
       font-size: 0.75rem;
       color: var(--muted);
@@ -1369,7 +1491,7 @@
 
       <!-- Confirmación desde el panel modal -->
       <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
             <div class="modal-header">
               <h5 class="modal-title" id="confirmModalLabel">Confirmación de turno</h5>
@@ -1386,13 +1508,58 @@
                 <label class="form-label" for="confirm-medico">Médico</label>
                 <input type="text" class="form-control" id="confirm-medico">
               </div>
-              <div class="mb-3">
-                <label class="form-label" for="confirm-appointment">Día y hora</label>
-                <input type="datetime-local" class="form-control" id="confirm-appointment" required>
+
+              <fieldset class="sched-fieldset">
+                <legend class="sched-legend">Cómo confirmar el turno</legend>
+                <div class="sched-options" role="radiogroup" aria-label="Modo de horario">
+                  <label class="sched-option">
+                    <input type="radio" name="sched-mode" value="hora" checked>
+                    <span class="sched-card">
+                      <strong>Hora específica</strong>
+                      <span>Día + hora fija en el mensaje</span>
+                    </span>
+                  </label>
+                  <label class="sched-option">
+                    <input type="radio" name="sched-mode" value="orden">
+                    <span class="sched-card">
+                      <strong>Por orden de llegada</strong>
+                      <span>Solo día; sin hora puntual</span>
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <div class="sched-fields two-col" id="fields-hora">
+                <div>
+                  <label class="form-label" for="confirm-date">Día</label>
+                  <input type="date" class="form-control" id="confirm-date">
+                </div>
+                <div>
+                  <label class="form-label" for="confirm-time">Hora</label>
+                  <input type="time" class="form-control" id="confirm-time" step="300">
+                </div>
               </div>
-              <div class="mb-0">
+
+              <div class="sched-fields" id="fields-orden" hidden>
+                <div>
+                  <label class="form-label" for="confirm-date-orden">Día</label>
+                  <input type="date" class="form-control" id="confirm-date-orden">
+                </div>
+              </div>
+
+              <div class="orden-note" id="orden-note" hidden>
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                <span>El paciente verá el día y la leyenda <em>por orden de llegada</em>. No se envía una hora puntual.</span>
+              </div>
+
+              <div class="mb-3">
                 <label class="form-label" for="confirm-nota">Nota al paciente</label>
                 <textarea class="form-control" id="confirm-nota" rows="2" placeholder="Opcional"></textarea>
+              </div>
+
+              <div class="mb-0">
+                <div class="wa-preview-label">Vista previa del WhatsApp</div>
+                <div class="wa-bubble is-empty" id="wa-preview" aria-live="polite">Completá día (y hora si aplica) para ver el mensaje.</div>
               </div>
             </div>
             <div class="modal-footer">
@@ -1801,7 +1968,17 @@
     }
 
     function detalleCell(b) {
+      if (b.detalle && b.por_orden_de_llegada) {
+        return escapeHtml(b.detalle);
+      }
       if (b.appointment_at) {
+        if (b.por_orden_de_llegada) {
+          const raw = String(b.appointment_date || b.appointment_at).slice(0, 10);
+          const [y, m, d] = raw.split('-');
+          if (y && m && d) {
+            return escapeHtml(`${d}/${m}/${y} — Por orden de llegada`);
+          }
+        }
         const d = new Date(b.appointment_at);
         if (!Number.isNaN(d.getTime())) {
           const pad = n => String(n).padStart(2, '0');
@@ -1841,7 +2018,124 @@
       return solicitudesCache.find(s => s.id === id) || null;
     }
 
-    function openConfirmModal(b, { edit } = { edit: false }) {
+    
+    function getSchedMode() {
+      const checked = document.querySelector('input[name="sched-mode"]:checked');
+      return checked ? checked.value : 'hora';
+    }
+
+    function setSchedMode(mode) {
+      const el = document.querySelector(`input[name="sched-mode"][value="${mode}"]`);
+      if (el) el.checked = true;
+      syncSchedModeUI();
+    }
+
+    function syncSchedModeUI() {
+      const isOrden = getSchedMode() === 'orden';
+      const fieldsHora = document.getElementById('fields-hora');
+      const fieldsOrden = document.getElementById('fields-orden');
+      const ordenNote = document.getElementById('orden-note');
+      if (fieldsHora) fieldsHora.hidden = isOrden;
+      if (fieldsOrden) fieldsOrden.hidden = !isOrden;
+      if (ordenNote) ordenNote.hidden = !isOrden;
+      const dateHora = document.getElementById('confirm-date');
+      const dateOrden = document.getElementById('confirm-date-orden');
+      if (isOrden && dateHora && dateOrden && dateHora.value) dateOrden.value = dateHora.value;
+      if (!isOrden && dateHora && dateOrden && dateOrden.value) dateHora.value = dateOrden.value;
+      updateConfirmPreview();
+    }
+
+    function formatDisplayDate(isoDate) {
+      if (!isoDate) return '';
+      const [y, m, d] = isoDate.split('-');
+      return `${d}/${m}/${y}`;
+    }
+
+    function buildConfirmPreviewMessage() {
+      const mode = getSchedMode();
+      const nombre = (document.getElementById('confirm-nombre').value || '').trim() || '—';
+      const medico = (document.getElementById('confirm-medico').value || '').trim() || '—';
+      const nota = (document.getElementById('confirm-nota').value || '').trim();
+      const isReprog = confirmDraft && confirmDraft.tipo === 'reprogramar';
+      let diaLine = '';
+      if (mode === 'hora') {
+        const date = document.getElementById('confirm-date').value;
+        const time = document.getElementById('confirm-time').value;
+        if (!date || !time) return null;
+        diaLine = isReprog
+          ? `Nuevo día y hora: ${formatDisplayDate(date)} ${time}`
+          : `Día y hora: ${formatDisplayDate(date)} ${time}`;
+      } else {
+        const date = document.getElementById('confirm-date-orden').value;
+        if (!date) return null;
+        diaLine = isReprog
+          ? `Nuevo día: ${formatDisplayDate(date)} — Por orden de llegada`
+          : `Día: ${formatDisplayDate(date)} — Por orden de llegada`;
+      }
+      const lines = [
+        isReprog ? '✅ TURNO REPROGRAMADO' : '✅ TURNO CONFIRMADO',
+        '',
+        `Nombre: ${nombre}`,
+        `Médico: ${medico}`,
+        diaLine,
+      ];
+      if (nota) lines.push(`Nota: ${nota}`);
+      lines.push('');
+      if (mode === 'orden') {
+        lines.push(
+          isReprog
+            ? 'Su turno anterior fue cancelado. Presentate el día indicado; te atenderán por orden de llegada. Escribí menú para volver.'
+            : 'Presentate el día indicado; te atenderán por orden de llegada. Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver.'
+        );
+      } else {
+        lines.push(
+          isReprog
+            ? 'Su turno anterior fue cancelado. Agende este nuevo horario. Escribí menú para volver.'
+            : 'Te esperamos unos minutos antes del horario. Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver.'
+        );
+      }
+      return lines.join('
+');
+    }
+
+    function updateConfirmPreview() {
+      const preview = document.getElementById('wa-preview');
+      if (!preview) return;
+      const msg = buildConfirmPreviewMessage();
+      if (!msg) {
+        preview.textContent = 'Completá día (y hora si aplica) para ver el mensaje.';
+        preview.classList.add('is-empty');
+        return;
+      }
+      preview.textContent = msg;
+      preview.classList.remove('is-empty');
+    }
+
+    function fillConfirmSchedule(b) {
+      const porOrden = !!b.por_orden_de_llegada;
+      const raw = String(b.appointment_at || b.appointment_date || '');
+      let date = '';
+      let time = '';
+      if (raw) {
+        const normalized = raw.replace(' ', 'T');
+        date = normalized.slice(0, 10);
+        if (normalized.length >= 16 && !porOrden) {
+          time = normalized.slice(11, 16);
+        }
+      }
+      if (!date) {
+        const t = new Date();
+        t.setDate(t.getDate() + 1);
+        date = t.toISOString().slice(0, 10);
+      }
+      if (!time) time = '10:30';
+      document.getElementById('confirm-date').value = date;
+      document.getElementById('confirm-time').value = time;
+      document.getElementById('confirm-date-orden').value = date;
+      setSchedMode(porOrden ? 'orden' : 'hora');
+    }
+
+function openConfirmModal(b, { edit } = { edit: false }) {
       confirmDraft = b;
       const title = b.tipo === 'reprogramar'
         ? (edit ? 'Editar reprogramación' : 'Confirmación de reprogramación')
@@ -1851,9 +2145,10 @@
       document.getElementById('confirm-id').value = b.id;
       document.getElementById('confirm-nombre').value = (b.nombre && b.nombre !== '-') ? b.nombre : '';
       document.getElementById('confirm-medico').value = (b.medico && b.medico !== '-') ? b.medico : '';
-      document.getElementById('confirm-appointment').value = b.appointment_at || '';
       document.getElementById('confirm-nota').value = b.nota_paciente || '';
       document.getElementById('confirm-alert').innerHTML = '';
+      fillConfirmSchedule(b || {});
+      updateConfirmPreview();
       if (!confirmModal) {
         confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
       }
@@ -2048,21 +2343,44 @@
       btn.disabled = true;
       alertEl.innerHTML = '';
       try {
+        const mode = getSchedMode();
+        const nombre = document.getElementById('confirm-nombre').value;
+        const medico = document.getElementById('confirm-medico').value;
+        const nota_paciente = document.getElementById('confirm-nota').value;
+        let payload;
+        if (mode === 'orden') {
+          const appointment_date = document.getElementById('confirm-date-orden').value;
+          if (!appointment_date) throw new Error('Elegí el día (por orden de llegada).');
+          payload = {
+            scheduling_mode: 'por_orden_de_llegada',
+            por_orden_de_llegada: true,
+            appointment_date,
+            nombre,
+            medico,
+            nota_paciente,
+          };
+        } else {
+          const date = document.getElementById('confirm-date').value;
+          const time = document.getElementById('confirm-time').value;
+          if (!date || !time) throw new Error('Elegí día y hora del turno.');
+          payload = {
+            scheduling_mode: 'hora_especifica',
+            por_orden_de_llegada: false,
+            appointment_at: `${date}T${time}`,
+            nombre,
+            medico,
+            nota_paciente,
+          };
+        }
         const res = await fetch('/api/solicitudes/' + encodeURIComponent(id) + '/confirm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            appointment_at: document.getElementById('confirm-appointment').value,
-            nombre: document.getElementById('confirm-nombre').value,
-            medico: document.getElementById('confirm-medico').value,
-            nota_paciente: document.getElementById('confirm-nota').value
-          })
+          body: JSON.stringify(payload)
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'No se pudo confirmar');
         if (data.whatsapp_warning) {
           alertEl.innerHTML = `<div class="alert alert-warning py-2">${escapeHtml(data.whatsapp_warning)}</div>`;
-          // Still close after short delay if sent, or keep open if failed
         }
         if (data.whatsapp_send_status === 'failed') {
           alertEl.innerHTML = `<div class="alert alert-danger py-2">Fallo al enviar: ${escapeHtml(data.whatsapp_warning || 'error')}</div>`;
@@ -2076,6 +2394,16 @@
       } finally {
         btn.disabled = false;
       }
+    });
+
+    document.querySelectorAll('input[name="sched-mode"]').forEach((el) => {
+      el.addEventListener('change', syncSchedModeUI);
+    });
+    ['confirm-date', 'confirm-time', 'confirm-date-orden', 'confirm-nombre', 'confirm-medico', 'confirm-nota'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', updateConfirmPreview);
+      el.addEventListener('change', updateConfirmPreview);
     });
 
     async function loadClinic() {

@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#e8eef2">
+  <title>Mock — Confirmar: hora o por orden de llegada</title>
+  <!--
+    Sign-off mock: confirm modal can choose hora específica OR “por orden de llegada”.
+    Standalone; no backend. Approve UX here before porting to dashboard/templates/index.html.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #1a2430;
+      --muted: #5a6b7c;
+      --paper: #e8eef2;
+      --surface: #ffffff;
+      --accent: #0e7c8b;
+      --accent-soft: #d8eef1;
+      --border: #d3dce4;
+      --border-soft: #e4ebf0;
+      --ok: #1a7a4c;
+      --danger: #b42318;
+      --focus-ring: 0 0 0 3px rgba(14, 124, 139, 0.28);
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      color-scheme: light;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Figtree, system-ui, sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100dvh;
+      font-size: 14px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .lede {
+      margin: 0 0 1.5rem;
+      color: var(--muted);
+      max-width: 40rem;
+    }
+
+    .demo-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.35rem;
+      box-shadow: 0 1px 2px rgba(26, 36, 48, 0.04);
+    }
+    .demo-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1rem;
+      justify-content: space-between;
+    }
+    .paciente {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      min-width: 0;
+    }
+    .paciente strong { font-size: 0.9375rem; }
+    .paciente span { color: var(--muted); font-size: 0.8125rem; }
+
+    .btn-open {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.95rem;
+      border-radius: 7px;
+      border: 1px solid var(--ok);
+      background: var(--ok);
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out);
+    }
+    .btn-open:hover { background: #156640; border-color: #156640; }
+    .btn-open:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+    .hint {
+      margin: 1rem 0 0;
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+    .hint code {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.78em;
+      background: var(--border-soft);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+
+    /* —— Modal polish (match panel tokens) —— */
+    .modal-content {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 16px 40px rgba(26, 36, 48, 0.16);
+      overflow: hidden;
+    }
+    .modal-header {
+      border-bottom-color: var(--border-soft);
+      padding: 1rem 1.15rem;
+    }
+    .modal-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .modal-body { padding: 1.1rem 1.15rem 0.35rem; }
+    .modal-footer {
+      border-top-color: var(--border-soft);
+      padding: 0.85rem 1.15rem 1rem;
+      gap: 0.5rem;
+    }
+    .form-label {
+      font-weight: 600;
+      font-size: 0.8125rem;
+      color: var(--ink);
+      margin-bottom: 0.35rem;
+    }
+    .form-control, .form-select {
+      border-color: var(--border);
+      border-radius: 7px;
+      font-size: 0.875rem;
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: var(--accent);
+      box-shadow: var(--focus-ring);
+    }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .btn-primary:hover {
+      background: #0b6774;
+      border-color: #0b6774;
+    }
+    .btn-primary:focus-visible {
+      box-shadow: var(--focus-ring);
+    }
+
+    /* Scheduling mode toggle */
+    .sched-fieldset {
+      margin: 0 0 1rem;
+      padding: 0;
+      border: 0;
+    }
+    .sched-legend {
+      font-weight: 600;
+      font-size: 0.8125rem;
+      margin-bottom: 0.45rem;
+      float: none;
+      width: 100%;
+    }
+    .sched-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    @media (max-width: 420px) {
+      .sched-options { grid-template-columns: 1fr; }
+    }
+    .sched-option {
+      position: relative;
+      margin: 0;
+    }
+    .sched-option input {
+      position: absolute;
+      opacity: 0;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      cursor: pointer;
+      z-index: 2;
+    }
+    .sched-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      padding: 0.7rem 0.8rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      transition:
+        border-color 160ms var(--ease-out),
+        background 160ms var(--ease-out),
+        box-shadow 160ms var(--ease-out);
+      min-height: 100%;
+    }
+    .sched-card strong {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .sched-card span {
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .sched-option input:hover + .sched-card {
+      border-color: #b8c8d2;
+    }
+    .sched-option input:checked + .sched-card {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      box-shadow: inset 0 0 0 1px var(--accent);
+    }
+    .sched-option input:focus-visible + .sched-card {
+      box-shadow: var(--focus-ring), inset 0 0 0 1px var(--accent);
+    }
+
+    .sched-fields {
+      display: grid;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .sched-fields.two-col {
+      grid-template-columns: 1fr 1fr;
+    }
+    @media (max-width: 420px) {
+      .sched-fields.two-col { grid-template-columns: 1fr; }
+    }
+    .sched-fields[hidden] { display: none !important; }
+
+    .orden-note {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+      padding: 0.65rem 0.75rem;
+      background: #f3f7f9;
+      border: 1px solid var(--border-soft);
+      border-radius: 7px;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .orden-note[hidden] { display: none !important; }
+    .orden-note i {
+      color: var(--accent);
+      margin-top: 0.1rem;
+      flex-shrink: 0;
+    }
+
+    /* WhatsApp preview */
+    .wa-preview-label {
+      font-weight: 600;
+      font-size: 0.8125rem;
+      margin-bottom: 0.4rem;
+    }
+    .wa-bubble {
+      background: #e7ffdb;
+      border: 1px solid #c8e6b8;
+      border-radius: 8px 8px 8px 2px;
+      padding: 0.75rem 0.85rem;
+      font-size: 0.8125rem;
+      white-space: pre-wrap;
+      font-family: Figtree, system-ui, sans-serif;
+      color: var(--ink);
+      line-height: 1.4;
+      min-height: 6.5rem;
+    }
+    .wa-bubble.is-empty {
+      color: var(--muted);
+      background: #f5f7f9;
+      border-color: var(--border-soft);
+      font-style: italic;
+    }
+
+    .alert-mock {
+      display: none;
+      margin-bottom: 0.85rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: 7px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+    }
+    .alert-mock.show { display: block; }
+    .alert-mock.ok {
+      background: #e8f6ee;
+      color: var(--ok);
+      border: 1px solid #b7dfc8;
+    }
+    .alert-mock.err {
+      background: #fdecea;
+      color: var(--danger);
+      border: 1px solid #f0c4bf;
+    }
+
+    .result-panel {
+      margin-top: 1.25rem;
+      padding: 1rem 1.15rem;
+      border-radius: 10px;
+      border: 1px dashed var(--border);
+      background: #f7fafb;
+      display: none;
+    }
+    .result-panel.show { display: block; }
+    .result-panel h2 {
+      margin: 0 0 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
+    .result-panel pre {
+      margin: 0;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.75rem;
+      white-space: pre-wrap;
+      color: var(--ink);
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <p class="eyebrow">Mock de aprobación · Secretaría</p>
+    <h1>Confirmar turno: hora o por orden de llegada</h1>
+    <p class="lede">
+      Abrí el modal como lo haría secretaría. Podés elegir <strong>hora específica</strong>
+      o <strong>por orden de llegada</strong> (solo día). El preview muestra el mensaje de WhatsApp
+      que recibiría el paciente.
+    </p>
+
+    <div class="demo-card">
+      <div class="demo-row">
+        <div class="paciente">
+          <strong>María Gómez</strong>
+          <span>turno · Dr. Artigas · pendiente · OSDE</span>
+        </div>
+        <button type="button" class="btn-open" id="open-modal" data-bs-toggle="modal" data-bs-target="#confirmModal">
+          <i class="bi bi-calendar-check" aria-hidden="true"></i>
+          Confirmar turno
+        </button>
+      </div>
+      <p class="hint">
+        Archivo de sign-off: <code>dashboard/examples/confirm-modal-orden-llegada.html</code>.
+        No escribe al backend.
+      </p>
+    </div>
+
+    <div class="result-panel" id="result-panel" aria-live="polite">
+      <h2>Payload que se enviaría al confirmar</h2>
+      <pre id="result-json"></pre>
+    </div>
+  </div>
+
+  <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="confirmModalLabel">Confirmación de turno</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert-mock" id="confirm-alert" role="alert"></div>
+
+          <div class="mb-3">
+            <label class="form-label" for="confirm-nombre">Nombre</label>
+            <input type="text" class="form-control" id="confirm-nombre" value="María Gómez" autocomplete="name">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="confirm-medico">Médico</label>
+            <input type="text" class="form-control" id="confirm-medico" value="Dr. Artigas">
+          </div>
+
+          <fieldset class="sched-fieldset">
+            <legend class="sched-legend">Cómo confirmar el turno</legend>
+            <div class="sched-options" role="radiogroup" aria-label="Modo de horario">
+              <label class="sched-option">
+                <input type="radio" name="sched-mode" value="hora" checked>
+                <span class="sched-card">
+                  <strong>Hora específica</strong>
+                  <span>Día + hora fija en el mensaje</span>
+                </span>
+              </label>
+              <label class="sched-option">
+                <input type="radio" name="sched-mode" value="orden">
+                <span class="sched-card">
+                  <strong>Por orden de llegada</strong>
+                  <span>Solo día; sin hora puntual</span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="sched-fields two-col" id="fields-hora">
+            <div>
+              <label class="form-label" for="confirm-date">Día</label>
+              <input type="date" class="form-control" id="confirm-date">
+            </div>
+            <div>
+              <label class="form-label" for="confirm-time">Hora</label>
+              <input type="time" class="form-control" id="confirm-time" step="300">
+            </div>
+          </div>
+
+          <div class="sched-fields" id="fields-orden" hidden>
+            <div>
+              <label class="form-label" for="confirm-date-orden">Día</label>
+              <input type="date" class="form-control" id="confirm-date-orden">
+            </div>
+          </div>
+
+          <div class="orden-note" id="orden-note" hidden>
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <span>El paciente verá el día y la leyenda <em>por orden de llegada</em>. No se envía una hora puntual.</span>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="confirm-nota">Nota al paciente</label>
+            <textarea class="form-control" id="confirm-nota" rows="2" placeholder="Opcional"></textarea>
+          </div>
+
+          <div class="mb-3">
+            <div class="wa-preview-label">Vista previa del WhatsApp</div>
+            <div class="wa-bubble is-empty" id="wa-preview" aria-live="polite">Completá día (y hora si aplica) para ver el mensaje.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="confirm-submit">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (function () {
+      const modeInputs = document.querySelectorAll('input[name="sched-mode"]');
+      const fieldsHora = document.getElementById('fields-hora');
+      const fieldsOrden = document.getElementById('fields-orden');
+      const ordenNote = document.getElementById('orden-note');
+      const dateHora = document.getElementById('confirm-date');
+      const timeHora = document.getElementById('confirm-time');
+      const dateOrden = document.getElementById('confirm-date-orden');
+      const nombreEl = document.getElementById('confirm-nombre');
+      const medicoEl = document.getElementById('confirm-medico');
+      const notaEl = document.getElementById('confirm-nota');
+      const preview = document.getElementById('wa-preview');
+      const alertEl = document.getElementById('confirm-alert');
+      const resultPanel = document.getElementById('result-panel');
+      const resultJson = document.getElementById('result-json');
+
+      // Seed a sensible default (tomorrow 10:30)
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const yyyy = tomorrow.getFullYear();
+      const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+      const dd = String(tomorrow.getDate()).padStart(2, '0');
+      dateHora.value = `${yyyy}-${mm}-${dd}`;
+      dateOrden.value = `${yyyy}-${mm}-${dd}`;
+      timeHora.value = '10:30';
+
+      function getMode() {
+        const checked = document.querySelector('input[name="sched-mode"]:checked');
+        return checked ? checked.value : 'hora';
+      }
+
+      function syncModeUI() {
+        const mode = getMode();
+        const isOrden = mode === 'orden';
+        fieldsHora.hidden = isOrden;
+        fieldsOrden.hidden = !isOrden;
+        ordenNote.hidden = !isOrden;
+        // Keep dates in sync when switching
+        if (isOrden && dateHora.value) dateOrden.value = dateHora.value;
+        if (!isOrden && dateOrden.value) dateHora.value = dateOrden.value;
+        updatePreview();
+      }
+
+      function formatDisplayDate(isoDate) {
+        if (!isoDate) return '';
+        const [y, m, d] = isoDate.split('-');
+        return `${d}/${m}/${y}`;
+      }
+
+      function buildMessage() {
+        const mode = getMode();
+        const nombre = (nombreEl.value || '').trim() || '—';
+        const medico = (medicoEl.value || '').trim() || '—';
+        const nota = (notaEl.value || '').trim();
+        let diaLine = '';
+
+        if (mode === 'hora') {
+          const date = dateHora.value;
+          const time = timeHora.value;
+          if (!date || !time) return null;
+          diaLine = `Día y hora: ${formatDisplayDate(date)} ${time}`;
+        } else {
+          const date = dateOrden.value;
+          if (!date) return null;
+          diaLine = `Día: ${formatDisplayDate(date)} — Por orden de llegada`;
+        }
+
+        const lines = [
+          '✅ TURNO CONFIRMADO',
+          '',
+          `Nombre: ${nombre}`,
+          `Médico: ${medico}`,
+          diaLine,
+        ];
+        if (nota) lines.push(`Nota: ${nota}`);
+        lines.push('');
+        if (mode === 'orden') {
+          lines.push('Presentate el día indicado; te atenderán por orden de llegada. Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver.');
+        } else {
+          lines.push('Te esperamos unos minutos antes del horario. Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver.');
+        }
+        return lines.join('\n');
+      }
+
+      function updatePreview() {
+        const msg = buildMessage();
+        if (!msg) {
+          preview.textContent = 'Completá día (y hora si aplica) para ver el mensaje.';
+          preview.classList.add('is-empty');
+          return;
+        }
+        preview.textContent = msg;
+        preview.classList.remove('is-empty');
+      }
+
+      function showAlert(type, text) {
+        alertEl.textContent = text;
+        alertEl.className = 'alert-mock show ' + type;
+      }
+
+      function clearAlert() {
+        alertEl.textContent = '';
+        alertEl.className = 'alert-mock';
+      }
+
+      function buildPayload() {
+        const mode = getMode();
+        const base = {
+          nombre: (nombreEl.value || '').trim(),
+          medico: (medicoEl.value || '').trim(),
+          nota_paciente: (notaEl.value || '').trim(),
+          scheduling_mode: mode === 'orden' ? 'por_orden_de_llegada' : 'hora_especifica',
+        };
+        if (mode === 'hora') {
+          base.appointment_at = dateHora.value && timeHora.value
+            ? `${dateHora.value}T${timeHora.value}`
+            : '';
+          base.por_orden_de_llegada = false;
+        } else {
+          base.appointment_date = dateOrden.value || '';
+          base.appointment_at = null;
+          base.por_orden_de_llegada = true;
+        }
+        return base;
+      }
+
+      modeInputs.forEach((el) => el.addEventListener('change', syncModeUI));
+      [dateHora, timeHora, dateOrden, nombreEl, medicoEl, notaEl].forEach((el) => {
+        el.addEventListener('input', updatePreview);
+        el.addEventListener('change', updatePreview);
+      });
+
+      document.getElementById('confirm-submit').addEventListener('click', () => {
+        clearAlert();
+        const mode = getMode();
+        if (mode === 'hora') {
+          if (!dateHora.value || !timeHora.value) {
+            showAlert('err', 'Elegí día y hora del turno.');
+            return;
+          }
+        } else if (!dateOrden.value) {
+          showAlert('err', 'Elegí el día (por orden de llegada).');
+          return;
+        }
+        if (!(nombreEl.value || '').trim()) {
+          showAlert('err', 'Falta el nombre del paciente.');
+          return;
+        }
+
+        const payload = buildPayload();
+        const message = buildMessage();
+        resultJson.textContent = JSON.stringify({ ...payload, whatsapp_message: message }, null, 2);
+        resultPanel.classList.add('show');
+        showAlert('ok', 'Listo (mock). En producción esto confirmaría y enviaría el WhatsApp.');
+
+        // Close after a short beat so the success state is readable
+        setTimeout(() => {
+          const modal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+          if (modal) modal.hide();
+        }, 650);
+      });
+
+      document.getElementById('confirmModal').addEventListener('show.bs.modal', () => {
+        clearAlert();
+        syncModeUI();
+      });
+
+      syncModeUI();
+    })();
+  </script>
+</body>
+</html>
