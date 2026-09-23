@@ -886,6 +886,15 @@
       .btn-confirmar:hover { background: #156640; border-color: #156640; }
     }
 
+    .btn-reprogramar {
+      color: #fff;
+      background: #9b2d6e;
+      border: 1px solid #9b2d6e;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-reprogramar:hover { background: #7d2458; border-color: #7d2458; }
+    }
+
     .btn-reenviar {
       color: #fff;
       background: var(--danger);
@@ -1552,7 +1561,7 @@
                 <span>El paciente verá el día y la leyenda <em>por orden de llegada</em>. No se envía una hora puntual.</span>
               </div>
 
-              <div class="mb-3">
+              <div class="mb-3" id="confirm-nota-wrap">
                 <label class="form-label" for="confirm-nota">Nota al paciente</label>
                 <textarea class="form-control" id="confirm-nota" rows="2" placeholder="Opcional"></textarea>
               </div>
@@ -1907,6 +1916,7 @@
 
     const ICO = {
       calendarCheck: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>',
+      calendarClock: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 14v2.2l1.6 1"/><path d="M16 2v4"/><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M3 10h5"/><path d="M8 2v4"/><circle cx="16" cy="16" r="6"/></svg>',
       send: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>',
       squarePen: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg>',
       messages: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>'
@@ -1954,6 +1964,9 @@
       const parts = [];
       if (b.can_confirm) {
         parts.push(`<button type="button" class="btn-action btn-confirmar" data-confirm-id="${b.id}" aria-label="Confirmar turno">${ICO.calendarCheck}<span class="btn-tip" aria-hidden="true">Confirmar turno</span></button>`);
+      }
+      if (b.can_reprogramar) {
+        parts.push(`<button type="button" class="btn-action btn-reprogramar" data-reprogramar-id="${b.id}" aria-label="Reprogramar">${ICO.calendarClock}<span class="btn-tip" aria-hidden="true">Reprogramar</span></button>`);
       }
       if (b.can_reenviar) {
         parts.push(`<button type="button" class="btn-action btn-reenviar" data-reenviar-id="${b.id}" aria-label="Reenviar">${ICO.send}<span class="btn-tip" aria-hidden="true">Reenviar</span></button>`);
@@ -2051,12 +2064,18 @@
       return `${d}/${m}/${y}`;
     }
 
+    function isReprogramModal() {
+      return !!(confirmDraft && confirmDraft._mode === 'reprogram');
+    }
+
     function buildConfirmPreviewMessage() {
       const mode = getSchedMode();
       const nombre = (document.getElementById('confirm-nombre').value || '').trim() || '—';
       const medico = (document.getElementById('confirm-medico').value || '').trim() || '—';
-      const nota = (document.getElementById('confirm-nota').value || '').trim();
-      const isReprog = confirmDraft && confirmDraft.tipo === 'reprogramar';
+      const nota = isReprogramModal()
+        ? ''
+        : (document.getElementById('confirm-nota').value || '').trim();
+      const isReprog = isReprogramModal();
       let diaLine = '';
       if (mode === 'hora') {
         const date = document.getElementById('confirm-date').value;
@@ -2136,17 +2155,30 @@
       setSchedMode(porOrden ? 'orden' : 'hora');
     }
 
-function openConfirmModal(b, { edit } = { edit: false }) {
-      confirmDraft = b;
-      const title = b.tipo === 'reprogramar'
-        ? (edit ? 'Editar reprogramación' : 'Confirmación de reprogramación')
+function openConfirmModal(b, { edit, reprogram } = { edit: false, reprogram: false }) {
+      confirmDraft = Object.assign({}, b, {
+        _mode: reprogram ? 'reprogram' : (edit ? 'edit' : 'confirm'),
+      });
+      const isReprog = confirmDraft._mode === 'reprogram';
+      const title = isReprog
+        ? 'Reprogramación de turno'
         : (edit ? 'Editar y reenviar' : 'Confirmación de turno');
       document.getElementById('confirmModalLabel').textContent = title;
-      document.getElementById('confirm-submit').textContent = edit ? 'Guardar y reenviar' : 'Confirmar';
+      document.getElementById('confirm-submit').textContent = isReprog
+        ? 'Reprogramar'
+        : (edit ? 'Guardar y reenviar' : 'Confirmar');
       document.getElementById('confirm-id').value = b.id;
       document.getElementById('confirm-nombre').value = (b.nombre && b.nombre !== '-') ? b.nombre : '';
       document.getElementById('confirm-medico').value = (b.medico && b.medico !== '-') ? b.medico : '';
-      document.getElementById('confirm-nota').value = b.nota_paciente || '';
+      document.getElementById('confirm-nota').value = isReprog ? '' : (b.nota_paciente || '');
+      const notaWrap = document.getElementById('confirm-nota-wrap');
+      if (notaWrap) notaWrap.hidden = isReprog;
+      const schedLegend = document.querySelector('#confirmModal .sched-legend');
+      if (schedLegend) {
+        schedLegend.textContent = isReprog
+          ? 'Cómo reprogramar el turno'
+          : 'Cómo confirmar el turno';
+      }
       document.getElementById('confirm-alert').innerHTML = '';
       fillConfirmSchedule(b || {});
       updateConfirmPreview();
@@ -2163,6 +2195,12 @@ function openConfirmModal(b, { edit } = { edit: false }) {
         btn.addEventListener('click', () => {
           const flat = findSolicitud(Number(btn.getAttribute('data-confirm-id')));
           if (flat) openConfirmModal(flat, { edit: false });
+        });
+      });
+      tbody.querySelectorAll('[data-reprogramar-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const flat = findSolicitud(Number(btn.getAttribute('data-reprogramar-id')));
+          if (flat) openConfirmModal(flat, { reprogram: true });
         });
       });
       tbody.querySelectorAll('[data-edit-id]').forEach(btn => {
@@ -2341,13 +2379,13 @@ function openConfirmModal(b, { edit } = { edit: false }) {
       const id = document.getElementById('confirm-id').value;
       const btn = document.getElementById('confirm-submit');
       const alertEl = document.getElementById('confirm-alert');
+      const isReprog = isReprogramModal();
       btn.disabled = true;
       alertEl.innerHTML = '';
       try {
         const mode = getSchedMode();
         const nombre = document.getElementById('confirm-nombre').value;
         const medico = document.getElementById('confirm-medico').value;
-        const nota_paciente = document.getElementById('confirm-nota').value;
         let payload;
         if (mode === 'orden') {
           const appointment_date = document.getElementById('confirm-date-orden').value;
@@ -2358,7 +2396,6 @@ function openConfirmModal(b, { edit } = { edit: false }) {
             appointment_date,
             nombre,
             medico,
-            nota_paciente,
           };
         } else {
           const date = document.getElementById('confirm-date').value;
@@ -2370,16 +2407,21 @@ function openConfirmModal(b, { edit } = { edit: false }) {
             appointment_at: `${date}T${time}`,
             nombre,
             medico,
-            nota_paciente,
           };
         }
-        const res = await fetch('/api/solicitudes/' + encodeURIComponent(id) + '/confirm', {
+        if (!isReprog) {
+          payload.nota_paciente = document.getElementById('confirm-nota').value;
+        }
+        const action = isReprog ? 'reprogramar' : 'confirm';
+        const res = await fetch('/api/solicitudes/' + encodeURIComponent(id) + '/' + action, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'No se pudo confirmar');
+        if (!res.ok) {
+          throw new Error(data.error || (isReprog ? 'No se pudo reprogramar' : 'No se pudo confirmar'));
+        }
         if (data.whatsapp_warning) {
           alertEl.innerHTML = `<div class="alert alert-warning py-2">${escapeHtml(data.whatsapp_warning)}</div>`;
         }

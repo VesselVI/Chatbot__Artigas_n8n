@@ -218,3 +218,24 @@ def send_confirmacion(
         body_params=[nombre, medico, dia_hora_display],
         opener=opener,
     )
+
+
+def send_reprogramacion(
+    conversation_id: Any,
+    *,
+    nombre: str,
+    medico: str,
+    dia_hora_display: str,
+    template_name: str = "confirmacion_reprogramacion",
+    opener: Callable[..., Any] | None = None,
+) -> SendResult:
+    """
+    Reprogramación desde el panel — always Meta utility plantilla (ADR-0005).
+    Never free-form. body_params: [nombre, medico, dia_hora].
+    """
+    return send_utility_template(
+        conversation_id,
+        template_name=template_name or "confirmacion_reprogramacion",
+        body_params=[nombre, medico, dia_hora_display],
+        opener=opener,
+    )

@@ -19,8 +19,14 @@ from confirmacion import (
     status_badge_label,
     validate_confirm_payload,
 )
-from chatwoot_send import ChatwootSendError, send_confirmacion
+from chatwoot_send import ChatwootSendError, send_confirmacion, send_reprogramacion
 from mensajes import build_outbound_message, format_dia_hora_display
+from reprogramacion import (
+    REPROGRAM_TEMPLATE,
+    assert_reprogramable,
+    can_reprogram,
+    validate_reprogram_payload,
+)
 
 DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 DAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
@@ -505,6 +511,9 @@ def save_solicitud_confirmacion(solicitud_id: int, fields: dict[str, Any]) -> No
             fields["medico"],
             fields["status"],
         ]
+        if "tipo" in fields:
+            sets.append("tipo = %s")
+            params.append(fields["tipo"])
         if has_appointment and "appointment_at" in fields:
             sets.append("appointment_at = %s")
             params.append(fields["appointment_at"])
@@ -552,17 +561,21 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
     created = parse_solicitud_dt(r.get("created_at"))
     if created:
         created_s = created.strftime("%d/%m/%Y %H:%M")
-        hora = created.strftime("%H:%M")
-        dia = created.date().isoformat()
-        dia_label = f"{DAY_NAMES[created.weekday()]} {created.strftime('%d/%m/%Y')}"
     else:
         created_s = str(r.get("created_at") or "-")
-        hora = "-"
-        dia = ""
-        dia_label = "Sin fecha"
     tipo = normalize_tipo(r.get("tipo"))
     status = str(r.get("status") or "pending")
     appointment_at = _format_appointment_at(r.get("appointment_at"))
+    # Board grouping: surface confirmed/reprogrammed rows under appointment day (#9).
+    board_dt = parse_solicitud_dt(r.get("appointment_at")) or created
+    if board_dt:
+        hora = board_dt.strftime("%H:%M")
+        dia = board_dt.date().isoformat()
+        dia_label = f"{DAY_NAMES[board_dt.weekday()]} {board_dt.strftime('%d/%m/%Y')}"
+    else:
+        hora = "-"
+        dia = ""
+        dia_label = "Sin fecha"
     por_orden = bool(int(r.get("por_orden_de_llegada") or 0))
     nota = r.get("nota_paciente")
     if nota is None:
@@ -602,7 +615,10 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
         "status": status,
         "status_badge": status_badge_label(status, tipo),
         "can_confirm": can_confirm,
-        "can_edit_resend": is_confirmed and send_status == "sent",
+        "can_reprogramar": can_reprogram(r),
+        "can_edit_resend": (
+            is_confirmed and send_status == "sent" and tipo in CONFIRMABLE_TIPOS
+        ),
         "can_reenviar": is_confirmed and send_status == "failed",
         "whatsapp_send_status": send_status,
         "whatsapp_send_channel": send_channel,
@@ -735,6 +751,81 @@ async def api_confirm_solicitud(request: Request, solicitud_id: int):
         )
 
 
+@app.post("/api/solicitudes/{solicitud_id}/reprogramar")
+@login_required
+async def api_reprogramar_solicitud(request: Request, solicitud_id: int):
+    """Reprogramación desde el panel on an existing solicitud (#9)."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Cuerpo inválido.", "code": "invalid_body"},
+            status_code=400,
+        )
+    try:
+        payload = validate_reprogram_payload(body if isinstance(body, dict) else {})
+        existing = fetch_solicitud(solicitud_id)
+        row = assert_reprogramable(existing)
+        fields = {
+            "nombre": payload["nombre"],
+            "medico": payload["medico"],
+            "appointment_at": payload["appointment_at"],
+            "por_orden_de_llegada": payload["por_orden_de_llegada"],
+            "tipo": "reprogramar",
+            "status": CONFIRMED_STATUS,
+        }
+        save_solicitud_confirmacion(solicitud_id, fields)
+
+        message = build_outbound_message(
+            "reprogramar",
+            nombre=payload["nombre"],
+            medico=payload["medico"],
+            appointment_at=payload["appointment_at"],
+            nota_paciente="",
+            include_nota=False,
+            por_orden_de_llegada=payload["por_orden_de_llegada"],
+        )
+        send_outcome = _attempt_reprogram_send(
+            row.get("conversation_id"),
+            nombre=payload["nombre"],
+            medico=payload["medico"],
+            appointment_at=payload["appointment_at"],
+            por_orden_de_llegada=payload["por_orden_de_llegada"],
+        )
+        save_solicitud_confirmacion(
+            solicitud_id,
+            {
+                **fields,
+                "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+                "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+                "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+            },
+        )
+        return {
+            "ok": True,
+            "id": solicitud_id,
+            "tipo": "reprogramar",
+            "status": CONFIRMED_STATUS,
+            "status_badge": status_badge_label(CONFIRMED_STATUS, "reprogramar"),
+            "appointment_at": payload["appointment_at"].strftime("%Y-%m-%dT%H:%M"),
+            "por_orden_de_llegada": payload["por_orden_de_llegada"],
+            "nombre": payload["nombre"],
+            "medico": payload["medico"],
+            "whatsapp_sent": send_outcome["whatsapp_send_status"] == "sent",
+            "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+            "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+            "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+            "whatsapp_warning": send_outcome.get("whatsapp_warning"),
+            "message_preview": message,
+        }
+    except ConfirmError as e:
+        status = 404 if e.code == "not_found" else 400
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code},
+            status_code=status,
+        )
+
+
 @app.post("/api/solicitudes/{solicitud_id}/reenviar")
 @login_required
 async def api_reenviar_solicitud(request: Request, solicitud_id: int):
@@ -784,33 +875,43 @@ async def api_reenviar_solicitud(request: Request, solicitud_id: int):
         medico=medico,
         appointment_at=appointment_at,
         nota_paciente=nota,
-        include_nota=True,
+        include_nota=(tipo != "reprogramar"),
         por_orden_de_llegada=por_orden,
     )
-    send_outcome = _attempt_whatsapp_send(
-        row.get("conversation_id"),
-        tipo=tipo,
-        message=message,
-        nombre=nombre,
-        medico=medico,
-        appointment_at=appointment_at,
-        nota_paciente=nota,
-        por_orden_de_llegada=por_orden,
-    )
-    save_solicitud_confirmacion(
-        solicitud_id,
-        {
-            "nombre": nombre,
-            "medico": medico,
-            "status": CONFIRMED_STATUS,
-            "appointment_at": appointment_at,
-            "por_orden_de_llegada": por_orden,
-            "nota_paciente": nota,
-            "whatsapp_send_status": send_outcome["whatsapp_send_status"],
-            "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
-            "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
-        },
-    )
+    if tipo == "reprogramar":
+        send_outcome = _attempt_reprogram_send(
+            row.get("conversation_id"),
+            nombre=nombre,
+            medico=medico,
+            appointment_at=appointment_at,
+            por_orden_de_llegada=por_orden,
+        )
+    else:
+        send_outcome = _attempt_whatsapp_send(
+            row.get("conversation_id"),
+            tipo=tipo,
+            message=message,
+            nombre=nombre,
+            medico=medico,
+            appointment_at=appointment_at,
+            nota_paciente=nota,
+            por_orden_de_llegada=por_orden,
+        )
+    save_fields: dict[str, Any] = {
+        "nombre": nombre,
+        "medico": medico,
+        "status": CONFIRMED_STATUS,
+        "appointment_at": appointment_at,
+        "por_orden_de_llegada": por_orden,
+        "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+        "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+        "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+    }
+    if tipo == "reprogramar":
+        save_fields["tipo"] = "reprogramar"
+    else:
+        save_fields["nota_paciente"] = nota
+    save_solicitud_confirmacion(solicitud_id, save_fields)
     return {
         "ok": True,
         "id": solicitud_id,
@@ -857,6 +958,41 @@ def _attempt_whatsapp_send(
             "whatsapp_send_channel": result.channel,
             "whatsapp_nota_omitted": result.nota_omitted,
             "whatsapp_warning": warning,
+        }
+    except ChatwootSendError as e:
+        return {
+            "whatsapp_send_status": "failed",
+            "whatsapp_send_channel": None,
+            "whatsapp_nota_omitted": False,
+            "whatsapp_warning": str(e),
+        }
+
+
+def _attempt_reprogram_send(
+    conversation_id: Any,
+    *,
+    nombre: str,
+    medico: str,
+    appointment_at: Any,
+    por_orden_de_llegada: bool = False,
+) -> dict[str, Any]:
+    """Always utility plantilla confirmacion_reprogramacion (ADR-0005)."""
+    dia_hora = format_dia_hora_display(
+        appointment_at, por_orden_de_llegada=por_orden_de_llegada
+    )
+    try:
+        result = send_reprogramacion(
+            conversation_id,
+            nombre=nombre,
+            medico=medico,
+            dia_hora_display=dia_hora,
+            template_name=REPROGRAM_TEMPLATE,
+        )
+        return {
+            "whatsapp_send_status": "sent",
+            "whatsapp_send_channel": result.channel,
+            "whatsapp_nota_omitted": result.nota_omitted,
+            "whatsapp_warning": None,
         }
     except ChatwootSendError as e:
         return {
