@@ -1,6 +1,12 @@
 """Unit tests for patient search / autocomplete domain (#10)."""
 
-from busqueda import filter_solicitudes_by_query, fold_text, solicitud_matches_query
+from busqueda import (
+    filter_solicitudes_by_query,
+    fold_text,
+    looks_like_phone_query,
+    normalize_phone_e164,
+    solicitud_matches_query,
+)
 
 
 def test_fold_strips_accents():
@@ -45,3 +51,16 @@ def test_filter_preserves_order_and_limit():
     ]
     out = filter_solicitudes_by_query(rows, "ana", limit=2)
     assert [r["id"] for r in out] == [1, 2]
+
+
+def test_normalize_phone_e164_ar():
+    assert normalize_phone_e164("11 5555-6677") == "5491155556677"
+    assert normalize_phone_e164("+54 9 11 5555-6677") == "5491155556677"
+    assert normalize_phone_e164("5491155556677") == "5491155556677"
+
+
+def test_looks_like_phone_query():
+    assert looks_like_phone_query("1155556677") is True
+    assert looks_like_phone_query("11 5555-6677") is True
+    assert looks_like_phone_query("Ana") is False
+    assert looks_like_phone_query("12") is False

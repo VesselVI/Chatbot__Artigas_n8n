@@ -85,6 +85,7 @@ def client(store, monkeypatch):
     monkeypatch.setattr(dash_app, "list_solicitudes_rows", store.list_rows)
     monkeypatch.setattr(dash_app, "save_solicitud_confirmacion", store.update_confirm)
     monkeypatch.setattr(dash_app, "get_db", lambda: MagicMock())
+    monkeypatch.setattr(dash_app, "send_private_note", lambda *a, **k: None)
 
     with TestClient(dash_app.app) as c:
         r = c.post(

@@ -100,6 +100,7 @@ def client(store, monkeypatch):
         "send_reprogramacion",
         lambda *a, **k: SendResult(channel="utility", nota_omitted=True),
     )
+    monkeypatch.setattr(dash_app, "send_private_note", lambda *a, **k: None)
 
     with TestClient(dash_app.app) as c:
         r = c.post(

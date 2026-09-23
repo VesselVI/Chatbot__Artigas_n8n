@@ -239,3 +239,187 @@ def send_reprogramacion(
         body_params=[nombre, medico, dia_hora_display],
         opener=opener,
     )
+
+
+def send_private_note(
+    conversation_id: Any,
+    content: str,
+    *,
+    opener: Callable[..., Any] | None = None,
+) -> None:
+    """Chatwoot private note for panel audit (#11)."""
+    cid = str(conversation_id or "").strip()
+    if not cid:
+        raise ChatwootSendError("Solicitud sin conversation_id.", code="missing_conversation")
+    text = str(content or "").strip()
+    if not text:
+        raise ChatwootSendError("Nota privada vacía.", code="empty_message")
+    url = (
+        f"{chatwoot_api_base()}/accounts/{chatwoot_account_id()}"
+        f"/conversations/{cid}/messages"
+    )
+    _http_json(
+        "POST",
+        url,
+        {
+            "content": text,
+            "message_type": "outgoing",
+            "private": True,
+            "content_type": "text",
+        },
+        opener=opener,
+    )
+
+
+def chatwoot_inbox_id() -> str:
+    inbox = (
+        _env("CHATWOOT_INBOX_ID")
+        or _env("CHATWOOT_WHATSAPP_INBOX_ID")
+        or ""
+    ).strip()
+    if not inbox:
+        raise ChatwootSendError(
+            "Falta CHATWOOT_INBOX_ID para abrir conversaciones.",
+            code="misconfigured",
+        )
+    return inbox
+
+
+def _contact_phone_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    payload = payload or {}
+    for key in ("payload", "data"):
+        block = payload.get(key)
+        if isinstance(block, list):
+            out.extend(c for c in block if isinstance(c, dict))
+        elif isinstance(block, dict):
+            nested = block.get("payload") or block.get("contacts") or []
+            if isinstance(nested, list):
+                out.extend(c for c in nested if isinstance(c, dict))
+    if isinstance(payload.get("contacts"), list):
+        out.extend(c for c in payload["contacts"] if isinstance(c, dict))
+    seen: set[str] = set()
+    uniq: list[dict[str, Any]] = []
+    for c in out:
+        cid = str(c.get("id") or "")
+        if cid and cid in seen:
+            continue
+        if cid:
+            seen.add(cid)
+        uniq.append(c)
+    return uniq
+
+
+def ensure_whatsapp_conversation(
+    *,
+    phone: str,
+    nombre: str = "",
+    opener: Callable[..., Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Find or create Chatwoot contact + WhatsApp conversation for cold open (#11).
+    Returns {conversation_id, contact_id, created}.
+    """
+    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    if len(digits) < 8:
+        raise ChatwootSendError("Teléfono inválido para Chatwoot.", code="invalid_phone")
+    e164 = f"+{digits}"
+    inbox_id = chatwoot_inbox_id()
+    account = chatwoot_account_id()
+    base = f"{chatwoot_api_base()}/accounts/{account}"
+
+    search = _http_json(
+        "GET",
+        f"{base}/contacts/search?q={digits}",
+        opener=opener,
+    )
+    contacts = _contact_phone_candidates(search if isinstance(search, dict) else {})
+    contact = None
+    for c in contacts:
+        cphone = "".join(
+            ch
+            for ch in str(c.get("phone_number") or c.get("identifier") or "")
+            if ch.isdigit()
+        )
+        if cphone and (cphone.endswith(digits) or digits.endswith(cphone)):
+            contact = c
+            break
+    created = False
+    if not contact:
+        created_payload = _http_json(
+            "POST",
+            f"{base}/contacts",
+            {
+                "inbox_id": int(inbox_id) if str(inbox_id).isdigit() else inbox_id,
+                "name": (nombre or digits).strip() or digits,
+                "phone_number": e164,
+            },
+            opener=opener,
+        )
+        contact = None
+        if isinstance(created_payload, dict):
+            nested = created_payload.get("payload")
+            if isinstance(nested, dict):
+                contact = nested.get("contact") if isinstance(nested.get("contact"), dict) else nested
+            if not contact and isinstance(created_payload.get("contact"), dict):
+                contact = created_payload["contact"]
+            if not contact:
+                contact = created_payload
+        created = True
+    contact_id = str((contact or {}).get("id") or "").strip()
+    if not contact_id:
+        raise ChatwootSendError(
+            "No se pudo resolver el contacto en Chatwoot.",
+            code="contact_failed",
+        )
+
+    conv_list = _http_json(
+        "GET",
+        f"{base}/contacts/{contact_id}/conversations",
+        opener=opener,
+    )
+    conversations: list[dict[str, Any]] = []
+    if isinstance(conv_list, dict):
+        payload = conv_list.get("payload")
+        if isinstance(payload, list):
+            conversations = [c for c in payload if isinstance(c, dict)]
+        elif isinstance(payload, dict) and isinstance(payload.get("conversations"), list):
+            conversations = [
+                c for c in payload["conversations"] if isinstance(c, dict)
+            ]
+    if conversations:
+        cid = str(conversations[0].get("id") or "").strip()
+        if cid:
+            return {
+                "conversation_id": cid,
+                "contact_id": contact_id,
+                "created": created,
+            }
+
+    created_conv = _http_json(
+        "POST",
+        f"{base}/conversations",
+        {
+            "source_id": digits,
+            "inbox_id": int(inbox_id) if str(inbox_id).isdigit() else inbox_id,
+            "contact_id": int(contact_id) if contact_id.isdigit() else contact_id,
+            "status": "open",
+        },
+        opener=opener,
+    )
+    cid = ""
+    if isinstance(created_conv, dict):
+        cid = str(created_conv.get("id") or "").strip()
+        nested = created_conv.get("payload")
+        if not cid and isinstance(nested, dict):
+            cid = str(nested.get("id") or "").strip()
+    if not cid:
+        raise ChatwootSendError(
+            "No se pudo crear la conversación en Chatwoot.",
+            code="conversation_failed",
+        )
+    return {
+        "conversation_id": cid,
+        "contact_id": contact_id,
+        "created": True,
+    }
