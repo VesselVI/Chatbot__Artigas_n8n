@@ -64,6 +64,13 @@ def test_assert_confirmable_rejects_cancelar():
     assert ei.value.code == "ineligible_tipo"
 
 
+def test_assert_confirmable_rejects_reprogramar():
+    """#8: Confirmación is turno-only; reprogramar uses Reprogramación desde el panel."""
+    with pytest.raises(ConfirmError) as ei:
+        assert_confirmable({"id": 1, "tipo": "reprogramar", "status": "pending"})
+    assert ei.value.code == "ineligible_tipo"
+
+
 def test_assert_confirmable_allows_turno_pending():
     row = assert_confirmable({"id": 1, "tipo": "turno", "status": "pending"})
     assert row["id"] == 1

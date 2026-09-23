@@ -5,7 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-CONFIRMABLE_TIPOS = frozenset({"turno", "reprogramar"})
+# Confirmación desde el panel: first-time turno only (ADR-0005 / #8).
+# Reprogramación uses Reprogramación desde el panel, not Confirmar.
+CONFIRMABLE_TIPOS = frozenset({"turno"})
 CONFIRMED_STATUS = "confirmed"
 PENDING_STATUS = "pending"
 

@@ -136,11 +136,12 @@ def test_confirm_omits_nota_line_when_empty(client, monkeypatch):
     assert "Nota:" not in captured["content"]
 
 
-def test_confirm_reprogramar_badge_and_message(client, store, monkeypatch):
-    captured = {}
+def test_confirm_rejects_reprogramar(client, store, monkeypatch):
+    """#8: pending reprogramar is not Confirmación — use Reprogramación desde el panel."""
+    called = {"n": 0}
 
-    def fake_send(cid, **kwargs):
-        captured["content"] = kwargs["freeform_content"]
+    def fake_send(*a, **k):
+        called["n"] += 1
         return SendResult(channel="freeform", nota_omitted=False)
 
     monkeypatch.setattr(dash_app, "send_confirmacion", fake_send)
@@ -152,13 +153,14 @@ def test_confirm_reprogramar_badge_and_message(client, store, monkeypatch):
             "medico": "Adrian Artigas",
         },
     )
-    assert res.status_code == 200
-    assert res.json()["status_badge"] == "Reprogramado"
-    assert "TURNO REPROGRAMADO" in captured["content"]
+    assert res.status_code == 400
+    assert res.json()["code"] == "ineligible_tipo"
+    assert called["n"] == 0
+    assert store.get(2)["status"] == "pending"
     listed = client.get("/api/solicitudes").json()
     item = next(s for s in listed["solicitudes"] if s["id"] == 2)
-    assert item["status_badge"] == "Reprogramado"
     assert item["can_confirm"] is False
+    assert item["tipo"] == "reprogramar"
 
 
 def test_confirm_persists_when_send_fails(client, store, monkeypatch):

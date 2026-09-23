@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from confirmacion import (
+    CONFIRMABLE_TIPOS,
     CONFIRMED_STATUS,
     ConfirmError,
     assert_confirmable,
@@ -578,7 +579,7 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
     send_channel = str(r.get("whatsapp_send_channel") or "").strip().lower() or None
     nota_omitted = bool(int(r.get("whatsapp_nota_omitted") or 0))
     is_confirmed = status.lower() == CONFIRMED_STATUS
-    can_confirm = status.lower() == "pending" and tipo in ("turno", "reprogramar")
+    can_confirm = status.lower() == "pending" and tipo in CONFIRMABLE_TIPOS
     appointment_date = appointment_at[:10] if appointment_at and len(appointment_at) >= 10 else None
     return {
         "id": r["id"],

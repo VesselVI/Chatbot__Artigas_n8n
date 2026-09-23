@@ -158,6 +158,28 @@ def test_confirm_rejects_cancelar(client):
     assert res.json()["code"] == "ineligible_tipo"
 
 
+def test_confirm_rejects_reprogramar_and_list_can_confirm(client, store):
+    store.rows[3] = _row(id=3, tipo="reprogramar", nombre="Luis")
+    res = client.post(
+        "/api/solicitudes/3/confirm",
+        json={
+            "appointment_at": "2026-09-22T10:30",
+            "nombre": "Luis",
+            "medico": "Adrian Artigas",
+        },
+    )
+    assert res.status_code == 400
+    assert res.json()["code"] == "ineligible_tipo"
+
+    listed = client.get("/api/solicitudes")
+    assert listed.status_code == 200
+    by_id = {s["id"]: s for s in listed.json()["solicitudes"]}
+    assert by_id[1]["can_confirm"] is True
+    assert by_id[1]["tipo"] == "turno"
+    assert by_id[3]["can_confirm"] is False
+    assert by_id[3]["tipo"] == "reprogramar"
+
+
 def test_confirm_not_found(client):
     res = client.post(
         "/api/solicitudes/999/confirm",
