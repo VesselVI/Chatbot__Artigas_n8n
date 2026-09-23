@@ -10,6 +10,7 @@ from typing import Any
 CONFIRMABLE_TIPOS = frozenset({"turno"})
 CONFIRMED_STATUS = "confirmed"
 PENDING_STATUS = "pending"
+CANCELLED_STATUS = "cancelled"
 
 
 class ConfirmError(ValueError):
@@ -28,8 +29,11 @@ def normalize_tipo(value: Any) -> str:
 
 
 def status_badge_label(status: Any, tipo: Any) -> str | None:
-    """UI badge for a confirmed solicitud; None if still pending / other."""
-    if str(status or "").strip().lower() != CONFIRMED_STATUS:
+    """UI badge for confirmed / cancelled solicitudes; None if still pending / other."""
+    st = str(status or "").strip().lower()
+    if st == CANCELLED_STATUS:
+        return "Cancelado"
+    if st != CONFIRMED_STATUS:
         return None
     if normalize_tipo(tipo) == "reprogramar":
         return "Reprogramado"

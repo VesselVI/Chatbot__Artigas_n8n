@@ -471,6 +471,7 @@
     .badge-solicitud { background: #f0ebf8; color: #5c3d9a; border-color: #c4b3e0; }
     .badge-confirmado { background: #e6f5ec; color: #176b42; border-color: #9bcfb0; }
     .badge-estado-reprogramado { background: #f9e8f1; color: #9b2d6e; border-color: #e0a8c4; }
+    .badge-cancelado { background: #fceceb; color: var(--danger); border-color: #e8a8a1; }
     .badge-pendiente { background: #f2f4f6; color: var(--muted); border-color: #cfd6dd; }
     .badge-pendiente::before { opacity: 0.45; }
 
@@ -916,6 +917,38 @@
     .btn-board-reprogramar:focus-visible {
       outline: none;
       box-shadow: var(--focus-ring);
+    }
+
+    .btn-board-cancelar {
+      appearance: none;
+      border: 1px solid #e8a8a1;
+      background: #fceceb;
+      color: var(--danger);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      line-height: 1.2;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-board-cancelar:hover {
+        background: #f8d9d6;
+        border-color: var(--danger);
+      }
+    }
+    .btn-board-cancelar:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+    .btn-cancelar-row {
+      color: #fff;
+      background: var(--danger);
+      border: 1px solid var(--danger);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-cancelar-row:hover { background: #912018; border-color: #912018; }
     }
 
     .btn-reenviar {
@@ -1509,6 +1542,9 @@
               <button type="button" class="btn-board-reprogramar" id="board-reprogramar-btn">
                 Reprogramar
               </button>
+              <button type="button" class="btn-board-cancelar" id="board-cancelar-btn">
+                Cancelar
+              </button>
               <span class="status-pill" id="solicitudes-status" aria-live="polite">Cargando…</span>
               <button class="btn-refresh" id="refresh-btn" type="button">Actualizar</button>
             </div>
@@ -1525,6 +1561,7 @@
             <span class="badge-estado badge-pendiente">pendiente</span>
             <span class="badge-estado badge-confirmado">Confirmado</span>
             <span class="badge-estado badge-estado-reprogramado">Reprogramado</span>
+            <span class="badge-estado badge-cancelado">Cancelado</span>
           </div>
           <div class="solicitudes-scroll" tabindex="0" aria-label="Tabla de solicitudes">
             <table class="solicitudes-table">
@@ -1659,6 +1696,49 @@
             <div class="modal-footer">
               <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancelar</button>
               <button type="button" class="btn btn-primary" id="confirm-submit">Confirmar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cancelación desde el panel modal (#12) -->
+      <div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="cancelModalLabel">Cancelación de turno</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <div id="cancel-alert"></div>
+              <input type="hidden" id="cancel-id">
+              <div class="mb-3" id="cancel-search-wrap" hidden>
+                <label class="form-label" for="cancel-patient-search">Buscar paciente</label>
+                <input
+                  type="search"
+                  class="form-control"
+                  id="cancel-patient-search"
+                  placeholder="Nombre o teléfono…"
+                  autocomplete="off"
+                  spellcheck="false"
+                >
+                <div class="patient-suggest" id="cancel-patient-suggest" role="listbox" hidden></div>
+                <div class="form-text">
+                  Elegí una solicitud, o un teléfono nuevo para abrir conversación en Chatwoot.
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="cancel-nombre">Nombre</label>
+                <input type="text" class="form-control" id="cancel-nombre" autocomplete="name">
+              </div>
+              <div class="mb-0">
+                <div class="wa-preview-label">Vista previa (plantilla cancelacion_turno)</div>
+                <div class="wa-bubble is-empty" id="cancel-wa-preview" aria-live="polite">Completá el nombre para ver la plantilla.</div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cerrar</button>
+              <button type="button" class="btn btn-danger" id="cancel-submit">Cancelar turno</button>
             </div>
           </div>
         </div>
@@ -2002,6 +2082,7 @@
     const ICO = {
       calendarCheck: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>',
       calendarClock: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 14v2.2l1.6 1"/><path d="M16 2v4"/><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M3 10h5"/><path d="M8 2v4"/><circle cx="16" cy="16" r="6"/></svg>',
+      ban: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>',
       send: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>',
       squarePen: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg>',
       messages: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>'
@@ -2026,7 +2107,7 @@
       } else {
         const cls = b.status_badge === 'Reprogramado'
           ? 'badge-estado-reprogramado'
-          : 'badge-confirmado';
+          : (b.status_badge === 'Cancelado' ? 'badge-cancelado' : 'badge-confirmado');
         html = `<span class="badge-estado ${cls}">${escapeHtml(b.status_badge)}</span>`;
       }
       if (b.fallo_al_enviar) {
@@ -2052,6 +2133,9 @@
       }
       if (b.can_reprogramar) {
         parts.push(`<button type="button" class="btn-action btn-reprogramar" data-reprogramar-id="${b.id}" aria-label="Reprogramar">${ICO.calendarClock}<span class="btn-tip" aria-hidden="true">Reprogramar</span></button>`);
+      }
+      if (b.can_cancelar) {
+        parts.push(`<button type="button" class="btn-action btn-cancelar-row" data-cancelar-id="${b.id}" aria-label="Cancelar turno">${ICO.ban}<span class="btn-tip" aria-hidden="true">Cancelar turno</span></button>`);
       }
       if (b.can_reenviar) {
         parts.push(`<button type="button" class="btn-action btn-reenviar" data-reenviar-id="${b.id}" aria-label="Reenviar">${ICO.send}<span class="btn-tip" aria-hidden="true">Reenviar</span></button>`);
@@ -2108,7 +2192,9 @@
     }
 
     let confirmModal;
+    let cancelModal;
     let confirmDraft = null;
+    let cancelDraft = null;
     let solicitudesCache = [];
     let solicitudesGroups = [];
 
@@ -2468,6 +2554,12 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
           if (flat) openConfirmModal(flat, { reprogram: true });
         });
       });
+      tbody.querySelectorAll('[data-cancelar-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const flat = findSolicitud(Number(btn.getAttribute('data-cancelar-id')));
+          if (flat) openCancelModal(flat, { searchFirst: false });
+        });
+      });
       tbody.querySelectorAll('[data-edit-id]').forEach(btn => {
         btn.addEventListener('click', () => {
           const flat = findSolicitud(Number(btn.getAttribute('data-edit-id')));
@@ -2635,6 +2727,239 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
     document.getElementById('board-reprogramar-btn')?.addEventListener('click', () => {
       openConfirmModal(null, { reprogram: true, searchFirst: true });
     });
+    document.getElementById('board-cancelar-btn')?.addEventListener('click', () => {
+      openCancelModal(null, { searchFirst: true });
+    });
+
+    function updateCancelPreview() {
+      const preview = document.getElementById('cancel-wa-preview');
+      if (!preview) return;
+      const nombre = (document.getElementById('cancel-nombre').value || '').trim();
+      if (!nombre) {
+        preview.textContent = 'Completá el nombre para ver la plantilla.';
+        preview.classList.add('is-empty');
+        return;
+      }
+      preview.textContent =
+        `Plantilla cancelacion_turno (es_AR)\n\nNombre: ${nombre}\n\n` +
+        'Se envía siempre como utility — sin mensaje libre.';
+      preview.classList.remove('is-empty');
+    }
+
+    function syncCancelSubmitEnabled() {
+      const btn = document.getElementById('cancel-submit');
+      if (!btn) return;
+      if (cancelDraft && cancelDraft._searchFirst) {
+        const id = (document.getElementById('cancel-id').value || '').trim();
+        const cold = !!(cancelDraft._coldPhone);
+        const nombre = (document.getElementById('cancel-nombre').value || '').trim();
+        btn.disabled = !(nombre && (id || cold));
+      } else {
+        const nombre = (document.getElementById('cancel-nombre').value || '').trim();
+        btn.disabled = !nombre;
+      }
+    }
+
+    function openCancelModal(b, { searchFirst } = {}) {
+      const empty = !b || !b.id;
+      cancelDraft = Object.assign({}, b || {}, {
+        _searchFirst: !!searchFirst,
+        _coldPhone: null,
+      });
+      document.getElementById('cancelModalLabel').textContent = searchFirst
+        ? 'Cancelar — buscar paciente'
+        : 'Cancelación de turno';
+      document.getElementById('cancel-id').value = empty ? '' : b.id;
+      document.getElementById('cancel-nombre').value =
+        (!empty && b.nombre && b.nombre !== '-') ? b.nombre : '';
+      const searchWrap = document.getElementById('cancel-search-wrap');
+      if (searchWrap) searchWrap.hidden = !searchFirst;
+      const searchInput = document.getElementById('cancel-patient-search');
+      const suggest = document.getElementById('cancel-patient-suggest');
+      if (searchInput) searchInput.value = '';
+      if (suggest) {
+        suggest.innerHTML = '';
+        suggest.hidden = true;
+      }
+      document.getElementById('cancel-alert').innerHTML = '';
+      updateCancelPreview();
+      syncCancelSubmitEnabled();
+      if (!cancelModal) {
+        cancelModal = new bootstrap.Modal(document.getElementById('cancelModal'));
+      }
+      cancelModal.show();
+      if (searchFirst && searchInput) setTimeout(() => searchInput.focus(), 200);
+    }
+
+    function bindCancelFromHit(hit) {
+      if (!hit || !hit.id) return;
+      if (hit.can_cancelar === false) {
+        document.getElementById('cancel-alert').innerHTML =
+          '<div class="alert alert-warning py-2">Esa solicitud no admite Cancelar.</div>';
+        return;
+      }
+      cancelDraft = Object.assign({}, hit, { _searchFirst: true, _coldPhone: null });
+      document.getElementById('cancel-id').value = hit.id;
+      document.getElementById('cancel-nombre').value =
+        (hit.nombre && hit.nombre !== '-') ? hit.nombre : '';
+      const suggest = document.getElementById('cancel-patient-suggest');
+      if (suggest) {
+        suggest.innerHTML = '';
+        suggest.hidden = true;
+      }
+      const searchInput = document.getElementById('cancel-patient-search');
+      if (searchInput) {
+        const tel = hit.telefono_contacto || hit.phone || '';
+        searchInput.value = `${hit.nombre || ''} · ${tel}`.trim();
+      }
+      document.getElementById('cancel-alert').innerHTML = '';
+      updateCancelPreview();
+      syncCancelSubmitEnabled();
+    }
+
+    function bindCancelColdPhone(phoneRaw) {
+      const digits = digitsOnly(phoneRaw);
+      if (digits.length < 8) return;
+      cancelDraft = Object.assign({}, cancelDraft || {}, {
+        _searchFirst: true,
+        _coldPhone: digits,
+      });
+      document.getElementById('cancel-id').value = '';
+      const searchInput = document.getElementById('cancel-patient-search');
+      if (searchInput) searchInput.value = phoneRaw.trim();
+      const suggest = document.getElementById('cancel-patient-suggest');
+      if (suggest) {
+        suggest.innerHTML = '';
+        suggest.hidden = true;
+      }
+      document.getElementById('cancel-alert').innerHTML =
+        '<div class="alert alert-info py-2">Teléfono nuevo: se abrirá conversación en Chatwoot al cancelar.</div>';
+      syncCancelSubmitEnabled();
+    }
+
+    let cancelSearchTimer = null;
+    async function runCancelPatientSearch(q) {
+      const suggest = document.getElementById('cancel-patient-suggest');
+      if (!suggest) return;
+      const query = (q || '').trim();
+      if (query.length < 2) {
+        suggest.innerHTML = '';
+        suggest.hidden = true;
+        return;
+      }
+      try {
+        const res = await fetch(
+          '/api/solicitudes/search?q=' + encodeURIComponent(query) + '&_=' + Date.now(),
+          { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }
+        );
+        if (!res.ok) throw new Error('search failed');
+        const data = await res.json();
+        const items = data.solicitudes || [];
+        if (!items.length) {
+          if (looksLikePhoneQuery(query)) {
+            const safe = escapeHtml(query.trim());
+            suggest.innerHTML =
+              `<button type="button" class="patient-suggest-item" id="cancel-cold-phone-pick" role="option">` +
+              `<span class="patient-suggest-name">Usar teléfono ${safe}</span>` +
+              `<span class="patient-suggest-meta">Abrir conversación en Chatwoot</span>` +
+              `</button>`;
+            suggest.hidden = false;
+            document.getElementById('cancel-cold-phone-pick')?.addEventListener('click', () => {
+              bindCancelColdPhone(query);
+            });
+            return;
+          }
+          suggest.innerHTML =
+            '<div class="patient-suggest-meta" style="padding:0.55rem 0.75rem">Sin coincidencias.</div>';
+          suggest.hidden = false;
+          return;
+        }
+        suggest.innerHTML = items.map((s) => {
+          const tel = escapeHtml(s.telefono_contacto || s.phone || '');
+          const nombre = escapeHtml(s.nombre || '—');
+          const badge = s.status_badge
+            ? escapeHtml(s.status_badge)
+            : escapeHtml(s.status || 'pending');
+          const disabled = s.can_cancelar ? '' : ' is-disabled';
+          return (
+            `<button type="button" class="patient-suggest-item${disabled}" data-cancel-hit-id="${s.id}" role="option">` +
+            `<span class="patient-suggest-name">${nombre}</span>` +
+            `<span class="patient-suggest-meta">${tel} · ${escapeHtml(s.tipo || '')} · ${badge}</span>` +
+            `</button>`
+          );
+        }).join('');
+        suggest.hidden = false;
+        suggest.querySelectorAll('[data-cancel-hit-id]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const id = Number(btn.getAttribute('data-cancel-hit-id'));
+            const hit = items.find((x) => x.id === id);
+            if (hit) bindCancelFromHit(hit);
+          });
+        });
+      } catch (err) {
+        suggest.innerHTML =
+          '<div class="patient-suggest-meta" style="padding:0.55rem 0.75rem">No se pudo buscar.</div>';
+        suggest.hidden = false;
+      }
+    }
+
+    document.getElementById('cancel-patient-search')?.addEventListener('input', (ev) => {
+      if (cancelDraft && cancelDraft._searchFirst) {
+        document.getElementById('cancel-id').value = '';
+        cancelDraft._coldPhone = null;
+        syncCancelSubmitEnabled();
+      }
+      clearTimeout(cancelSearchTimer);
+      cancelSearchTimer = setTimeout(() => runCancelPatientSearch(ev.target.value), 220);
+    });
+    document.getElementById('cancel-nombre')?.addEventListener('input', () => {
+      updateCancelPreview();
+      syncCancelSubmitEnabled();
+    });
+    document.getElementById('cancel-submit')?.addEventListener('click', async () => {
+      const btn = document.getElementById('cancel-submit');
+      const alertEl = document.getElementById('cancel-alert');
+      btn.disabled = true;
+      alertEl.innerHTML = '';
+      try {
+        const nombre = (document.getElementById('cancel-nombre').value || '').trim();
+        if (!nombre) throw new Error('Falta el nombre del paciente.');
+        const payload = { nombre };
+        let url;
+        if (cancelDraft && cancelDraft._searchFirst) {
+          const boundId = (document.getElementById('cancel-id').value || '').trim();
+          if (boundId) payload.solicitud_id = Number(boundId);
+          else if (cancelDraft._coldPhone) payload.phone = cancelDraft._coldPhone;
+          else throw new Error('Buscá y elegí un paciente, o un teléfono nuevo.');
+          url = '/api/solicitudes/cancelar';
+        } else {
+          const id = document.getElementById('cancel-id').value;
+          url = '/api/solicitudes/' + encodeURIComponent(id) + '/cancelar';
+        }
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'No se pudo cancelar');
+        if (data.whatsapp_warning) {
+          alertEl.innerHTML = `<div class="alert alert-warning py-2">${escapeHtml(data.whatsapp_warning)}</div>`;
+        }
+        if (data.whatsapp_send_status === 'failed') {
+          alertEl.innerHTML = `<div class="alert alert-danger py-2">Fallo al enviar: ${escapeHtml(data.whatsapp_warning || 'error')}</div>`;
+        }
+        if (cancelModal && data.whatsapp_send_status !== 'failed') {
+          cancelModal.hide();
+        }
+        await loadSolicitudes();
+      } catch (err) {
+        alertEl.innerHTML = `<div class="alert alert-danger py-2">${escapeHtml(err.message || 'Error')}</div>`;
+      } finally {
+        syncCancelSubmitEnabled();
+      }
+    });
+
     document.getElementById('patient-search')?.addEventListener('input', (ev) => {
       const q = ev.target.value;
       // Typing again clears bound id / cold phone until a new pick.

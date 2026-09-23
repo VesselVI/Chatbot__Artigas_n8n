@@ -241,6 +241,25 @@ def send_reprogramacion(
     )
 
 
+def send_cancelacion(
+    conversation_id: Any,
+    *,
+    nombre: str,
+    template_name: str = "cancelacion_turno",
+    opener: Callable[..., Any] | None = None,
+) -> SendResult:
+    """
+    Cancelación desde el panel — always Meta utility plantilla (ADR-0005).
+    Never free-form. body_params: [nombre].
+    """
+    return send_utility_template(
+        conversation_id,
+        template_name=template_name or "cancelacion_turno",
+        body_params=[nombre],
+        opener=opener,
+    )
+
+
 def send_private_note(
     conversation_id: Any,
     content: str,

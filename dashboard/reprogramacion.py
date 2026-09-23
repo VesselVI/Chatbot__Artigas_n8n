@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from confirmacion import (
+    CANCELLED_STATUS,
     CONFIRMED_STATUS,
     ConfirmError,
     PENDING_STATUS,
@@ -58,6 +59,11 @@ def assert_reprogramable(row: dict[str, Any] | None) -> dict[str, Any]:
         raise ConfirmError("Solicitud no encontrada.", code="not_found")
     tipo = normalize_tipo(row.get("tipo"))
     status = str(row.get("status") or PENDING_STATUS).strip().lower()
+    if status == CANCELLED_STATUS:
+        raise ConfirmError(
+            "No se puede reprogramar una solicitud cancelada.",
+            code="ineligible_reprogram",
+        )
     if status == PENDING_STATUS and tipo == "reprogramar":
         return row
     if status == CONFIRMED_STATUS and tipo in ("turno", "reprogramar"):

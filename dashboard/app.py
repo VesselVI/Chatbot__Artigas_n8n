@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from confirmacion import (
+    CANCELLED_STATUS,
     CONFIRMABLE_TIPOS,
     CONFIRMED_STATUS,
     ConfirmError,
@@ -22,12 +23,19 @@ from confirmacion import (
 from chatwoot_send import (
     ChatwootSendError,
     ensure_whatsapp_conversation,
+    send_cancelacion,
     send_confirmacion,
     send_private_note,
     send_reprogramacion,
 )
 from mensajes import build_outbound_message, format_dia_hora_display
 from busqueda import filter_solicitudes_by_query, normalize_phone_e164
+from cancelacion import (
+    CANCEL_TEMPLATE,
+    assert_cancelable,
+    can_cancel,
+    validate_cancel_payload,
+)
 from reprogramacion import (
     REPROGRAM_TEMPLATE,
     assert_reprogramable,
@@ -619,6 +627,64 @@ def insert_solicitud_reprogramacion(fields: dict[str, Any]) -> int:
         conn.close()
 
 
+def insert_solicitud_cancelacion(fields: dict[str, Any]) -> int:
+    """Insert a new solicitud for cold-open Cancelación (#12). Returns new id."""
+    conn = get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        has_send = _column_exists(cur, "turno_solicitudes", "whatsapp_send_status")
+        has_tipo = _column_exists(cur, "turno_solicitudes", "tipo")
+        cols = [
+            "phone",
+            "nombre",
+            "dni",
+            "obra_social",
+            "telefono_contacto",
+            "medico",
+            "horario_preferido",
+            "status",
+            "conversation_id",
+        ]
+        vals: list[Any] = [
+            fields["phone"],
+            fields["nombre"],
+            fields.get("dni") or "",
+            fields.get("obra_social") or "",
+            fields.get("telefono_contacto") or fields["phone"],
+            fields.get("medico") or "",
+            fields.get("horario_preferido") or "Cancelación desde el panel",
+            fields.get("status") or CANCELLED_STATUS,
+            fields.get("conversation_id"),
+        ]
+        if has_tipo:
+            cols.append("tipo")
+            vals.append(fields.get("tipo") or "cancelar")
+        if has_send:
+            cols.extend(
+                [
+                    "whatsapp_send_status",
+                    "whatsapp_send_channel",
+                    "whatsapp_nota_omitted",
+                ]
+            )
+            vals.extend(
+                [
+                    fields.get("whatsapp_send_status"),
+                    fields.get("whatsapp_send_channel"),
+                    1 if fields.get("whatsapp_nota_omitted") else 0,
+                ]
+            )
+        placeholders = ", ".join(["%s"] * len(cols))
+        cur.execute(
+            f"INSERT INTO turno_solicitudes ({', '.join(cols)}) VALUES ({placeholders})",
+            tuple(vals),
+        )
+        conn.commit()
+        return int(cur.lastrowid)
+    finally:
+        conn.close()
+
+
 def _format_appointment_at(value: Any) -> str | None:
     if value is None:
         return None
@@ -668,6 +734,7 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
     send_channel = str(r.get("whatsapp_send_channel") or "").strip().lower() or None
     nota_omitted = bool(int(r.get("whatsapp_nota_omitted") or 0))
     is_confirmed = status.lower() == CONFIRMED_STATUS
+    is_cancelled = status.lower() == CANCELLED_STATUS
     can_confirm = status.lower() == "pending" and tipo in CONFIRMABLE_TIPOS
     appointment_date = appointment_at[:10] if appointment_at and len(appointment_at) >= 10 else None
     return {
@@ -692,10 +759,13 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
         "status_badge": status_badge_label(status, tipo),
         "can_confirm": can_confirm,
         "can_reprogramar": can_reprogram(r),
+        "can_cancelar": can_cancel(r),
         "can_edit_resend": (
             is_confirmed and send_status == "sent" and tipo in CONFIRMABLE_TIPOS
         ),
-        "can_reenviar": is_confirmed and send_status == "failed",
+        "can_reenviar": (
+            (is_confirmed or is_cancelled) and send_status == "failed"
+        ),
         "whatsapp_send_status": send_status,
         "whatsapp_send_channel": send_channel,
         "whatsapp_nota_omitted": nota_omitted,
@@ -1030,6 +1100,170 @@ def _execute_reprogramacion(body: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+@app.post("/api/solicitudes/cancelar")
+@login_required
+async def api_cancelar_cold_or_selected(request: Request):
+    """Board / cold-open Cancelación (#12)."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Cuerpo inválido.", "code": "invalid_body"},
+            status_code=400,
+        )
+    if not isinstance(body, dict):
+        return JSONResponse(
+            {"ok": False, "error": "Cuerpo inválido.", "code": "invalid_body"},
+            status_code=400,
+        )
+    try:
+        return _execute_cancelacion(body)
+    except ConfirmError as e:
+        status = 404 if e.code == "not_found" else 400
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code},
+            status_code=status,
+        )
+    except ChatwootSendError as e:
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code or "ensure_failed"},
+            status_code=400,
+        )
+
+
+@app.post("/api/solicitudes/{solicitud_id}/cancelar")
+@login_required
+async def api_cancelar_solicitud(request: Request, solicitud_id: int):
+    """Cancelación desde el panel on an existing solicitud (#12)."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Cuerpo inválido.", "code": "invalid_body"},
+            status_code=400,
+        )
+    if not isinstance(body, dict):
+        body = {}
+    body = {**body, "solicitud_id": solicitud_id}
+    try:
+        return _execute_cancelacion(body)
+    except ConfirmError as e:
+        status = 404 if e.code == "not_found" else 400
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code},
+            status_code=status,
+        )
+    except ChatwootSendError as e:
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code or "ensure_failed"},
+            status_code=400,
+        )
+
+
+def _execute_cancelacion(body: dict[str, Any]) -> dict[str, Any]:
+    """Shared cancel: ensure conversation → persist cancelled → plantilla → note."""
+    payload = validate_cancel_payload(body)
+    raw_sid = body.get("solicitud_id")
+    solicitud_id = int(raw_sid) if raw_sid not in (None, "", 0, "0") else None
+    created = False
+    conversation_id: str | None = None
+    phone = ""
+    medico = ""
+
+    if solicitud_id is not None:
+        existing = fetch_solicitud(solicitud_id)
+        row = assert_cancelable(existing)
+        phone = normalize_phone_e164(
+            body.get("phone") or row.get("telefono_contacto") or row.get("phone")
+        ) or normalize_phone_e164(row.get("phone"))
+        conversation_id = str(row.get("conversation_id") or "").strip() or None
+        medico = str(row.get("medico") or "").strip()
+        if not payload["nombre"] or payload["nombre"] == "-":
+            payload["nombre"] = str(row.get("nombre") or "").strip()
+    else:
+        phone = normalize_phone_e164(body.get("phone") or body.get("telefono"))
+        if len(phone) < 8:
+            raise ConfirmError(
+                "Falta un teléfono válido para abrir la conversación.",
+                code="missing_phone",
+            )
+        medico = str(body.get("medico") or "").strip()
+
+    if not conversation_id:
+        ensured = ensure_whatsapp_conversation(
+            phone=phone,
+            nombre=payload["nombre"],
+        )
+        conversation_id = str(ensured["conversation_id"])
+
+    fields = {
+        "nombre": payload["nombre"],
+        "medico": medico,
+        "tipo": "cancelar",
+        "status": CANCELLED_STATUS,
+        "conversation_id": conversation_id,
+    }
+
+    if solicitud_id is None:
+        solicitud_id = insert_solicitud_cancelacion(
+            {
+                **fields,
+                "phone": phone,
+                "telefono_contacto": phone,
+            }
+        )
+        created = True
+    else:
+        save_solicitud_confirmacion(solicitud_id, fields)
+
+    send_outcome = _attempt_cancel_send(
+        conversation_id,
+        nombre=payload["nombre"],
+    )
+    save_solicitud_confirmacion(
+        solicitud_id,
+        {
+            **fields,
+            "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+            "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+            "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+        },
+    )
+    note = (
+        "Cancelación desde el panel — "
+        f"{payload['nombre']}. "
+        f"WhatsApp: {send_outcome['whatsapp_send_status']}."
+    )
+    try:
+        send_private_note(conversation_id, note)
+    except ChatwootSendError as e:
+        if not send_outcome.get("whatsapp_warning"):
+            send_outcome["whatsapp_warning"] = f"Nota privada: {e}"
+
+    preview = (
+        f"Plantilla cancelacion_turno\n"
+        f"Nombre: {payload['nombre']}\n"
+        f"(utility es_AR)"
+    )
+    return {
+        "ok": True,
+        "id": solicitud_id,
+        "created": created,
+        "tipo": "cancelar",
+        "status": CANCELLED_STATUS,
+        "status_badge": status_badge_label(CANCELLED_STATUS, "cancelar"),
+        "nombre": payload["nombre"],
+        "phone": phone or None,
+        "conversation_id": conversation_id,
+        "whatsapp_sent": send_outcome["whatsapp_send_status"] == "sent",
+        "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+        "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+        "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+        "whatsapp_warning": send_outcome.get("whatsapp_warning"),
+        "message_preview": preview,
+    }
+
+
 @app.post("/api/solicitudes/{solicitud_id}/reenviar")
 @login_required
 async def api_reenviar_solicitud(request: Request, solicitud_id: int):
@@ -1040,11 +1274,12 @@ async def api_reenviar_solicitud(request: Request, solicitud_id: int):
             {"ok": False, "error": "Solicitud no encontrada.", "code": "not_found"},
             status_code=404,
         )
-    if str(row.get("status") or "").lower() != CONFIRMED_STATUS:
+    status = str(row.get("status") or "").lower()
+    if status not in (CONFIRMED_STATUS, CANCELLED_STATUS):
         return JSONResponse(
             {
                 "ok": False,
-                "error": "Solo se reenvía un turno confirmado.",
+                "error": "Solo se reenvía un turno confirmado o cancelado.",
                 "code": "not_confirmed",
             },
             status_code=400,
@@ -1059,7 +1294,57 @@ async def api_reenviar_solicitud(request: Request, solicitud_id: int):
             status_code=400,
         )
     tipo = normalize_tipo(row.get("tipo"))
+    nombre = str(row.get("nombre") or "").strip()
+    medico = str(row.get("medico") or "").strip()
+    nota = str(row.get("nota_paciente") or "").strip()
+    por_orden = bool(int(row.get("por_orden_de_llegada") or 0))
     appointment_at = row.get("appointment_at")
+    conversation_id = str(row.get("conversation_id") or "").strip() or None
+
+    if status == CANCELLED_STATUS or tipo == "cancelar":
+        if not conversation_id:
+            phone = normalize_phone_e164(row.get("telefono_contacto") or row.get("phone"))
+            try:
+                ensured = ensure_whatsapp_conversation(phone=phone, nombre=nombre)
+                conversation_id = str(ensured["conversation_id"])
+            except ChatwootSendError as e:
+                return JSONResponse(
+                    {"ok": False, "error": str(e), "code": e.code or "ensure_failed"},
+                    status_code=400,
+                )
+        send_outcome = _attempt_cancel_send(conversation_id, nombre=nombre)
+        save_solicitud_confirmacion(
+            solicitud_id,
+            {
+                "nombre": nombre,
+                "medico": medico,
+                "status": CANCELLED_STATUS,
+                "tipo": "cancelar",
+                "conversation_id": conversation_id,
+                "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+                "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+                "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+            },
+        )
+        try:
+            send_private_note(
+                conversation_id,
+                "Cancelación desde el panel (reenvío) — "
+                f"{nombre}. WhatsApp: {send_outcome['whatsapp_send_status']}.",
+            )
+        except ChatwootSendError:
+            pass
+        return {
+            "ok": True,
+            "id": solicitud_id,
+            "whatsapp_sent": send_outcome["whatsapp_send_status"] == "sent",
+            "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+            "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+            "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+            "whatsapp_warning": send_outcome.get("whatsapp_warning"),
+            "message_preview": f"Plantilla cancelacion_turno\nNombre: {nombre}",
+        }
+
     if not appointment_at:
         return JSONResponse(
             {
@@ -1069,10 +1354,6 @@ async def api_reenviar_solicitud(request: Request, solicitud_id: int):
             },
             status_code=400,
         )
-    nombre = str(row.get("nombre") or "").strip()
-    medico = str(row.get("medico") or "").strip()
-    nota = str(row.get("nota_paciente") or "").strip()
-    por_orden = bool(int(row.get("por_orden_de_llegada") or 0))
     message = build_outbound_message(
         tipo,
         nombre=nombre,
@@ -1082,7 +1363,6 @@ async def api_reenviar_solicitud(request: Request, solicitud_id: int):
         include_nota=(tipo != "reprogramar"),
         por_orden_de_llegada=por_orden,
     )
-    conversation_id = str(row.get("conversation_id") or "").strip() or None
     if tipo == "reprogramar" and not conversation_id:
         phone = normalize_phone_e164(row.get("telefono_contacto") or row.get("phone"))
         try:
@@ -1213,6 +1493,33 @@ def _attempt_reprogram_send(
             medico=medico,
             dia_hora_display=dia_hora,
             template_name=REPROGRAM_TEMPLATE,
+        )
+        return {
+            "whatsapp_send_status": "sent",
+            "whatsapp_send_channel": result.channel,
+            "whatsapp_nota_omitted": result.nota_omitted,
+            "whatsapp_warning": None,
+        }
+    except ChatwootSendError as e:
+        return {
+            "whatsapp_send_status": "failed",
+            "whatsapp_send_channel": None,
+            "whatsapp_nota_omitted": False,
+            "whatsapp_warning": str(e),
+        }
+
+
+def _attempt_cancel_send(
+    conversation_id: Any,
+    *,
+    nombre: str,
+) -> dict[str, Any]:
+    """Always utility plantilla cancelacion_turno (ADR-0005)."""
+    try:
+        result = send_cancelacion(
+            conversation_id,
+            nombre=nombre,
+            template_name=CANCEL_TEMPLATE,
         )
         return {
             "whatsapp_send_status": "sent",
