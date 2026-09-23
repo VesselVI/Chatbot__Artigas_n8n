@@ -385,30 +385,28 @@ IMPORTANTE: este mensaje confirma su turno. Por favor no vaya a la clínica hast
 Escribí menú para volver.
 ```
 
-### Reprogramación (versión C)
+### Reprogramación — panel (`confirmacion_reprogramacion`)
 
-- Title: `Confirmación reprogramación`
+- Name: `confirmacion_reprogramacion` (es_AR, UTILITY)
+- Header: `TURNO REPROGRAMADO`
+- Dashboard `body_params` (numbered): `{{1}}` = nombre, `{{2}}` = médico, `{{3}}` = nuevo día y hora
 
 ```text
-✅ Turno reprogramado
+Nombre: {{1}}
+Médico: {{2}}
+Nuevo día y hora: {{3}}
 
-Nombre: {{nombre}}
-Médico: {{medico}}
-Nuevo día y hora: {{dia_hora}}
-
-Su turno anterior fue cancelado. Agende este nuevo horario.
-Escribí menú para volver.
+Su turno ha sido reprogramado. Agende este nuevo horario. Escribí menú para volver.
 ```
 
-### Cancelación
+### Cancelación — panel (`cancelacion_turno`)
 
-- Title: `Confirmación cancelación turno`
+- Name: `cancelacion_turno` (es_AR, UTILITY)
+- Header: `Turno cancelado`
+- Dashboard sends **no** body variables (fixed copy)
 
 ```text
-Hola {{nombre}}, confirmamos la cancelación de tu turno.
-
-DNI registrado: {{dni}}.
-Si querés reprogramar, respondé por este chat y te ayudamos.
+Su turno ha sido cancelado. Comuníquese de nuevo por este chat si desea agendar otro.
 ```
 
 ### Booking smoke (no día/hora step)

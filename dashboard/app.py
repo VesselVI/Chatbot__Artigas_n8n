@@ -1342,7 +1342,12 @@ async def api_reenviar_solicitud(request: Request, solicitud_id: int):
             "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
             "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
             "whatsapp_warning": send_outcome.get("whatsapp_warning"),
-            "message_preview": f"Plantilla cancelacion_turno\nNombre: {nombre}",
+            "message_preview": (
+                "Plantilla cancelacion_turno\n"
+                "Turno cancelado\n"
+                "Su turno ha sido cancelado. Comuníquese de nuevo por este chat "
+                "si desea agendar otro."
+            ),
         }
 
     if not appointment_at:

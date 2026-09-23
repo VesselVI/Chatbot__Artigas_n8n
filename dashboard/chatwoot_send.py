@@ -231,7 +231,9 @@ def send_reprogramacion(
 ) -> SendResult:
     """
     Reprogramación desde el panel — always Meta utility plantilla (ADR-0005).
-    Never free-form. body_params: [nombre, medico, dia_hora].
+    Never free-form.
+    WABA: confirmacion_reprogramacion (es_AR), numbered body vars:
+      {{1}} = nombre, {{2}} = médico, {{3}} = nuevo día y hora.
     """
     return send_utility_template(
         conversation_id,
@@ -244,18 +246,21 @@ def send_reprogramacion(
 def send_cancelacion(
     conversation_id: Any,
     *,
-    nombre: str,
+    nombre: str = "",
     template_name: str = "cancelacion_turno",
     opener: Callable[..., Any] | None = None,
 ) -> SendResult:
     """
     Cancelación desde el panel — always Meta utility plantilla (ADR-0005).
-    Never free-form. body_params: [nombre].
+    Never free-form.
+    WABA: cancelacion_turno (es_AR) — fixed body, no variables.
+    `nombre` is accepted for call-site compatibility / audit only.
     """
+    _ = nombre  # not a Meta body variable on this plantilla
     return send_utility_template(
         conversation_id,
         template_name=template_name or "cancelacion_turno",
-        body_params=[nombre],
+        body_params=[],
         opener=opener,
     )
 

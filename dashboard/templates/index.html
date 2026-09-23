@@ -1689,7 +1689,7 @@
               </div>
 
               <div class="mb-0">
-                <div class="wa-preview-label">Vista previa del WhatsApp</div>
+                <div class="wa-preview-label" id="confirm-wa-preview-label">Vista previa del WhatsApp</div>
                 <div class="wa-bubble is-empty" id="wa-preview" aria-live="polite">Completá día (y hora si aplica) para ver el mensaje.</div>
               </div>
             </div>
@@ -1733,7 +1733,7 @@
               </div>
               <div class="mb-0">
                 <div class="wa-preview-label">Vista previa (plantilla cancelacion_turno)</div>
-                <div class="wa-bubble is-empty" id="cancel-wa-preview" aria-live="polite">Completá el nombre para ver la plantilla.</div>
+                <div class="wa-bubble is-empty" id="cancel-wa-preview" aria-live="polite">Plantilla fija — sin variables.</div>
               </div>
             </div>
             <div class="modal-footer">
@@ -2247,25 +2247,34 @@
         ? ''
         : (document.getElementById('confirm-nota').value || '').trim();
       const isReprog = isReprogramModal();
-      let diaLine = '';
+      let diaHora = '';
       if (mode === 'hora') {
         const date = document.getElementById('confirm-date').value;
         const time = document.getElementById('confirm-time').value;
         if (!date || !time) return null;
-        diaLine = isReprog
-          ? `Nuevo día y hora: ${formatDisplayDate(date)} ${time}`
-          : `Día y hora: ${formatDisplayDate(date)} ${time}`;
+        diaHora = `${formatDisplayDate(date)} ${time}`;
       } else {
         const date = document.getElementById('confirm-date-orden').value;
         if (!date) return null;
-        diaLine = isReprog
-          ? `Nuevo día: ${formatDisplayDate(date)} — Por orden de llegada`
-          : `Día: ${formatDisplayDate(date)} — Por orden de llegada`;
+        diaHora = `${formatDisplayDate(date)} — Por orden de llegada`;
       }
+      // Reprogramación: match Meta plantilla confirmacion_reprogramacion (es_AR).
+      if (isReprog) {
+        return [
+          'TURNO REPROGRAMADO',
+          '',
+          `Nombre: ${nombre}`,
+          `Médico: ${medico}`,
+          `Nuevo día y hora: ${diaHora}`,
+          '',
+          'Su turno ha sido reprogramado. Agende este nuevo horario. Escribí menú para volver.',
+        ].join('\n');
+      }
+      const diaLine = mode === 'hora'
+        ? `Día y hora: ${diaHora}`
+        : `Día: ${diaHora}`;
       const lines = [
-        mode === 'orden'
-          ? '👤 INFORMACION DEL TURNO'
-          : (isReprog ? '✅ TURNO REPROGRAMADO' : '✅ TURNO CONFIRMADO'),
+        mode === 'orden' ? '👤 INFORMACION DEL TURNO' : '✅ TURNO CONFIRMADO',
         '',
         `Nombre: ${nombre}`,
         `Médico: ${medico}`,
@@ -2275,15 +2284,11 @@
       lines.push('');
       if (mode === 'orden') {
         lines.push(
-          isReprog
-            ? 'Su turno anterior fue cancelado. Presentate el día indicado; te atenderán por orden de llegada. Escribí menú para volver.'
-            : 'Presentate el día indicado; te atenderán por orden de llegada. Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver.'
+          'Presentate el día indicado; te atenderán por orden de llegada. Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver.'
         );
       } else {
         lines.push(
-          isReprog
-            ? 'Su turno anterior fue cancelado. Agende este nuevo horario. Escribí menú para volver.'
-            : 'Te esperamos unos minutos antes del horario. Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver.'
+          'Te esperamos unos minutos antes del horario. Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver.'
         );
       }
       return lines.join('\n');
@@ -2342,6 +2347,12 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
       document.getElementById('confirm-submit').textContent = isReprog
         ? 'Reprogramar'
         : (edit ? 'Guardar y reenviar' : 'Confirmar');
+      const previewLabel = document.getElementById('confirm-wa-preview-label');
+      if (previewLabel) {
+        previewLabel.textContent = isReprog
+          ? 'Vista previa (plantilla confirmacion_reprogramacion)'
+          : 'Vista previa del WhatsApp';
+      }
       document.getElementById('confirm-id').value = empty ? '' : b.id;
       document.getElementById('confirm-nombre').value =
         (!empty && b.nombre && b.nombre !== '-') ? b.nombre : '';
@@ -2734,15 +2745,10 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
     function updateCancelPreview() {
       const preview = document.getElementById('cancel-wa-preview');
       if (!preview) return;
-      const nombre = (document.getElementById('cancel-nombre').value || '').trim();
-      if (!nombre) {
-        preview.textContent = 'Completá el nombre para ver la plantilla.';
-        preview.classList.add('is-empty');
-        return;
-      }
+      // Meta cancelacion_turno (es_AR): fixed header + body, no variables.
       preview.textContent =
-        `Plantilla cancelacion_turno (es_AR)\n\nNombre: ${nombre}\n\n` +
-        'Se envía siempre como utility — sin mensaje libre.';
+        'Turno cancelado\n\n' +
+        'Su turno ha sido cancelado. Comuníquese de nuevo por este chat si desea agendar otro.';
       preview.classList.remove('is-empty');
     }
 
