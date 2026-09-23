@@ -895,6 +895,29 @@
       .btn-reprogramar:hover { background: #7d2458; border-color: #7d2458; }
     }
 
+    .btn-board-reprogramar {
+      appearance: none;
+      border: 1px solid #e0a8c4;
+      background: #f9e8f1;
+      color: #9b2d6e;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      line-height: 1.2;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-board-reprogramar:hover {
+        background: #f3d5e6;
+        border-color: #9b2d6e;
+      }
+    }
+    .btn-board-reprogramar:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
     .btn-reenviar {
       color: #fff;
       background: var(--danger);
@@ -1041,6 +1064,48 @@
       margin: 0 0 1rem;
       padding: 0;
       border: 0;
+    }
+    .patient-suggest {
+      margin-top: 0.35rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      max-height: 12rem;
+      overflow: auto;
+      box-shadow: 0 8px 20px rgba(30, 42, 56, 0.08);
+    }
+    .patient-suggest[hidden] { display: none !important; }
+    .patient-suggest-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      padding: 0.55rem 0.75rem;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .patient-suggest-item:last-child { border-bottom: 0; }
+    .patient-suggest-item:hover,
+    .patient-suggest-item:focus-visible {
+      background: #f5f8fa;
+      outline: none;
+    }
+    .patient-suggest-item.is-disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .patient-suggest-name {
+      display: block;
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: var(--ink);
+    }
+    .patient-suggest-meta {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
     }
     .sched-legend {
       font-weight: 600;
@@ -1441,6 +1506,9 @@
           <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span>Cola de solicitudes</span>
             <div class="d-flex align-items-center gap-2 header-actions">
+              <button type="button" class="btn-board-reprogramar" id="board-reprogramar-btn">
+                Reprogramar
+              </button>
               <span class="status-pill" id="solicitudes-status" aria-live="polite">Cargando…</span>
               <button class="btn-refresh" id="refresh-btn" type="button">Actualizar</button>
             </div>
@@ -1509,6 +1577,23 @@
             <div class="modal-body">
               <div id="confirm-alert"></div>
               <input type="hidden" id="confirm-id">
+
+              <div class="mb-3" id="patient-search-wrap" hidden>
+                <label class="form-label" for="patient-search">Buscar paciente</label>
+                <input
+                  type="search"
+                  class="form-control"
+                  id="patient-search"
+                  placeholder="Nombre o teléfono…"
+                  autocomplete="off"
+                  spellcheck="false"
+                >
+                <div class="patient-suggest" id="patient-suggest" role="listbox" hidden></div>
+                <div class="form-text" id="patient-search-hint">
+                  Elegí una solicitud existente. Teléfonos nuevos se habilitan en un próximo paso.
+                </div>
+              </div>
+
               <div class="mb-3">
                 <label class="form-label" for="confirm-nombre">Nombre</label>
                 <input type="text" class="form-control" id="confirm-nombre" autocomplete="name">
@@ -2155,24 +2240,38 @@
       setSchedMode(porOrden ? 'orden' : 'hora');
     }
 
-function openConfirmModal(b, { edit, reprogram } = { edit: false, reprogram: false }) {
-      confirmDraft = Object.assign({}, b, {
-        _mode: reprogram ? 'reprogram' : (edit ? 'edit' : 'confirm'),
+function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
+      const empty = !b || !b.id;
+      confirmDraft = Object.assign({}, b || {}, {
+        _mode: reprogram || searchFirst ? 'reprogram' : (edit ? 'edit' : 'confirm'),
+        _searchFirst: !!searchFirst,
       });
       const isReprog = confirmDraft._mode === 'reprogram';
+      const isSearchFirst = !!confirmDraft._searchFirst;
       const title = isReprog
-        ? 'Reprogramación de turno'
+        ? (isSearchFirst ? 'Reprogramar — buscar paciente' : 'Reprogramación de turno')
         : (edit ? 'Editar y reenviar' : 'Confirmación de turno');
       document.getElementById('confirmModalLabel').textContent = title;
       document.getElementById('confirm-submit').textContent = isReprog
         ? 'Reprogramar'
         : (edit ? 'Guardar y reenviar' : 'Confirmar');
-      document.getElementById('confirm-id').value = b.id;
-      document.getElementById('confirm-nombre').value = (b.nombre && b.nombre !== '-') ? b.nombre : '';
-      document.getElementById('confirm-medico').value = (b.medico && b.medico !== '-') ? b.medico : '';
-      document.getElementById('confirm-nota').value = isReprog ? '' : (b.nota_paciente || '');
+      document.getElementById('confirm-id').value = empty ? '' : b.id;
+      document.getElementById('confirm-nombre').value =
+        (!empty && b.nombre && b.nombre !== '-') ? b.nombre : '';
+      document.getElementById('confirm-medico').value =
+        (!empty && b.medico && b.medico !== '-') ? b.medico : '';
+      document.getElementById('confirm-nota').value = isReprog ? '' : ((!empty && b.nota_paciente) || '');
       const notaWrap = document.getElementById('confirm-nota-wrap');
       if (notaWrap) notaWrap.hidden = isReprog;
+      const searchWrap = document.getElementById('patient-search-wrap');
+      if (searchWrap) searchWrap.hidden = !isSearchFirst;
+      const searchInput = document.getElementById('patient-search');
+      const suggest = document.getElementById('patient-suggest');
+      if (searchInput) searchInput.value = '';
+      if (suggest) {
+        suggest.innerHTML = '';
+        suggest.hidden = true;
+      }
       const schedLegend = document.querySelector('#confirmModal .sched-legend');
       if (schedLegend) {
         schedLegend.textContent = isReprog
@@ -2180,12 +2279,127 @@ function openConfirmModal(b, { edit, reprogram } = { edit: false, reprogram: fal
           : 'Cómo confirmar el turno';
       }
       document.getElementById('confirm-alert').innerHTML = '';
-      fillConfirmSchedule(b || {});
+      if (!(isSearchFirst && empty)) {
+        fillConfirmSchedule(empty ? {} : b);
+      } else {
+        document.getElementById('confirm-date').value = '';
+        document.getElementById('confirm-time').value = '';
+        document.getElementById('confirm-date-orden').value = '';
+        setSchedMode('hora');
+      }
       updateConfirmPreview();
+      syncReprogramSubmitEnabled();
       if (!confirmModal) {
         confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
       }
       confirmModal.show();
+      if (isSearchFirst && searchInput) {
+        setTimeout(() => searchInput.focus(), 200);
+      }
+    }
+
+    function syncReprogramSubmitEnabled() {
+      const btn = document.getElementById('confirm-submit');
+      if (!btn) return;
+      if (isReprogramModal() && confirmDraft && confirmDraft._searchFirst) {
+        const id = (document.getElementById('confirm-id').value || '').trim();
+        btn.disabled = !id;
+      } else {
+        btn.disabled = false;
+      }
+    }
+
+    function bindPatientFromSearchHit(hit) {
+      if (!hit || !hit.id) return;
+      if (hit.can_reprogramar === false) {
+        const alertEl = document.getElementById('confirm-alert');
+        if (alertEl) {
+          alertEl.innerHTML =
+            '<div class="alert alert-warning py-2">Esa solicitud no admite Reprogramar (usá Confirmar si es un turno pendiente).</div>';
+        }
+        return;
+      }
+      confirmDraft = Object.assign({}, hit, {
+        _mode: 'reprogram',
+        _searchFirst: true,
+      });
+      document.getElementById('confirm-id').value = hit.id;
+      document.getElementById('confirm-nombre').value =
+        (hit.nombre && hit.nombre !== '-') ? hit.nombre : '';
+      document.getElementById('confirm-medico').value =
+        (hit.medico && hit.medico !== '-') ? hit.medico : '';
+      fillConfirmSchedule(hit);
+      updateConfirmPreview();
+      syncReprogramSubmitEnabled();
+      const suggest = document.getElementById('patient-suggest');
+      if (suggest) {
+        suggest.innerHTML = '';
+        suggest.hidden = true;
+      }
+      const searchInput = document.getElementById('patient-search');
+      if (searchInput) {
+        const tel = hit.telefono_contacto || hit.phone || '';
+        searchInput.value = `${hit.nombre || ''} · ${tel}`.trim();
+      }
+      document.getElementById('confirm-alert').innerHTML = '';
+    }
+
+    let patientSearchTimer = null;
+    async function runPatientSearch(q) {
+      const suggest = document.getElementById('patient-suggest');
+      if (!suggest) return;
+      const query = (q || '').trim();
+      if (query.length < 2) {
+        suggest.innerHTML = '';
+        suggest.hidden = true;
+        return;
+      }
+      try {
+        const res = await fetch(
+          '/api/solicitudes/search?q=' + encodeURIComponent(query) + '&_=' + Date.now(),
+          { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }
+        );
+        if (!res.ok) throw new Error('search failed');
+        const data = await res.json();
+        const items = data.solicitudes || [];
+        if (!items.length) {
+          suggest.innerHTML =
+            '<div class="patient-suggest-meta" style="padding:0.55rem 0.75rem">Sin coincidencias en solicitudes.</div>';
+          suggest.hidden = false;
+          return;
+        }
+        suggest.innerHTML = items
+          .map((s) => {
+            const tel = escapeHtml(s.telefono_contacto || s.phone || '');
+            const nombre = escapeHtml(s.nombre || '—');
+            const badge = s.status_badge
+              ? escapeHtml(s.status_badge)
+              : escapeHtml(s.status || 'pending');
+            const disabled = s.can_reprogramar ? '' : ' is-disabled';
+            const title = s.can_reprogramar
+              ? ''
+              : ' title="No admite Reprogramar"';
+            return (
+              `<button type="button" class="patient-suggest-item${disabled}" data-hit-id="${s.id}" role="option"${title}>` +
+              `<span class="patient-suggest-name">${nombre}</span>` +
+              `<span class="patient-suggest-meta">${tel} · ${escapeHtml(s.tipo || '')} · ${badge}</span>` +
+              `</button>`
+            );
+          })
+          .join('');
+        suggest.hidden = false;
+        suggest.querySelectorAll('[data-hit-id]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const id = Number(btn.getAttribute('data-hit-id'));
+            const hit = items.find((x) => x.id === id);
+            if (hit) bindPatientFromSearchHit(hit);
+          });
+        });
+      } catch (err) {
+        suggest.innerHTML =
+          '<div class="patient-suggest-meta" style="padding:0.55rem 0.75rem">No se pudo buscar.</div>';
+        suggest.hidden = false;
+      }
     }
 
     function bindSolicitudActions(data) {
@@ -2367,6 +2581,19 @@ function openConfirmModal(b, { edit, reprogram } = { edit: false, reprogram: fal
     document.getElementById('refresh-btn').addEventListener('click', () => {
       loadSolicitudes();
     });
+    document.getElementById('board-reprogramar-btn')?.addEventListener('click', () => {
+      openConfirmModal(null, { reprogram: true, searchFirst: true });
+    });
+    document.getElementById('patient-search')?.addEventListener('input', (ev) => {
+      const q = ev.target.value;
+      // Typing again clears bound id until a new hit is chosen.
+      if (confirmDraft && confirmDraft._searchFirst) {
+        document.getElementById('confirm-id').value = '';
+        syncReprogramSubmitEnabled();
+      }
+      clearTimeout(patientSearchTimer);
+      patientSearchTimer = setTimeout(() => runPatientSearch(q), 220);
+    });
     document.getElementById('solicitudes-search').addEventListener('input', applySolicitudesFilter);
     document.getElementById('search-clear').addEventListener('click', () => {
       const input = document.getElementById('solicitudes-search');
@@ -2386,6 +2613,12 @@ function openConfirmModal(b, { edit, reprogram } = { edit: false, reprogram: fal
         const mode = getSchedMode();
         const nombre = document.getElementById('confirm-nombre').value;
         const medico = document.getElementById('confirm-medico').value;
+        if (isReprog && confirmDraft && confirmDraft._searchFirst) {
+          const boundId = (document.getElementById('confirm-id').value || '').trim();
+          if (!boundId) {
+            throw new Error('Buscá y elegí un paciente de la lista.');
+          }
+        }
         let payload;
         if (mode === 'orden') {
           const appointment_date = document.getElementById('confirm-date-orden').value;
@@ -2435,7 +2668,11 @@ function openConfirmModal(b, { edit, reprogram } = { edit: false, reprogram: fal
       } catch (err) {
         alertEl.innerHTML = `<div class="alert alert-danger py-2">${escapeHtml(err.message || 'Error')}</div>`;
       } finally {
-        btn.disabled = false;
+        if (isReprogramModal() && confirmDraft && confirmDraft._searchFirst) {
+          syncReprogramSubmitEnabled();
+        } else {
+          btn.disabled = false;
+        }
       }
     });
 

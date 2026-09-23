@@ -21,6 +21,7 @@ from confirmacion import (
 )
 from chatwoot_send import ChatwootSendError, send_confirmacion, send_reprogramacion
 from mensajes import build_outbound_message, format_dia_hora_display
+from busqueda import filter_solicitudes_by_query
 from reprogramacion import (
     REPROGRAM_TEMPLATE,
     assert_reprogramable,
@@ -663,6 +664,22 @@ async def api_solicitudes(request: Request):
 
     return JSONResponse(
         {"solicitudes": out, "dias": dias},
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+        },
+    )
+
+
+@app.get("/api/solicitudes/search")
+@login_required
+async def api_solicitudes_search(request: Request):
+    """Autocomplete by nombre / phone for Reprogramación desde el panel (#10)."""
+    q = str(request.query_params.get("q") or "").strip()
+    rows = list_solicitudes_rows()
+    matched = filter_solicitudes_by_query(rows, q, limit=20)
+    return JSONResponse(
+        {"solicitudes": [serialize_solicitud(r) for r in matched], "q": q},
         headers={
             "Cache-Control": "no-store, no-cache, must-revalidate",
             "Pragma": "no-cache",
