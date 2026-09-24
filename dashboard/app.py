@@ -30,6 +30,7 @@ from chatwoot_send import (
 )
 from mensajes import build_outbound_message, format_dia_hora_display
 from busqueda import filter_solicitudes_by_query, normalize_phone_e164
+from stats import compute_solicitudes_week_stats, week_bounds
 from cancelacion import (
     CANCEL_TEMPLATE,
     assert_cancelable,
@@ -809,6 +810,46 @@ async def api_solicitudes(request: Request):
 
     return JSONResponse(
         {"solicitudes": out, "dias": dias},
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+        },
+    )
+
+
+def fetch_solicitudes_created_between(
+    range_start: date, range_end_inclusive: date
+) -> list[dict[str, Any]]:
+    """Rows created in [range_start, range_end_inclusive] for weekly KPIs (no LIMIT)."""
+    conn = get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        has_tipo = _column_exists(cur, "turno_solicitudes", "tipo")
+        tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
+        # Exclusive upper bound: day after range_end at midnight.
+        upper = range_end_inclusive + timedelta(days=1)
+        cur.execute(
+            f"""
+            SELECT id, created_at, status, {tipo_sql}
+            FROM turno_solicitudes
+            WHERE created_at >= %s AND created_at < %s
+            """,
+            (range_start.isoformat(), upper.isoformat()),
+        )
+        return list(cur.fetchall() or [])
+    finally:
+        conn.close()
+
+
+@app.get("/api/solicitudes/stats")
+@login_required
+async def api_solicitudes_stats(request: Request):
+    """Weekly KPIs (Mon–Sun by created_at) with week-over-week trends."""
+    current_start, current_end, previous_start, _previous_end = week_bounds()
+    rows = fetch_solicitudes_created_between(previous_start, current_end)
+    payload = compute_solicitudes_week_stats(rows)
+    return JSONResponse(
+        payload,
         headers={
             "Cache-Control": "no-store, no-cache, must-revalidate",
             "Pragma": "no-cache",
