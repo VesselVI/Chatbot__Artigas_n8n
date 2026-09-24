@@ -30,8 +30,12 @@ def test_week_label_same_month():
 
 def test_classify_row_buckets():
     assert classify_row({"status": "confirmed", "tipo": "turno"}) == "confirmados"
-    assert classify_row({"status": "confirmed", "tipo": "reprogramar"}) == "reprogramados"
-    assert classify_row({"status": "cancelled", "tipo": "turno"}) == "cancelados"
+    assert classify_row({"status": "pending", "tipo": "reprogramar"}) == "reprogramaciones"
+    assert classify_row({"status": "confirmed", "tipo": "reprogramar"}) == "reprogramaciones"
+    assert classify_row({"status": "pending", "tipo": "cancelar"}) == "cancelaciones"
+    assert classify_row({"status": "cancelled", "tipo": "cancelar"}) == "cancelaciones"
+    # Panel cancel of a turno is not a cancelación solicitud
+    assert classify_row({"status": "cancelled", "tipo": "turno"}) is None
     assert classify_row({"status": "pending", "tipo": "turno"}) is None
 
 
@@ -52,13 +56,13 @@ def test_compute_solicitudes_week_stats_counts_and_trends():
         # current week
         _row(datetime(2026, 9, 22, 10, 0), "pending", "turno"),
         _row(datetime(2026, 9, 22, 11, 0), "confirmed", "turno"),
-        _row(datetime(2026, 9, 23, 9, 0), "confirmed", "reprogramar"),
-        _row(datetime(2026, 9, 24, 9, 0), "cancelled", "cancelar"),
+        _row(datetime(2026, 9, 23, 9, 0), "pending", "reprogramar"),
+        _row(datetime(2026, 9, 24, 9, 0), "pending", "cancelar"),
         _row(datetime(2026, 9, 21, 8, 0), "confirmed", "estudio"),
         # previous week
         _row(datetime(2026, 9, 15, 10, 0), "confirmed", "turno"),
         _row(datetime(2026, 9, 16, 10, 0), "confirmed", "turno"),
-        _row(datetime(2026, 9, 17, 10, 0), "cancelled", "cancelar"),
+        _row(datetime(2026, 9, 17, 10, 0), "pending", "cancelar"),
         # outside range
         _row(datetime(2026, 9, 1, 10, 0), "confirmed", "turno"),
     ]
@@ -68,20 +72,20 @@ def test_compute_solicitudes_week_stats_counts_and_trends():
     assert out["current"] == {
         "total": 5,
         "confirmados": 2,
-        "reprogramados": 1,
-        "cancelados": 1,
+        "reprogramaciones": 1,
+        "cancelaciones": 1,
     }
     assert out["previous"] == {
         "total": 3,
         "confirmados": 2,
-        "reprogramados": 0,
-        "cancelados": 1,
+        "reprogramaciones": 0,
+        "cancelaciones": 1,
     }
     # total 5 vs 3 → +67%
     assert out["trends"]["total"]["pct"] == 67
     assert "+67%" in out["trends"]["total"]["label"]
-    # cancelados share of current total: 1/5 → 20%
-    assert out["trends"]["cancelados"]["label"] == "20% del total"
+    # cancelaciones share of current total: 1/5 → 20%
+    assert out["trends"]["cancelaciones"]["label"] == "20% del total"
     assert "septiembre" in out["week_label"]
 
 

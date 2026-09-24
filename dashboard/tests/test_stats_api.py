@@ -79,7 +79,7 @@ def test_stats_api_aggregates_rows(client: TestClient, monkeypatch):
     assert body["week_end"] == "2026-09-27"
     assert body["current"]["total"] == 2
     assert body["current"]["confirmados"] == 1
-    assert body["current"]["cancelados"] == 1
+    assert body["current"]["cancelaciones"] == 1
     assert body["previous"]["total"] == 1
-    assert body["trends"]["cancelados"]["label"] == "50% del total"
+    assert body["trends"]["cancelaciones"]["label"] == "50% del total"
     assert "no-store" in res.headers.get("Cache-Control", "")

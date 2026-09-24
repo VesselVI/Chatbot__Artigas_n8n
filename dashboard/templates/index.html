@@ -1795,7 +1795,7 @@
           </div>
           <div class="metric-card m-reprogramados">
             <div class="metric-info">
-              <span class="metric-label">Reprogramados</span>
+              <span class="metric-label">Reprogramaciones</span>
               <span class="metric-value" id="kpi-reprog">—</span>
               <span class="metric-trend is-neutral" id="kpi-reprog-trend">—</span>
             </div>
@@ -1803,7 +1803,7 @@
           </div>
           <div class="metric-card m-cancelados">
             <div class="metric-info">
-              <span class="metric-label">Cancelados</span>
+              <span class="metric-label">Cancelaciones</span>
               <span class="metric-value" id="kpi-cancelados">—</span>
               <span class="metric-trend is-cancel" id="kpi-cancelados-trend">—</span>
             </div>
@@ -3022,7 +3022,7 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
     }
 
     function trendClass(key, trend) {
-      if (key === 'cancelados') return 'is-cancel';
+      if (key === 'cancelaciones') return 'is-cancel';
       const pct = trend && trend.pct;
       const delta = trend && trend.delta;
       if (typeof pct === 'number') {
@@ -3061,14 +3061,14 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
         const trends = data.trends || {};
         setKpi('kpi-total', 'kpi-total-trend', cur.total, trends.total, 'total');
         setKpi('kpi-confirmados', 'kpi-confirmados-trend', cur.confirmados, trends.confirmados, 'confirmados');
-        setKpi('kpi-reprog', 'kpi-reprog-trend', cur.reprogramados, trends.reprogramados, 'reprogramados');
-        setKpi('kpi-cancelados', 'kpi-cancelados-trend', cur.cancelados, trends.cancelados, 'cancelados');
+        setKpi('kpi-reprog', 'kpi-reprog-trend', cur.reprogramaciones, trends.reprogramaciones, 'reprogramaciones');
+        setKpi('kpi-cancelados', 'kpi-cancelados-trend', cur.cancelaciones, trends.cancelaciones, 'cancelaciones');
       } catch (err) {
         if (weekLabel) weekLabel.textContent = 'No se pudieron cargar';
         setKpi('kpi-total', 'kpi-total-trend', '—', { label: '—' }, 'total');
         setKpi('kpi-confirmados', 'kpi-confirmados-trend', '—', { label: '—' }, 'confirmados');
-        setKpi('kpi-reprog', 'kpi-reprog-trend', '—', { label: '—' }, 'reprogramados');
-        setKpi('kpi-cancelados', 'kpi-cancelados-trend', '—', { label: '—' }, 'cancelados');
+        setKpi('kpi-reprog', 'kpi-reprog-trend', '—', { label: '—' }, 'reprogramaciones');
+        setKpi('kpi-cancelados', 'kpi-cancelados-trend', '—', { label: '—' }, 'cancelaciones');
       }
     }
 

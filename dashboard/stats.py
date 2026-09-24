@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from confirmacion import CANCELLED_STATUS, CONFIRMED_STATUS, normalize_tipo
+from confirmacion import CONFIRMED_STATUS, normalize_tipo
 
 MONTHS_ES = (
     "",
@@ -76,14 +76,19 @@ def _as_date(value: Any) -> date | None:
 
 
 def classify_row(row: dict[str, Any]) -> str | None:
-    """Return bucket key: confirmados | reprogramados | cancelados | None (other)."""
-    status = str(row.get("status") or "").strip().lower()
+    """Return bucket: confirmados | reprogramaciones | cancelaciones | None.
+
+    Reprogramaciones / cancelaciones count incoming solicitudes by tipo
+    (reprogramar / cancelar), regardless of status. Confirmados are panel
+    confirmations (status=confirmed) that are not those tipos.
+    """
     tipo = normalize_tipo(row.get("tipo"))
-    if status == CANCELLED_STATUS:
-        return "cancelados"
+    if tipo == "reprogramar":
+        return "reprogramaciones"
+    if tipo == "cancelar":
+        return "cancelaciones"
+    status = str(row.get("status") or "").strip().lower()
     if status == CONFIRMED_STATUS:
-        if tipo == "reprogramar":
-            return "reprogramados"
         return "confirmados"
     return None
 
@@ -92,8 +97,8 @@ def empty_counts() -> dict[str, int]:
     return {
         "total": 0,
         "confirmados": 0,
-        "reprogramados": 0,
-        "cancelados": 0,
+        "reprogramaciones": 0,
+        "cancelaciones": 0,
     }
 
 
@@ -130,11 +135,11 @@ def pct_change_trend(current: int, previous: int) -> dict[str, Any]:
     return {"pct": None, "delta": 0, "label": "sin cambio vs semana anterior"}
 
 
-def cancelados_share_trend(cancelados: int, total: int) -> dict[str, Any]:
+def cancelaciones_share_trend(cancelaciones: int, total: int) -> dict[str, Any]:
     if total <= 0:
         pct = 0
     else:
-        pct = round((cancelados / total) * 100)
+        pct = round((cancelaciones / total) * 100)
     return {"pct": pct, "delta": None, "label": f"{pct}% del total"}
 
 
@@ -144,11 +149,11 @@ def build_trends(current: dict[str, int], previous: dict[str, int]) -> dict[str,
         "confirmados": pct_change_trend(
             current["confirmados"], previous["confirmados"]
         ),
-        "reprogramados": pct_change_trend(
-            current["reprogramados"], previous["reprogramados"]
+        "reprogramaciones": pct_change_trend(
+            current["reprogramaciones"], previous["reprogramaciones"]
         ),
-        "cancelados": cancelados_share_trend(
-            current["cancelados"], current["total"]
+        "cancelaciones": cancelaciones_share_trend(
+            current["cancelaciones"], current["total"]
         ),
     }
 

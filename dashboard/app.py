@@ -844,7 +844,11 @@ def fetch_solicitudes_created_between(
 @app.get("/api/solicitudes/stats")
 @login_required
 async def api_solicitudes_stats(request: Request):
-    """Weekly KPIs (Mon–Sun by created_at) with week-over-week trends."""
+    """Weekly KPIs (Mon–Sun by created_at) with week-over-week trends.
+
+    Confirmados = status confirmed (not tipo reprogramar/cancelar).
+    Reprogramaciones / cancelaciones = solicitudes with those tipos.
+    """
     current_start, current_end, previous_start, _previous_end = week_bounds()
     rows = fetch_solicitudes_created_between(previous_start, current_end)
     payload = compute_solicitudes_week_stats(rows)
