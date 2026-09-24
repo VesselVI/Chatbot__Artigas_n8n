@@ -7,6 +7,7 @@ from typing import Any
 import mysql.connector
 from fastapi import FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -138,6 +139,12 @@ app.add_middleware(
     https_only=False,
 )
 templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon_ico():
+    return RedirectResponse("/static/favicon.ico", status_code=308)
 
 
 @app.get("/health")
