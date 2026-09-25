@@ -346,7 +346,7 @@
       color: var(--accent);
     }
 
-    /* —— Weekly KPI metrics —— */
+    /* —— Weekly KPI metrics (CoreUI-style solid widgets) —— */
     .stats-section {
       display: flex;
       flex-direction: column;
@@ -386,125 +386,122 @@
     }
     .metrics-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(4, 1fr);
       gap: 1rem;
     }
+    @media (max-width: 1199.98px) {
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 575.98px) {
+      .metrics-grid { grid-template-columns: 1fr; }
+    }
     .metric-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 1.15rem 1.25rem;
-      box-shadow: var(--shadow-sm);
+      background: #6261cc;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      box-shadow: none;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
+      flex-direction: column;
       position: relative;
       overflow: hidden;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-      border-left-width: 4px;
-      border-left-style: solid;
+      padding: 0;
+      transition: filter 0.15s ease, transform 0.15s ease;
     }
     .metric-card:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
+      filter: brightness(1.03);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
     }
-    .metric-card.m-total {
-      border-left-color: #0284c7;
-      box-shadow: rgba(2, 132, 199, 0.08) 0 4px 12px -2px, rgba(0, 0, 0, 0.04) 0 1px 3px;
-    }
-    .metric-card.m-confirmados {
-      border-left-color: #10b981;
-      box-shadow: rgba(16, 185, 129, 0.08) 0 4px 12px -2px, rgba(0, 0, 0, 0.04) 0 1px 3px;
-    }
-    .metric-card.m-reprogramados {
-      border-left-color: #a855f7;
-      box-shadow: rgba(168, 85, 247, 0.08) 0 4px 12px -2px, rgba(0, 0, 0, 0.04) 0 1px 3px;
-    }
-    .metric-card.m-cancelados {
-      border-left-color: #dc2626;
-      box-shadow: rgba(220, 38, 38, 0.08) 0 4px 12px -2px, rgba(0, 0, 0, 0.04) 0 1px 3px;
+    .metric-card.m-total { background: #6261cc; }
+    .metric-card.m-confirmados { background: #3d99f5; }
+    .metric-card.m-reprogramados { background: #edad21; }
+    .metric-card.m-cancelados { background: #db5d5d; }
+
+    .metric-card-body {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 1rem 1rem 0;
     }
     .metric-info {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: 0.15rem;
       min-width: 0;
     }
-    .metric-label {
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--muted);
+    .metric-value-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.35rem;
+      line-height: 1.15;
     }
     .metric-value {
-      font-size: 1.85rem;
-      font-weight: 800;
-      color: var(--ink);
-      line-height: 1;
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: #fff;
       font-variant-numeric: tabular-nums;
+      letter-spacing: -0.01em;
     }
     .metric-trend {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      margin-top: 0.1rem;
-      font-size: 0.725rem;
-      font-weight: 600;
-      padding: 0.2rem 0.55rem;
-      border-radius: 20px;
-      width: fit-content;
-      border: 1px solid transparent;
+      font-size: 0.875rem;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.92);
+      white-space: nowrap;
     }
-    .metric-trend.is-up {
-      color: #047857;
-      background: #ecfdf5;
-      border-color: #a7f3d0;
+    .metric-trend .trend-arrow {
+      font-size: 0.75em;
+      margin-left: 0.1em;
     }
-    .metric-trend.is-down {
-      color: #7c3aed;
-      background: #f5f3ff;
-      border-color: #ddd6fe;
+    .metric-label {
+      font-size: 0.875rem;
+      font-weight: 400;
+      letter-spacing: 0;
+      text-transform: none;
+      color: rgba(255, 255, 255, 0.95);
     }
-    .metric-trend.is-neutral {
-      color: var(--muted);
-      background: var(--surface-subtle);
-      border-color: var(--border);
-    }
-    .metric-trend.is-cancel {
-      color: #dc2626;
-      background: #fef2f2;
-      border-color: #fecaca;
-    }
-    .metric-icon-wrap {
-      width: 3.1rem;
-      height: 3.1rem;
-      border-radius: 12px;
+    .metric-opts {
+      flex-shrink: 0;
+      width: 1.5rem;
+      height: 1.5rem;
       display: grid;
       place-items: center;
-      font-size: 1.4rem;
-      flex-shrink: 0;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 1.1rem;
+      line-height: 1;
+      opacity: 0.85;
+      pointer-events: none;
     }
-    .m-total .metric-icon-wrap {
-      background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-      color: #0284c7;
-      box-shadow: inset 0 0 0 1px rgba(2, 132, 199, 0.12);
+    .metric-chart {
+      height: 70px;
+      margin: 0.75rem 0.75rem 0;
+      position: relative;
     }
-    .m-confirmados .metric-icon-wrap {
-      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-      color: #059669;
-      box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.12);
+    .metric-chart svg {
+      display: block;
+      width: 100%;
+      height: 100%;
     }
-    .m-reprogramados .metric-icon-wrap {
-      background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
-      color: #7c3aed;
-      box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.12);
+    .metric-chart .spark-line {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.95);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
-    .m-cancelados .metric-icon-wrap {
-      background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-      color: #dc2626;
-      box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.12);
+    .metric-chart .spark-dot {
+      fill: #fff;
+      stroke: rgba(255, 255, 255, 0.35);
+      stroke-width: 1;
+    }
+    .metric-chart .spark-area {
+      fill: rgba(255, 255, 255, 0.12);
+      stroke: none;
+    }
+    .metric-chart .spark-bar {
+      fill: rgba(255, 255, 255, 0.92);
     }
 
     /* —— Card —— */
@@ -1783,36 +1780,56 @@
         </div>
         <div class="metrics-grid">
           <div class="metric-card m-total">
-            <div class="metric-info">
-              <span class="metric-label">Total Solicitudes</span>
-              <span class="metric-value" id="kpi-total">—</span>
-              <span class="metric-trend is-neutral" id="kpi-total-trend">—</span>
+            <div class="metric-card-body">
+              <div class="metric-info">
+                <div class="metric-value-row">
+                  <span class="metric-value" id="kpi-total">—</span>
+                  <span class="metric-trend" id="kpi-total-trend"></span>
+                </div>
+                <span class="metric-label">Total solicitudes</span>
+              </div>
+              <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
             </div>
-            <div class="metric-icon-wrap" aria-hidden="true"><i class="bi bi-inbox-fill"></i></div>
+            <div class="metric-chart" id="kpi-total-chart" aria-hidden="true"></div>
           </div>
           <div class="metric-card m-confirmados">
-            <div class="metric-info">
-              <span class="metric-label">Confirmados</span>
-              <span class="metric-value" id="kpi-confirmados">—</span>
-              <span class="metric-trend is-neutral" id="kpi-confirmados-trend">—</span>
+            <div class="metric-card-body">
+              <div class="metric-info">
+                <div class="metric-value-row">
+                  <span class="metric-value" id="kpi-confirmados">—</span>
+                  <span class="metric-trend" id="kpi-confirmados-trend"></span>
+                </div>
+                <span class="metric-label">Confirmados</span>
+              </div>
+              <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
             </div>
-            <div class="metric-icon-wrap" aria-hidden="true"><i class="bi bi-calendar-check"></i></div>
+            <div class="metric-chart" id="kpi-confirmados-chart" aria-hidden="true"></div>
           </div>
           <div class="metric-card m-reprogramados">
-            <div class="metric-info">
-              <span class="metric-label">Reprogramaciones</span>
-              <span class="metric-value" id="kpi-reprog">—</span>
-              <span class="metric-trend is-neutral" id="kpi-reprog-trend">—</span>
+            <div class="metric-card-body">
+              <div class="metric-info">
+                <div class="metric-value-row">
+                  <span class="metric-value" id="kpi-reprog">—</span>
+                  <span class="metric-trend" id="kpi-reprog-trend"></span>
+                </div>
+                <span class="metric-label">Reprogramaciones</span>
+              </div>
+              <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
             </div>
-            <div class="metric-icon-wrap" aria-hidden="true"><i class="bi bi-calendar2-range"></i></div>
+            <div class="metric-chart" id="kpi-reprog-chart" aria-hidden="true"></div>
           </div>
           <div class="metric-card m-cancelados">
-            <div class="metric-info">
-              <span class="metric-label">Cancelaciones</span>
-              <span class="metric-value" id="kpi-cancelados">—</span>
-              <span class="metric-trend is-cancel" id="kpi-cancelados-trend">—</span>
+            <div class="metric-card-body">
+              <div class="metric-info">
+                <div class="metric-value-row">
+                  <span class="metric-value" id="kpi-cancelados">—</span>
+                  <span class="metric-trend" id="kpi-cancelados-trend"></span>
+                </div>
+                <span class="metric-label">Cancelaciones</span>
+              </div>
+              <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
             </div>
-            <div class="metric-icon-wrap" aria-hidden="true"><i class="bi bi-x-circle"></i></div>
+            <div class="metric-chart" id="kpi-cancelados-chart" aria-hidden="true"></div>
           </div>
         </div>
       </section>
@@ -3026,29 +3043,102 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
       }
     }
 
-    function trendClass(key, trend) {
-      if (key === 'cancelaciones') return 'is-cancel';
-      const pct = trend && trend.pct;
-      const delta = trend && trend.delta;
+    function formatCoreTrend(key, trend) {
+      if (!trend || trend.label == null || trend.label === '—') return '';
+      if (key === 'cancelaciones') {
+        const pct = typeof trend.pct === 'number' ? trend.pct : null;
+        if (pct === null) return trend.label ? '(' + trend.label + ')' : '';
+        return '(' + pct + '% del total)';
+      }
+      const pct = trend.pct;
+      const delta = trend.delta;
+      let arrow = '';
+      let text = '';
       if (typeof pct === 'number') {
-        if (pct > 0) return 'is-up';
-        if (pct < 0) return 'is-down';
-        return 'is-neutral';
+        const sign = pct > 0 ? '+' : '';
+        text = sign + pct + '%';
+        if (pct > 0) arrow = '↑';
+        else if (pct < 0) arrow = '↓';
+      } else if (typeof delta === 'number') {
+        if (delta === 0) return '(sin cambio)';
+        const sign = delta > 0 ? '+' : '';
+        text = sign + delta;
+        arrow = delta > 0 ? '↑' : '↓';
+      } else {
+        return trend.label ? '(' + trend.label.replace(/^sin cambio.*/, 'sin cambio') + ')' : '';
       }
-      if (typeof delta === 'number') {
-        if (delta > 0) return 'is-up';
-        if (delta < 0) return 'is-down';
-      }
-      return 'is-neutral';
+      return '(' + text + (arrow ? ' <span class="trend-arrow">' + arrow + '</span>' : '') + ')';
     }
 
-    function setKpi(valueId, trendId, value, trend, key) {
+    function sparkSeries(prev, curr, n) {
+      const points = n || 7;
+      const a = Math.max(0, Number(prev) || 0);
+      const b = Math.max(0, Number(curr) || 0);
+      const mid = (a + b) / 2;
+      const amp = Math.max(1, Math.abs(b - a) * 0.45, mid * 0.12);
+      const out = [];
+      for (let i = 0; i < points; i++) {
+        const t = i / (points - 1);
+        const base = a + (b - a) * t;
+        const wobble = Math.sin(i * 1.7 + (a + 1) * 0.3) * amp * (0.35 + 0.2 * Math.sin(i));
+        out.push(Math.max(0, base + wobble));
+      }
+      out[points - 1] = b;
+      return out;
+    }
+
+    function renderSparkline(el, values, style) {
+      if (!el) return;
+      const w = 100;
+      const h = 40;
+      const padY = 4;
+      const padX = 2;
+      const vals = values && values.length ? values : [0, 0];
+      const min = Math.min(...vals);
+      const max = Math.max(...vals);
+      const span = Math.max(0.0001, max - min);
+      const coords = vals.map((v, i) => {
+        const x = padX + (i / Math.max(1, vals.length - 1)) * (w - padX * 2);
+        const y = h - padY - ((v - min) / span) * (h - padY * 2);
+        return [x, y];
+      });
+
+      if (style === 'bars') {
+        const bw = Math.max(2, (w - padX * 2) / vals.length * 0.55);
+        const bars = vals.map((v, i) => {
+          const x = padX + (i / Math.max(1, vals.length - 1)) * (w - padX * 2) - bw / 2;
+          const y = h - padY - ((v - min) / span) * (h - padY * 2);
+          const bh = h - padY - y;
+          return `<rect class="spark-bar" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${bw.toFixed(2)}" height="${Math.max(1, bh).toFixed(2)}" rx="0.6"/>`;
+        }).join('');
+        el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${bars}</svg>`;
+        return;
+      }
+
+      const d = coords.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(2) + ' ' + p[1].toFixed(2)).join(' ');
+      const area = d + ` L${coords[coords.length - 1][0].toFixed(2)} ${h} L${coords[0][0].toFixed(2)} ${h} Z`;
+      const dots = style === 'dots'
+        ? coords.map(p => `<circle class="spark-dot" cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="1.6"/>`).join('')
+        : '';
+      const smooth = style === 'smooth';
+      el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        ${smooth ? `<path class="spark-area" d="${area}"/>` : ''}
+        <path class="spark-line" d="${d}"/>
+        ${dots}
+      </svg>`;
+    }
+
+    function setKpi(valueId, trendId, chartId, value, prev, trend, key, chartStyle) {
       const valueEl = document.getElementById(valueId);
       const trendEl = document.getElementById(trendId);
+      const chartEl = document.getElementById(chartId);
       if (valueEl) valueEl.textContent = String(value ?? '—');
       if (trendEl) {
-        trendEl.textContent = (trend && trend.label) || '—';
-        trendEl.className = 'metric-trend ' + trendClass(key, trend);
+        trendEl.innerHTML = formatCoreTrend(key, trend);
+      }
+      if (chartEl) {
+        const series = sparkSeries(prev, value, chartStyle === 'bars' ? 12 : 7);
+        renderSparkline(chartEl, series, chartStyle);
       }
     }
 
@@ -3063,17 +3153,18 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
         const data = await res.json();
         if (weekLabel) weekLabel.textContent = data.week_label || '';
         const cur = data.current || {};
+        const prev = data.previous || {};
         const trends = data.trends || {};
-        setKpi('kpi-total', 'kpi-total-trend', cur.total, trends.total, 'total');
-        setKpi('kpi-confirmados', 'kpi-confirmados-trend', cur.confirmados, trends.confirmados, 'confirmados');
-        setKpi('kpi-reprog', 'kpi-reprog-trend', cur.reprogramaciones, trends.reprogramaciones, 'reprogramaciones');
-        setKpi('kpi-cancelados', 'kpi-cancelados-trend', cur.cancelaciones, trends.cancelaciones, 'cancelaciones');
+        setKpi('kpi-total', 'kpi-total-trend', 'kpi-total-chart', cur.total, prev.total, trends.total, 'total', 'dots');
+        setKpi('kpi-confirmados', 'kpi-confirmados-trend', 'kpi-confirmados-chart', cur.confirmados, prev.confirmados, trends.confirmados, 'confirmados', 'dots');
+        setKpi('kpi-reprog', 'kpi-reprog-trend', 'kpi-reprog-chart', cur.reprogramaciones, prev.reprogramaciones, trends.reprogramaciones, 'reprogramaciones', 'smooth');
+        setKpi('kpi-cancelados', 'kpi-cancelados-trend', 'kpi-cancelados-chart', cur.cancelaciones, prev.cancelaciones, trends.cancelaciones, 'cancelaciones', 'bars');
       } catch (err) {
         if (weekLabel) weekLabel.textContent = 'No se pudieron cargar';
-        setKpi('kpi-total', 'kpi-total-trend', '—', { label: '—' }, 'total');
-        setKpi('kpi-confirmados', 'kpi-confirmados-trend', '—', { label: '—' }, 'confirmados');
-        setKpi('kpi-reprog', 'kpi-reprog-trend', '—', { label: '—' }, 'reprogramaciones');
-        setKpi('kpi-cancelados', 'kpi-cancelados-trend', '—', { label: '—' }, 'cancelaciones');
+        setKpi('kpi-total', 'kpi-total-trend', 'kpi-total-chart', '—', 0, null, 'total', 'dots');
+        setKpi('kpi-confirmados', 'kpi-confirmados-trend', 'kpi-confirmados-chart', '—', 0, null, 'confirmados', 'dots');
+        setKpi('kpi-reprog', 'kpi-reprog-trend', 'kpi-reprog-chart', '—', 0, null, 'reprogramaciones', 'smooth');
+        setKpi('kpi-cancelados', 'kpi-cancelados-trend', 'kpi-cancelados-chart', '—', 0, null, 'cancelaciones', 'bars');
       }
     }
 
