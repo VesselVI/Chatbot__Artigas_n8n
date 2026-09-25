@@ -1096,6 +1096,19 @@
       .btn-confirmar:hover { background: #156640; border-color: #156640; }
     }
 
+    .btn-marcar-confirmado {
+      color: #14532d;
+      background: #ecfdf3;
+      border: 1px solid #86efac;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-marcar-confirmado:hover {
+        background: #d1fae5;
+        border-color: #4ade80;
+        color: #14532d;
+      }
+    }
+
     .btn-reprogramar {
       color: #fff;
       background: #9b2d6e;
@@ -2393,6 +2406,7 @@
 
     const ICO = {
       calendarCheck: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>',
+      clipboardCheck: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>',
       calendarClock: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 14v2.2l1.6 1"/><path d="M16 2v4"/><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M3 10h5"/><path d="M8 2v4"/><circle cx="16" cy="16" r="6"/></svg>',
       ban: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>',
       send: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>',
@@ -2442,6 +2456,9 @@
       const parts = [];
       if (b.can_confirm) {
         parts.push(`<button type="button" class="btn-action btn-confirmar" data-confirm-id="${b.id}" aria-label="Confirmar turno">${ICO.calendarCheck}<span class="btn-tip" aria-hidden="true">Confirmar turno</span></button>`);
+      }
+      if (b.can_mark_confirmed) {
+        parts.push(`<button type="button" class="btn-action btn-marcar-confirmado" data-mark-confirmed-id="${b.id}" aria-label="Marcar confirmado">${ICO.clipboardCheck}<span class="btn-tip" aria-hidden="true">Marcar confirmado</span></button>`);
       }
       if (b.can_reprogramar) {
         parts.push(`<button type="button" class="btn-action btn-reprogramar" data-reprogramar-id="${b.id}" aria-label="Reprogramar">${ICO.calendarClock}<span class="btn-tip" aria-hidden="true">Reprogramar</span></button>`);
@@ -2556,8 +2573,13 @@
       return !!(confirmDraft && confirmDraft._mode === 'reprogram');
     }
 
+    function isMarkConfirmedModal() {
+      return !!(confirmDraft && confirmDraft._mode === 'mark');
+    }
+
     function buildConfirmPreviewMessage() {
       const isReprog = isReprogramModal();
+      const isMark = isMarkConfirmedModal();
       // Reprogramación always día+hora (Meta plantilla {{3}} = Nuevo día y hora).
       const mode = isReprog ? 'hora' : getSchedMode();
       const nombre = (document.getElementById('confirm-nombre').value || '').trim() || '—';
@@ -2588,6 +2610,21 @@
           'Su turno ha sido reprogramado. Agende este nuevo horario. Escribí menú para volver.',
         ].join('\n');
       }
+      if (isMark) {
+        const diaLine = mode === 'hora'
+          ? `Día y hora: ${diaHora}`
+          : `Día: ${diaHora}`;
+        const lines = [
+          'Marcar como Confirmado (sin WhatsApp)',
+          '',
+          `Nombre: ${nombre}`,
+          `Médico: ${medico}`,
+          diaLine,
+        ];
+        if (nota) lines.push(`Nota: ${nota}`);
+        lines.push('', 'No se envía mensaje. Usá esto si ya avisaste desde Chatwoot.');
+        return lines.join('\n');
+      }
       const diaLine = mode === 'hora'
         ? `Día y hora: ${diaHora}`
         : `Día: ${diaHora}`;
@@ -2617,7 +2654,9 @@
       if (!preview) return;
       const msg = buildConfirmPreviewMessage();
       if (!msg) {
-        preview.textContent = 'Completá día (y hora si aplica) para ver el mensaje.';
+        preview.textContent = isMarkConfirmedModal()
+          ? 'Completá día (y hora si aplica) para registrar el turno.'
+          : 'Completá día (y hora si aplica) para ver el mensaje.';
         preview.classList.add('is-empty');
         return;
       }
@@ -2650,27 +2689,32 @@
       setSchedMode(porOrden ? 'orden' : 'hora');
     }
 
-function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
+function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {}) {
       const empty = !b || !b.id;
+      let mode = 'confirm';
+      if (reprogram || searchFirst) mode = 'reprogram';
+      else if (edit) mode = 'edit';
+      else if (markConfirmed) mode = 'mark';
       confirmDraft = Object.assign({}, b || {}, {
-        _mode: reprogram || searchFirst ? 'reprogram' : (edit ? 'edit' : 'confirm'),
+        _mode: mode,
         _searchFirst: !!searchFirst,
         _coldPhone: null,
       });
       const isReprog = confirmDraft._mode === 'reprogram';
+      const isMark = confirmDraft._mode === 'mark';
       const isSearchFirst = !!confirmDraft._searchFirst;
       const title = isReprog
         ? (isSearchFirst ? 'Reprogramar — buscar paciente' : 'Reprogramación de turno')
-        : (edit ? 'Editar y reenviar' : 'Confirmación de turno');
+        : (edit ? 'Editar y reenviar' : (isMark ? 'Marcar como confirmado' : 'Confirmación de turno'));
       document.getElementById('confirmModalLabel').textContent = title;
       document.getElementById('confirm-submit').textContent = isReprog
         ? 'Reprogramar'
-        : (edit ? 'Guardar y reenviar' : 'Confirmar');
+        : (edit ? 'Guardar y reenviar' : (isMark ? 'Marcar confirmado' : 'Confirmar'));
       const previewLabel = document.getElementById('confirm-wa-preview-label');
       if (previewLabel) {
         previewLabel.textContent = isReprog
           ? 'Vista previa (plantilla confirmacion_reprogramacion)'
-          : 'Vista previa del WhatsApp';
+          : (isMark ? 'Registro en el tablero (sin WhatsApp)' : 'Vista previa del WhatsApp');
       }
       document.getElementById('confirm-id').value = empty ? '' : b.id;
       document.getElementById('confirm-nombre').value =
@@ -2690,6 +2734,10 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
         suggest.hidden = true;
       }
       document.getElementById('confirm-alert').innerHTML = '';
+      if (isMark) {
+        document.getElementById('confirm-alert').innerHTML =
+          '<div class="alert alert-info py-2 mb-3">No se envía WhatsApp. Usá esto si ya mandaste la confirmación desde Chatwoot.</div>';
+      }
       if (!(isSearchFirst && empty)) {
         fillConfirmSchedule(empty ? {} : b);
       } else {
@@ -2871,6 +2919,12 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
         btn.addEventListener('click', () => {
           const flat = findSolicitud(Number(btn.getAttribute('data-confirm-id')));
           if (flat) openConfirmModal(flat, { edit: false });
+        });
+      });
+      tbody.querySelectorAll('[data-mark-confirmed-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const flat = findSolicitud(Number(btn.getAttribute('data-mark-confirmed-id')));
+          if (flat) openConfirmModal(flat, { markConfirmed: true });
         });
       });
       tbody.querySelectorAll('[data-reprogramar-id]').forEach(btn => {
@@ -3521,6 +3575,7 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
       const btn = document.getElementById('confirm-submit');
       const alertEl = document.getElementById('confirm-alert');
       const isReprog = isReprogramModal();
+      const isMark = isMarkConfirmedModal();
       btn.disabled = true;
       alertEl.innerHTML = '';
       try {
@@ -3570,6 +3625,8 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
             payload.phone = confirmDraft._coldPhone;
           }
           url = '/api/solicitudes/reprogramar';
+        } else if (isMark) {
+          url = '/api/solicitudes/' + encodeURIComponent(id) + '/mark-confirmed';
         } else {
           const action = isReprog ? 'reprogramar' : 'confirm';
           url = '/api/solicitudes/' + encodeURIComponent(id) + '/' + action;
@@ -3581,7 +3638,10 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data.error || (isReprog ? 'No se pudo reprogramar' : 'No se pudo confirmar'));
+          throw new Error(
+            data.error
+              || (isReprog ? 'No se pudo reprogramar' : (isMark ? 'No se pudo marcar' : 'No se pudo confirmar'))
+          );
         }
         if (data.whatsapp_warning) {
           alertEl.innerHTML = `<div class="alert alert-warning py-2">${escapeHtml(data.whatsapp_warning)}</div>`;
@@ -3589,7 +3649,8 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
         if (data.whatsapp_send_status === 'failed') {
           alertEl.innerHTML = `<div class="alert alert-danger py-2">Fallo al enviar: ${escapeHtml(data.whatsapp_warning || 'error')}</div>`;
         }
-        if (confirmModal && data.whatsapp_send_status !== 'failed') {
+        // mark-confirmed never sends WhatsApp (status skipped) — always close on success.
+        if (confirmModal && (isMark || data.whatsapp_send_status !== 'failed')) {
           confirmModal.hide();
         }
         await loadSolicitudes();

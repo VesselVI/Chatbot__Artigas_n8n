@@ -17,6 +17,7 @@ from confirmacion import (
     CONFIRMED_STATUS,
     ConfirmError,
     assert_confirmable,
+    can_mark_confirmed,
     normalize_tipo,
     status_badge_label,
     validate_confirm_payload,
@@ -766,6 +767,7 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
         "status": status,
         "status_badge": status_badge_label(status, tipo),
         "can_confirm": can_confirm,
+        "can_mark_confirmed": can_mark_confirmed(r),
         "can_reprogramar": can_reprogram(r),
         "can_cancelar": can_cancel(r),
         "can_edit_resend": (
@@ -956,6 +958,59 @@ async def api_confirm_solicitud(request: Request, solicitud_id: int):
             "whatsapp_warning": send_outcome.get("whatsapp_warning"),
             "message_preview": message,
             "edited": was_confirmed,
+        }
+    except ConfirmError as e:
+        status = 404 if e.code == "not_found" else 400
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code},
+            status_code=status,
+        )
+
+
+@app.post("/api/solicitudes/{solicitud_id}/mark-confirmed")
+@login_required
+async def api_mark_confirmed_solicitud(request: Request, solicitud_id: int):
+    """Persist Confirmado + día/hora without sending WhatsApp (Chatwoot-already-notified)."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Cuerpo inválido.", "code": "invalid_body"},
+            status_code=400,
+        )
+    try:
+        payload = validate_confirm_payload(body if isinstance(body, dict) else {})
+        existing = fetch_solicitud(solicitud_id)
+        row = assert_confirmable(existing, allow_confirmed=False)
+        tipo = normalize_tipo(row.get("tipo"))
+        fields = {
+            "nombre": payload["nombre"],
+            "medico": payload["medico"],
+            "appointment_at": payload["appointment_at"],
+            "por_orden_de_llegada": payload["por_orden_de_llegada"],
+            "nota_paciente": payload["nota_paciente"],
+            "status": CONFIRMED_STATUS,
+            "whatsapp_send_status": "skipped",
+            "whatsapp_send_channel": "external",
+            "whatsapp_nota_omitted": False,
+        }
+        save_solicitud_confirmacion(solicitud_id, fields)
+        return {
+            "ok": True,
+            "id": solicitud_id,
+            "status": CONFIRMED_STATUS,
+            "status_badge": status_badge_label(CONFIRMED_STATUS, tipo),
+            "appointment_at": payload["appointment_at"].strftime("%Y-%m-%dT%H:%M"),
+            "por_orden_de_llegada": payload["por_orden_de_llegada"],
+            "nota_paciente": payload["nota_paciente"],
+            "nombre": payload["nombre"],
+            "medico": payload["medico"],
+            "whatsapp_sent": False,
+            "whatsapp_send_status": "skipped",
+            "whatsapp_send_channel": "external",
+            "whatsapp_nota_omitted": False,
+            "whatsapp_warning": None,
+            "marked_only": True,
         }
     except ConfirmError as e:
         status = 404 if e.code == "not_found" else 400

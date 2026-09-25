@@ -143,3 +143,12 @@ def assert_confirmable(
             code="invalid_status",
         )
     return row
+
+
+def can_mark_confirmed(row: dict[str, Any]) -> bool:
+    """Pending turno may be marked Confirmado without sending WhatsApp."""
+    try:
+        assert_confirmable(row, allow_confirmed=False)
+        return True
+    except ConfirmError:
+        return False

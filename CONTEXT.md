@@ -26,6 +26,10 @@ _Avoid_: Turno solicitado, confirmed booking (at bot ack / Recepción de solicit
 Secretaría opens a form on a pending solicitud with `tipo=turno`, edits prefilled nombre/médico, sets Día/hora del turno (free datetime), and may add a Nota al paciente; on submit the solicitud becomes confirmed and WhatsApp is sent. **Editar y reenviar** always saves and resends. If Chatwoot/WhatsApp send fails, the row shows a red **!** with **Fallo al enviar** and **Reenviar** (same payload). When the utility fallback runs, Secretaría is warned that the Nota al paciente was omitted. UI badge: **Confirmado**. Does not cover reschedules — those use Reprogramación desde el panel.
 _Avoid_: Confirmación de turno (alone, when meaning Recepción de solicitud), one-click with no form, immutable-after-confirm, save-without-send on edit, using Confirmación for `tipo=reprogramar`
 
+**Marcar confirmado**:
+Board-only Confirmado for a pending `tipo=turno` when Secretaría already notified the patient from Chatwoot (e.g. plantilla `confirmacion_turno`). Same día/hora (and optional Nota) form as Confirmación desde el panel, but **no WhatsApp send**; stores `whatsapp_send_channel=external` / `whatsapp_send_status=skipped` so the row is eligible for agenda features (e.g. recordatorios) without a second patient message.
+_Avoid_: Confirmación desde el panel (which always attempts WhatsApp), syncing Chatwoot template sends automatically
+
 **Mensaje de confirmación**:
 Patient-facing WhatsApp body after Confirmación desde el panel (free-form). Shape:
 

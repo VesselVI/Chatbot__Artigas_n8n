@@ -233,3 +233,69 @@ def test_confirm_por_orden_de_llegada(client, store):
     assert store.get(1)["por_orden_de_llegada"] in (True, 1)
     assert store.get(1)["appointment_at"] == datetime(2026, 9, 23, 0, 0)
     assert "Por orden de llegada" in (body.get("message_preview") or "")
+
+
+def test_mark_confirmed_persists_without_whatsapp(client, store, monkeypatch):
+    sent = []
+
+    def boom(*a, **k):
+        sent.append(True)
+        raise AssertionError("mark-confirmed must not send WhatsApp")
+
+    monkeypatch.setattr(dash_app, "send_confirmacion", boom)
+    monkeypatch.setattr(dash_app, "_attempt_whatsapp_send", boom)
+
+    res = client.post(
+        "/api/solicitudes/1/mark-confirmed",
+        json={
+            "appointment_at": "2026-09-24T15:00",
+            "nombre": "Ana Pérez",
+            "medico": "Adrian Artigas",
+            "nota_paciente": "Avisó por Chatwoot",
+        },
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["ok"] is True
+    assert body["marked_only"] is True
+    assert body["whatsapp_sent"] is False
+    assert body["whatsapp_send_status"] == "skipped"
+    assert body["whatsapp_send_channel"] == "external"
+    assert body["status_badge"] == "Confirmado"
+    assert sent == []
+
+    row = store.get(1)
+    assert row["status"] == "confirmed"
+    assert row["appointment_at"] == datetime(2026, 9, 24, 15, 0)
+    assert row["nota_paciente"] == "Avisó por Chatwoot"
+    assert row["whatsapp_send_status"] == "skipped"
+    assert row["whatsapp_send_channel"] == "external"
+
+    listed = client.get("/api/solicitudes")
+    item = next(s for s in listed.json()["solicitudes"] if s["id"] == 1)
+    assert item["can_confirm"] is False
+    assert item["can_mark_confirmed"] is False
+    assert item["can_reprogramar"] is True
+    assert item["status_badge"] == "Confirmado"
+    assert item["fallo_al_enviar"] is False
+
+
+def test_mark_confirmed_rejects_already_confirmed(client, store):
+    store.rows[1]["status"] = "confirmed"
+    res = client.post(
+        "/api/solicitudes/1/mark-confirmed",
+        json={
+            "appointment_at": "2026-09-24T15:00",
+            "nombre": "Ana Pérez",
+            "medico": "Adrian Artigas",
+        },
+    )
+    assert res.status_code == 400
+    assert res.json()["code"] == "already_confirmed"
+
+
+def test_list_exposes_can_mark_confirmed(client):
+    listed = client.get("/api/solicitudes")
+    by_id = {s["id"]: s for s in listed.json()["solicitudes"]}
+    assert by_id[1]["can_mark_confirmed"] is True
+    assert by_id[2]["can_mark_confirmed"] is False  # cancelar

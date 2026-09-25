@@ -7,6 +7,7 @@ import pytest
 from confirmacion import (
     ConfirmError,
     assert_confirmable,
+    can_mark_confirmed,
     parse_appointment_at,
     status_badge_label,
     validate_confirm_payload,
@@ -80,6 +81,12 @@ def test_assert_confirmable_rejects_already_confirmed():
     with pytest.raises(ConfirmError) as ei:
         assert_confirmable({"id": 1, "tipo": "turno", "status": "confirmed"})
     assert ei.value.code == "already_confirmed"
+
+
+def test_can_mark_confirmed_pending_turno_only():
+    assert can_mark_confirmed({"id": 1, "tipo": "turno", "status": "pending"}) is True
+    assert can_mark_confirmed({"id": 2, "tipo": "turno", "status": "confirmed"}) is False
+    assert can_mark_confirmed({"id": 3, "tipo": "reprogramar", "status": "pending"}) is False
 
 
 def test_validate_confirm_payload_por_orden_de_llegada():
