@@ -23,8 +23,8 @@ A turno whose Día/hora del turno Secretaría has assigned on the solicitud via 
 _Avoid_: Turno solicitado, confirmed booking (at bot ack / Recepción de solicitud alone)
 
 **Confirmación desde el panel**:
-Secretaría opens a form on a pending solicitud with `tipo=turno`, edits prefilled nombre/médico, sets Día/hora del turno (free datetime), and may add a Nota al paciente; on submit the solicitud becomes confirmed and WhatsApp is sent. **Editar y reenviar** always saves and resends. If Chatwoot/WhatsApp send fails, the row shows a red **!** with **Fallo al enviar** and **Reenviar** (same payload). When the utility fallback runs, Secretaría is warned that the Nota al paciente was omitted. UI badge: **Confirmado**. Does not cover reschedules — those use Reprogramación desde el panel.
-_Avoid_: Confirmación de turno (alone, when meaning Recepción de solicitud), one-click with no form, immutable-after-confirm, save-without-send on edit, using Confirmación for `tipo=reprogramar`
+Secretaría opens a form on a pending solicitud with `tipo=turno`, edits prefilled nombre/médico, sets Día/hora del turno (free datetime), and may add a Nota al paciente; on submit the solicitud becomes confirmed and WhatsApp is sent. If Chatwoot/WhatsApp send fails, the row shows a red **!** with **Fallo al enviar** and **Reenviar** (same payload). When the utility fallback runs, Secretaría is warned that the Nota al paciente was omitted. UI badge: **Confirmado**. Day/time changes after confirm use Reprogramación desde el panel (not a separate edit-and-resend control).
+_Avoid_: Confirmación de turno (alone, when meaning Recepción de solicitud), one-click with no form, immutable-after-confirm, using Confirmación for `tipo=reprogramar`
 
 **Marcar confirmado**:
 Board-only Confirmado for a pending `tipo=turno` when Secretaría already notified the patient from Chatwoot (e.g. plantilla `confirmacion_turno`). Same día/hora (and optional Nota) form as Confirmación desde el panel, but **no WhatsApp send**; stores `whatsapp_send_channel=external` / `whatsapp_send_status=skipped` so the row is eligible for agenda features (e.g. recordatorios) without a second patient message.
@@ -60,7 +60,7 @@ Clinic-initiated cancel notify from the dashboard: same patient search / phone�
 _Avoid_: Cancelación de turno (alone, when meaning only the patient’s bot request), Cancelación de solicitud
 
 **Fallo al enviar**:
-Panel warning when Chatwoot/WhatsApp rejects or fails an outbound send from Confirmación, Reprogramación, or Cancelación desde el panel; paired with **Reenviar** where that action applies. Distinct from a successful send that still needs a content fix (**Editar y reenviar** on confirmación).
+Panel warning when Chatwoot/WhatsApp rejects or fails an outbound send from Confirmación, Reprogramación, or Cancelación desde el panel; paired with **Reenviar** where that action applies.
 _Avoid_: Error genérico, failed booking, turno no confirmado (the solicitud may already be confirmed or cancelled in DB)
 
 **Nota al paciente**:

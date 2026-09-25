@@ -770,9 +770,6 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
         "can_mark_confirmed": can_mark_confirmed(r),
         "can_reprogramar": can_reprogram(r),
         "can_cancelar": can_cancel(r),
-        "can_edit_resend": (
-            is_confirmed and send_status == "sent" and tipo in CONFIRMABLE_TIPOS
-        ),
         "can_reenviar": (
             (is_confirmed or is_cancelled) and send_status == "failed"
         ),

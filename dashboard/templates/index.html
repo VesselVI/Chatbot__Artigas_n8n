@@ -1198,15 +1198,6 @@
       .btn-reenviar:hover { background: #912018; border-color: #912018; }
     }
 
-    .btn-editar-reenviar {
-      color: #2f5bd8;
-      background: var(--surface);
-      border: 1px solid #b3c4f5;
-    }
-    @media (hover: hover) and (pointer: fine) {
-      .btn-editar-reenviar:hover { background: #eef2ff; }
-    }
-
     .empty-filter {
       display: none;
       padding: 2.25rem 1rem;
@@ -2410,7 +2401,6 @@
       calendarClock: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 14v2.2l1.6 1"/><path d="M16 2v4"/><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M3 10h5"/><path d="M8 2v4"/><circle cx="16" cy="16" r="6"/></svg>',
       ban: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>',
       send: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>',
-      squarePen: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg>',
       messages: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>'
     };
 
@@ -2468,9 +2458,6 @@
       }
       if (b.can_reenviar) {
         parts.push(`<button type="button" class="btn-action btn-reenviar" data-reenviar-id="${b.id}" aria-label="Reenviar">${ICO.send}<span class="btn-tip" aria-hidden="true">Reenviar</span></button>`);
-      }
-      if (b.can_edit_resend) {
-        parts.push(`<button type="button" class="btn-action btn-editar-reenviar" data-edit-id="${b.id}" aria-label="Editar y reenviar">${ICO.squarePen}<span class="btn-tip" aria-hidden="true">Editar y reenviar</span></button>`);
       }
       if (!parts.length) {
         return `<div class="acciones-strip"><span class="acciones-empty" aria-hidden="true">—</span></div>`;
@@ -2937,12 +2924,6 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
         btn.addEventListener('click', () => {
           const flat = findSolicitud(Number(btn.getAttribute('data-cancelar-id')));
           if (flat) openCancelModal(flat, { searchFirst: false });
-        });
-      });
-      tbody.querySelectorAll('[data-edit-id]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const flat = findSolicitud(Number(btn.getAttribute('data-edit-id')));
-          if (flat) openConfirmModal(flat, { edit: true });
         });
       });
       tbody.querySelectorAll('[data-reenviar-id]').forEach(btn => {
