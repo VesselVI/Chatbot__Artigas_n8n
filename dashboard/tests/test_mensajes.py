@@ -36,9 +36,11 @@ def test_mensaje_reprogramacion_copy():
         appointment_at=datetime(2026, 9, 23, 16, 0),
         nota_paciente="",
     )
-    assert "✅ TURNO REPROGRAMADO" in text
+    assert text.startswith("TURNO REPROGRAMADO")
     assert "Nuevo día y hora: 23/09/2026 16:00" in text
-    assert "Su turno anterior fue cancelado" in text
+    assert "Su turno ha sido reprogramado" in text
+    assert "Escribí menú para volver" in text
+    assert "Por orden de llegada" not in text
 
 
 def test_outbound_picks_by_tipo():

@@ -50,9 +50,11 @@ def test_reprogramacion_sends_numbered_body_params(monkeypatch):
     assert tp["language"] == "es_AR"
     assert tp["category"] == "UTILITY"
     assert tp["processed_params"] == {
-        "1": "Maria Gómez",
-        "2": "Dr. Artigas",
-        "3": "23/09/2026 10:30",
+        "body": {
+            "1": "Maria Gómez",
+            "2": "Dr. Artigas",
+            "3": "23/09/2026 10:30",
+        }
     }
 
 

@@ -73,33 +73,25 @@ def build_mensaje_reprogramacion(
     include_nota: bool = True,
     por_orden_de_llegada: bool = False,
 ) -> str:
-    if por_orden_de_llegada:
-        title = "👤 INFORMACION DEL TURNO"
-        dia_line = (
-            f"Nuevo día: {format_dia_hora_display(appointment_at, por_orden_de_llegada=True)}"
-        )
-        footer = (
-            "Su turno anterior fue cancelado. Presentate el día indicado; "
-            "te atenderán por orden de llegada. Escribí menú para volver."
-        )
-    else:
-        title = "✅ TURNO REPROGRAMADO"
-        dia_line = f"Nuevo día y hora: {format_dia_hora_display(appointment_at)}"
-        footer = (
-            "Su turno anterior fue cancelado. Agende este nuevo horario. "
-            "Escribí menú para volver."
-        )
+    # Match Meta plantilla confirmacion_reprogramacion (es_AR) — always día+hora.
+    _ = por_orden_de_llegada
     lines = [
-        title,
+        "TURNO REPROGRAMADO",
         "",
         f"Nombre: {nombre}",
         f"Médico: {medico}",
-        dia_line,
+        f"Nuevo día y hora: {format_dia_hora_display(appointment_at)}",
     ]
     nota = (nota_paciente or "").strip()
     if include_nota and nota:
         lines.append(f"Nota: {nota}")
-    lines.extend(["", footer])
+    lines.extend(
+        [
+            "",
+            "Su turno ha sido reprogramado. Agende este nuevo horario. "
+            "Escribí menú para volver.",
+        ]
+    )
     return "\n".join(lines)
 
 

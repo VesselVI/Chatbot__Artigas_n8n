@@ -1946,7 +1946,7 @@
                 <input type="text" class="form-control" id="confirm-medico">
               </div>
 
-              <fieldset class="sched-fieldset">
+              <fieldset class="sched-fieldset" id="confirm-sched-fieldset">
                 <legend class="sched-legend">Cómo confirmar el turno</legend>
                 <div class="sched-options" role="radiogroup" aria-label="Modo de horario">
                   <label class="sched-option">
@@ -1965,6 +1965,10 @@
                   </label>
                 </div>
               </fieldset>
+
+              <div class="mb-2" id="reprogram-sched-label" hidden>
+                <span class="form-label mb-0">Nuevo día y hora</span>
+              </div>
 
               <div class="sched-fields two-col" id="fields-hora">
                 <div>
@@ -2526,10 +2530,15 @@
     }
 
     function syncSchedModeUI() {
-      const isOrden = getSchedMode() === 'orden';
+      const isReprog = isReprogramModal();
+      const isOrden = !isReprog && getSchedMode() === 'orden';
+      const fieldset = document.getElementById('confirm-sched-fieldset');
+      const reprogLabel = document.getElementById('reprogram-sched-label');
       const fieldsHora = document.getElementById('fields-hora');
       const fieldsOrden = document.getElementById('fields-orden');
       const ordenNote = document.getElementById('orden-note');
+      if (fieldset) fieldset.hidden = isReprog;
+      if (reprogLabel) reprogLabel.hidden = !isReprog;
       if (fieldsHora) fieldsHora.hidden = isOrden;
       if (fieldsOrden) fieldsOrden.hidden = !isOrden;
       if (ordenNote) ordenNote.hidden = !isOrden;
@@ -2551,13 +2560,14 @@
     }
 
     function buildConfirmPreviewMessage() {
-      const mode = getSchedMode();
+      const isReprog = isReprogramModal();
+      // Reprogramación always día+hora (Meta plantilla {{3}} = Nuevo día y hora).
+      const mode = isReprog ? 'hora' : getSchedMode();
       const nombre = (document.getElementById('confirm-nombre').value || '').trim() || '—';
       const medico = (document.getElementById('confirm-medico').value || '').trim() || '—';
-      const nota = isReprogramModal()
+      const nota = isReprog
         ? ''
         : (document.getElementById('confirm-nota').value || '').trim();
-      const isReprog = isReprogramModal();
       let diaHora = '';
       if (mode === 'hora') {
         const date = document.getElementById('confirm-date').value;
@@ -2619,7 +2629,8 @@
     }
 
     function fillConfirmSchedule(b) {
-      const porOrden = !!b.por_orden_de_llegada;
+      const isReprog = isReprogramModal();
+      const porOrden = !isReprog && !!b.por_orden_de_llegada;
       const raw = String(b.appointment_at || b.appointment_date || '');
       let date = '';
       let time = '';
@@ -2681,12 +2692,6 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
         suggest.innerHTML = '';
         suggest.hidden = true;
       }
-      const schedLegend = document.querySelector('#confirmModal .sched-legend');
-      if (schedLegend) {
-        schedLegend.textContent = isReprog
-          ? 'Cómo reprogramar el turno'
-          : 'Cómo confirmar el turno';
-      }
       document.getElementById('confirm-alert').innerHTML = '';
       if (!(isSearchFirst && empty)) {
         fillConfirmSchedule(empty ? {} : b);
@@ -2696,6 +2701,7 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
         document.getElementById('confirm-date-orden').value = '';
         setSchedMode('hora');
       }
+      syncSchedModeUI();
       updateConfirmPreview();
       syncReprogramSubmitEnabled();
       if (!confirmModal) {
@@ -3441,7 +3447,8 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
           }
         }
         let payload;
-        if (mode === 'orden') {
+        // Reprogramación: plantilla confirmacion_reprogramacion always needs día+hora ({{3}}).
+        if (!isReprog && mode === 'orden') {
           const appointment_date = document.getElementById('confirm-date-orden').value;
           if (!appointment_date) throw new Error('Elegí el día (por orden de llegada).');
           payload = {

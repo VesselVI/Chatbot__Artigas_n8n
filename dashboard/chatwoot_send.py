@@ -141,7 +141,13 @@ def send_utility_template(
         f"{chatwoot_api_base()}/accounts/{chatwoot_account_id()}"
         f"/conversations/{cid}/messages"
     )
-    # Chatwoot WhatsApp template payload shape (template_params)
+    # Chatwoot enhanced format: processed_params.body with numbered keys.
+    # Flat legacy {"1":…} can yield Meta #132000 on some Chatwoot builds.
+    processed: dict[str, Any] = {}
+    if body_params:
+        processed["body"] = {
+            str(i + 1): str(v) for i, v in enumerate(body_params)
+        }
     _http_json(
         "POST",
         url,
@@ -153,7 +159,7 @@ def send_utility_template(
                 "name": name,
                 "category": "UTILITY",
                 "language": "es_AR",
-                "processed_params": {str(i + 1): v for i, v in enumerate(body_params)},
+                "processed_params": processed,
             },
         },
         opener=opener,

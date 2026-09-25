@@ -12,7 +12,6 @@ from confirmacion import (
     is_por_orden_de_llegada,
     normalize_tipo,
     parse_appointment_at,
-    parse_appointment_date,
 )
 
 # Pending patient reprogram requests + confirmed turnos (ADR-0005 / #9).
@@ -20,21 +19,21 @@ REPROGRAM_TEMPLATE = "confirmacion_reprogramacion"
 
 
 def validate_reprogram_payload(body: dict[str, Any]) -> dict[str, Any]:
-    """Normalize body for Reprogramación desde el panel. No Nota al paciente."""
+    """Normalize body for Reprogramación desde el panel. No Nota al paciente.
+
+    Always requires día + hora: Meta plantilla confirmacion_reprogramacion
+    body {{3}} is «Nuevo día y hora» (no por-orden-de-llegada mode).
+    """
     if not isinstance(body, dict):
         raise ConfirmError("Cuerpo inválido.", code="invalid_body")
-    por_orden = is_por_orden_de_llegada(body)
-    if por_orden:
-        raw = (
-            body.get("appointment_date")
-            or body.get("appointment_at")
-            or body.get("dia_hora")
+    if is_por_orden_de_llegada(body):
+        raise ConfirmError(
+            "La reprogramación requiere día y hora (plantilla confirmacion_reprogramacion).",
+            code="hora_required",
         )
-        appointment_at = parse_appointment_date(raw)
-    else:
-        appointment_at = parse_appointment_at(
-            body.get("appointment_at") or body.get("dia_hora")
-        )
+    appointment_at = parse_appointment_at(
+        body.get("appointment_at") or body.get("dia_hora")
+    )
     nombre = str(body.get("nombre") or "").strip()
     medico = str(body.get("medico") or "").strip()
     if not nombre:
@@ -45,7 +44,7 @@ def validate_reprogram_payload(body: dict[str, Any]) -> dict[str, Any]:
         "appointment_at": appointment_at,
         "nombre": nombre,
         "medico": medico,
-        "por_orden_de_llegada": por_orden,
+        "por_orden_de_llegada": False,
     }
 
 

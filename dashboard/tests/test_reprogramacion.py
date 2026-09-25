@@ -28,17 +28,17 @@ def test_validate_reprogram_payload_ok_no_nota_field():
     assert "nota_paciente" not in out
 
 
-def test_validate_reprogram_payload_por_orden():
-    out = validate_reprogram_payload(
-        {
-            "scheduling_mode": "por_orden_de_llegada",
-            "appointment_date": "2026-09-26",
-            "nombre": "Ana",
-            "medico": "Adrian Artigas",
-        }
-    )
-    assert out["por_orden_de_llegada"] is True
-    assert out["appointment_at"] == datetime(2026, 9, 26, 0, 0)
+def test_validate_reprogram_payload_rejects_por_orden():
+    with pytest.raises(ConfirmError) as ei:
+        validate_reprogram_payload(
+            {
+                "scheduling_mode": "por_orden_de_llegada",
+                "appointment_date": "2026-09-26",
+                "nombre": "Ana",
+                "medico": "Adrian Artigas",
+            }
+        )
+    assert ei.value.code == "hora_required"
 
 
 def test_assert_reprogramable_pending_reprogramar():
