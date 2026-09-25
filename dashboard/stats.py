@@ -23,6 +23,17 @@ MONTHS_ES = (
     "diciembre",
 )
 
+DAY_SHORT_ES = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+DAY_FULL_ES = (
+    "Lunes",
+    "Martes",
+    "Miércoles",
+    "Jueves",
+    "Viernes",
+    "Sábado",
+    "Domingo",
+)
+
 
 def monday_of(d: date) -> date:
     return d - timedelta(days=d.weekday())
@@ -158,6 +169,40 @@ def build_trends(current: dict[str, int], previous: dict[str, int]) -> dict[str,
     }
 
 
+def empty_daily_series(week_start: date) -> dict[str, Any]:
+    days = [week_start + timedelta(days=i) for i in range(7)]
+    return {
+        "labels": list(DAY_SHORT_ES),
+        "labels_full": [
+            f"{DAY_FULL_ES[i]} {d.day:02d}/{d.month:02d}" for i, d in enumerate(days)
+        ],
+        "dates": [d.isoformat() for d in days],
+        "total": [0] * 7,
+        "confirmados": [0] * 7,
+        "reprogramaciones": [0] * 7,
+        "cancelaciones": [0] * 7,
+    }
+
+
+def daily_series_for_week(
+    rows: list[dict[str, Any]], week_start: date, week_end: date
+) -> dict[str, Any]:
+    """Per-day counts Mon–Sun (by created_at) for chart nodes."""
+    series = empty_daily_series(week_start)
+    for row in rows:
+        created = _as_date(row.get("created_at"))
+        if created is None or created < week_start or created > week_end:
+            continue
+        idx = (created - week_start).days
+        if idx < 0 or idx > 6:
+            continue
+        series["total"][idx] += 1
+        bucket = classify_row(row)
+        if bucket:
+            series[bucket][idx] += 1
+    return series
+
+
 def compute_solicitudes_week_stats(
     rows: list[dict[str, Any]], *, today: date | None = None
 ) -> dict[str, Any]:
@@ -172,4 +217,5 @@ def compute_solicitudes_week_stats(
         "current": current,
         "previous": previous,
         "trends": build_trends(current, previous),
+        "daily": daily_series_for_week(rows, current_start, current_end),
     }

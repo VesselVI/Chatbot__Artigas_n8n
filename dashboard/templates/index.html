@@ -476,32 +476,24 @@
     }
     .metric-chart {
       height: 70px;
-      margin: 0.75rem 0.75rem 0;
+      margin: 0.75rem 0.75rem 0.2rem;
       position: relative;
     }
-    .metric-chart svg {
+    .metric-chart canvas {
       display: block;
-      width: 100%;
-      height: 100%;
+      width: 100% !important;
+      height: 100% !important;
     }
-    .metric-chart .spark-line {
-      fill: none;
-      stroke: rgba(255, 255, 255, 0.95);
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-    .metric-chart .spark-dot {
-      fill: #fff;
-      stroke: rgba(255, 255, 255, 0.35);
-      stroke-width: 1;
-    }
-    .metric-chart .spark-area {
-      fill: rgba(255, 255, 255, 0.12);
-      stroke: none;
-    }
-    .metric-chart .spark-bar {
-      fill: rgba(255, 255, 255, 0.92);
+    .metric-day-legend {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 0.9rem 0.65rem;
+      font-size: 0.625rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: rgba(255, 255, 255, 0.75);
+      text-transform: uppercase;
+      font-variant-numeric: tabular-nums;
     }
 
     /* —— Card —— */
@@ -1790,7 +1782,8 @@
               </div>
               <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
             </div>
-            <div class="metric-chart" id="kpi-total-chart" aria-hidden="true"></div>
+            <div class="metric-chart"><canvas id="kpi-total-chart" aria-hidden="true"></canvas></div>
+            <div class="metric-day-legend" data-kpi-legend></div>
           </div>
           <div class="metric-card m-confirmados">
             <div class="metric-card-body">
@@ -1803,7 +1796,8 @@
               </div>
               <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
             </div>
-            <div class="metric-chart" id="kpi-confirmados-chart" aria-hidden="true"></div>
+            <div class="metric-chart"><canvas id="kpi-confirmados-chart" aria-hidden="true"></canvas></div>
+            <div class="metric-day-legend" data-kpi-legend></div>
           </div>
           <div class="metric-card m-reprogramados">
             <div class="metric-card-body">
@@ -1816,7 +1810,8 @@
               </div>
               <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
             </div>
-            <div class="metric-chart" id="kpi-reprog-chart" aria-hidden="true"></div>
+            <div class="metric-chart"><canvas id="kpi-reprog-chart" aria-hidden="true"></canvas></div>
+            <div class="metric-day-legend" data-kpi-legend></div>
           </div>
           <div class="metric-card m-cancelados">
             <div class="metric-card-body">
@@ -1829,7 +1824,8 @@
               </div>
               <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
             </div>
-            <div class="metric-chart" id="kpi-cancelados-chart" aria-hidden="true"></div>
+            <div class="metric-chart"><canvas id="kpi-cancelados-chart" aria-hidden="true"></canvas></div>
+            <div class="metric-day-legend" data-kpi-legend></div>
           </div>
         </div>
       </section>
@@ -2086,6 +2082,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
     const allTimes = {{ all_times_json | safe }};
     const shiftDefaults = { manana: ['09:00', '12:00'], noche: ['16:00', '19:00'] };
@@ -3076,80 +3073,161 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
       return '(' + text + (arrow ? ' <span class="trend-arrow">' + arrow + '</span>' : '') + ')';
     }
 
-    function sparkSeries(prev, curr, n) {
-      const points = n || 7;
-      const a = Math.max(0, Number(prev) || 0);
-      const b = Math.max(0, Number(curr) || 0);
-      const mid = (a + b) / 2;
-      const amp = Math.max(1, Math.abs(b - a) * 0.45, mid * 0.12);
-      const out = [];
-      for (let i = 0; i < points; i++) {
-        const t = i / (points - 1);
-        const base = a + (b - a) * t;
-        const wobble = Math.sin(i * 1.7 + (a + 1) * 0.3) * amp * (0.35 + 0.2 * Math.sin(i));
-        out.push(Math.max(0, base + wobble));
-      }
-      out[points - 1] = b;
-      return out;
+    const kpiCharts = {};
+    const KPI_POINT_COLORS = {
+      total: '#6261cc',
+      confirmados: '#3d99f5',
+      reprogramaciones: '#edad21',
+      cancelaciones: '#db5d5d',
+    };
+
+    function setKpiText(valueId, trendId, value, trend, key) {
+      const valueEl = document.getElementById(valueId);
+      const trendEl = document.getElementById(trendId);
+      if (valueEl) valueEl.textContent = String(value ?? '—');
+      if (trendEl) trendEl.innerHTML = formatCoreTrend(key, trend);
     }
 
-    function renderSparkline(el, values, style) {
-      if (!el) return;
-      const w = 100;
-      const h = 40;
-      const padY = 4;
-      const padX = 2;
-      const vals = values && values.length ? values : [0, 0];
-      const min = Math.min(...vals);
-      const max = Math.max(...vals);
-      const span = Math.max(0.0001, max - min);
-      const coords = vals.map((v, i) => {
-        const x = padX + (i / Math.max(1, vals.length - 1)) * (w - padX * 2);
-        const y = h - padY - ((v - min) / span) * (h - padY * 2);
-        return [x, y];
+    function updateDayLegends(labels) {
+      const days = labels && labels.length
+        ? labels
+        : ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+      document.querySelectorAll('[data-kpi-legend]').forEach(el => {
+        el.innerHTML = days.map(l => '<span>' + escapeHtml(l) + '</span>').join('');
       });
+    }
+
+    function destroyKpiChart(key) {
+      if (kpiCharts[key]) {
+        kpiCharts[key].destroy();
+        delete kpiCharts[key];
+      }
+    }
+
+    function lineChartOptions(fullLabels, unitLabel) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+            titleFont: { size: 12, weight: '600' },
+            bodyFont: { size: 12 },
+            padding: 8,
+            displayColors: false,
+            callbacks: {
+              title: (items) => (fullLabels && fullLabels[items[0].dataIndex]) || '',
+              label: (item) => item.parsed.y + ' ' + unitLabel,
+            },
+          },
+        },
+        scales: {
+          x: {
+            border: { display: false },
+            grid: { display: false },
+            ticks: { display: false },
+          },
+          y: {
+            display: false,
+            beginAtZero: true,
+            grid: { display: false },
+          },
+        },
+        elements: {
+          line: { borderWidth: 1.5, tension: 0.35 },
+          point: {
+            radius: 4,
+            hitRadius: 12,
+            hoverRadius: 5,
+            borderColor: 'rgba(255,255,255,0.95)',
+            borderWidth: 1,
+          },
+        },
+      };
+    }
+
+    function upsertKpiChart(key, canvasId, daily, style) {
+      if (typeof Chart === 'undefined') return;
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const labels = (daily && daily.labels) || ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+      const fullLabels = (daily && daily.labels_full) || labels;
+      const values = (daily && daily[key]) || [0, 0, 0, 0, 0, 0, 0];
+      const pointFill = KPI_POINT_COLORS[key] || '#fff';
+      destroyKpiChart(key);
 
       if (style === 'bars') {
-        const bw = Math.max(2, (w - padX * 2) / vals.length * 0.55);
-        const bars = vals.map((v, i) => {
-          const x = padX + (i / Math.max(1, vals.length - 1)) * (w - padX * 2) - bw / 2;
-          const y = h - padY - ((v - min) / span) * (h - padY * 2);
-          const bh = h - padY - y;
-          return `<rect class="spark-bar" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${bw.toFixed(2)}" height="${Math.max(1, bh).toFixed(2)}" rx="0.6"/>`;
-        }).join('');
-        el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${bars}</svg>`;
+        kpiCharts[key] = new Chart(canvas, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              data: values,
+              backgroundColor: 'rgba(255,255,255,0.35)',
+              hoverBackgroundColor: 'rgba(255,255,255,0.7)',
+              borderRadius: 2,
+              barPercentage: 0.55,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                enabled: true,
+                backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                displayColors: false,
+                callbacks: {
+                  title: (items) => fullLabels[items[0].dataIndex] || '',
+                  label: (item) => item.parsed.y + ' cancelaciones',
+                },
+              },
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { display: false } },
+              y: { display: false, beginAtZero: true, grid: { display: false } },
+            },
+          },
+        });
         return;
       }
 
-      const d = coords.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(2) + ' ' + p[1].toFixed(2)).join(' ');
-      const area = d + ` L${coords[coords.length - 1][0].toFixed(2)} ${h} L${coords[0][0].toFixed(2)} ${h} Z`;
-      const dots = style === 'dots'
-        ? coords.map(p => `<circle class="spark-dot" cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="1.6"/>`).join('')
-        : '';
-      const smooth = style === 'smooth';
-      el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-        ${smooth ? `<path class="spark-area" d="${area}"/>` : ''}
-        <path class="spark-line" d="${d}"/>
-        ${dots}
-      </svg>`;
-    }
-
-    function setKpi(valueId, trendId, chartId, value, prev, trend, key, chartStyle) {
-      const valueEl = document.getElementById(valueId);
-      const trendEl = document.getElementById(trendId);
-      const chartEl = document.getElementById(chartId);
-      if (valueEl) valueEl.textContent = String(value ?? '—');
-      if (trendEl) {
-        trendEl.innerHTML = formatCoreTrend(key, trend);
+      const fill = style === 'smooth';
+      const opts = lineChartOptions(fullLabels, key === 'reprogramaciones' ? 'reprogramaciones' : 'solicitudes');
+      if (fill) {
+        opts.elements.line.borderWidth = 2;
+        opts.elements.line.tension = 0.4;
       }
-      if (chartEl) {
-        const series = sparkSeries(prev, value, chartStyle === 'bars' ? 12 : 7);
-        renderSparkline(chartEl, series, chartStyle);
-      }
+      kpiCharts[key] = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            borderColor: 'rgba(255,255,255,0.55)',
+            backgroundColor: fill ? 'rgba(255,255,255,0.18)' : 'transparent',
+            fill,
+            pointBackgroundColor: pointFill,
+          }],
+        },
+        options: opts,
+      });
     }
 
     async function loadStats() {
       const weekLabel = document.getElementById('stats-week-label');
+      const emptyDaily = {
+        labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+        labels_full: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+        total: [0, 0, 0, 0, 0, 0, 0],
+        confirmados: [0, 0, 0, 0, 0, 0, 0],
+        reprogramaciones: [0, 0, 0, 0, 0, 0, 0],
+        cancelaciones: [0, 0, 0, 0, 0, 0, 0],
+      };
       try {
         const res = await fetch('/api/solicitudes/stats?_=' + Date.now(), {
           cache: 'no-store',
@@ -3159,18 +3237,28 @@ function openConfirmModal(b, { edit, reprogram, searchFirst } = {}) {
         const data = await res.json();
         if (weekLabel) weekLabel.textContent = data.week_label || '';
         const cur = data.current || {};
-        const prev = data.previous || {};
         const trends = data.trends || {};
-        setKpi('kpi-total', 'kpi-total-trend', 'kpi-total-chart', cur.total, prev.total, trends.total, 'total', 'dots');
-        setKpi('kpi-confirmados', 'kpi-confirmados-trend', 'kpi-confirmados-chart', cur.confirmados, prev.confirmados, trends.confirmados, 'confirmados', 'dots');
-        setKpi('kpi-reprog', 'kpi-reprog-trend', 'kpi-reprog-chart', cur.reprogramaciones, prev.reprogramaciones, trends.reprogramaciones, 'reprogramaciones', 'smooth');
-        setKpi('kpi-cancelados', 'kpi-cancelados-trend', 'kpi-cancelados-chart', cur.cancelaciones, prev.cancelaciones, trends.cancelaciones, 'cancelaciones', 'bars');
+        const daily = data.daily || emptyDaily;
+        updateDayLegends(daily.labels);
+        setKpiText('kpi-total', 'kpi-total-trend', cur.total, trends.total, 'total');
+        setKpiText('kpi-confirmados', 'kpi-confirmados-trend', cur.confirmados, trends.confirmados, 'confirmados');
+        setKpiText('kpi-reprog', 'kpi-reprog-trend', cur.reprogramaciones, trends.reprogramaciones, 'reprogramaciones');
+        setKpiText('kpi-cancelados', 'kpi-cancelados-trend', cur.cancelaciones, trends.cancelaciones, 'cancelaciones');
+        upsertKpiChart('total', 'kpi-total-chart', daily, 'dots');
+        upsertKpiChart('confirmados', 'kpi-confirmados-chart', daily, 'dots');
+        upsertKpiChart('reprogramaciones', 'kpi-reprog-chart', daily, 'smooth');
+        upsertKpiChart('cancelaciones', 'kpi-cancelados-chart', daily, 'bars');
       } catch (err) {
         if (weekLabel) weekLabel.textContent = 'No se pudieron cargar';
-        setKpi('kpi-total', 'kpi-total-trend', 'kpi-total-chart', '—', 0, null, 'total', 'dots');
-        setKpi('kpi-confirmados', 'kpi-confirmados-trend', 'kpi-confirmados-chart', '—', 0, null, 'confirmados', 'dots');
-        setKpi('kpi-reprog', 'kpi-reprog-trend', 'kpi-reprog-chart', '—', 0, null, 'reprogramaciones', 'smooth');
-        setKpi('kpi-cancelados', 'kpi-cancelados-trend', 'kpi-cancelados-chart', '—', 0, null, 'cancelaciones', 'bars');
+        updateDayLegends(emptyDaily.labels);
+        setKpiText('kpi-total', 'kpi-total-trend', '—', null, 'total');
+        setKpiText('kpi-confirmados', 'kpi-confirmados-trend', '—', null, 'confirmados');
+        setKpiText('kpi-reprog', 'kpi-reprog-trend', '—', null, 'reprogramaciones');
+        setKpiText('kpi-cancelados', 'kpi-cancelados-trend', '—', null, 'cancelaciones');
+        upsertKpiChart('total', 'kpi-total-chart', emptyDaily, 'dots');
+        upsertKpiChart('confirmados', 'kpi-confirmados-chart', emptyDaily, 'dots');
+        upsertKpiChart('reprogramaciones', 'kpi-reprog-chart', emptyDaily, 'smooth');
+        upsertKpiChart('cancelaciones', 'kpi-cancelados-chart', emptyDaily, 'bars');
       }
     }
 

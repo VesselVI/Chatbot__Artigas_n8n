@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview — KPI CoreUI (Chart.js por día)</title>
+  <!--
+    Standalone sign-off mock. Do NOT port to index.html until approved.
+    Charts: one point per weekday (Lun→Dom) of the current week.
+    Style mirrors CoreUI Free dashboard widgets (solid cards + Chart.js).
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --paper: #f4f7fb;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --font: 'Plus Jakarta Sans', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--paper);
+      color: var(--ink);
+      padding: 1.5rem 1.75rem 3rem;
+    }
+    .preview-banner {
+      max-width: 1120px;
+      margin: 0 auto 1.25rem;
+      padding: 0.85rem 1rem;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      color: #9a3412;
+    }
+    .preview-banner strong { color: #7c2d12; }
+    h1 {
+      max-width: 1120px;
+      margin: 0 auto 0.35rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .sub {
+      max-width: 1120px;
+      margin: 0 auto 1.25rem;
+      color: var(--muted);
+      font-size: 0.875rem;
+    }
+    .metrics-grid {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+    @media (max-width: 991.98px) {
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 575.98px) {
+      .metrics-grid { grid-template-columns: 1fr; }
+    }
+    .metric-card {
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .m-total { background: #6261cc; }
+    .m-confirmados { background: #3d99f5; }
+    .m-reprogramados { background: #edad21; }
+    .m-cancelados { background: #db5d5d; }
+    .metric-card-body {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 1rem 1rem 0;
+      gap: 0.5rem;
+    }
+    .metric-value-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.35rem;
+      line-height: 1.15;
+    }
+    .metric-value {
+      font-size: 1.35rem;
+      font-weight: 600;
+    }
+    .metric-trend {
+      font-size: 0.875rem;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.92);
+    }
+    .metric-label {
+      margin-top: 0.2rem;
+      font-size: 0.875rem;
+    }
+    .metric-opts {
+      opacity: 0.85;
+      font-size: 1.1rem;
+      pointer-events: none;
+    }
+    .metric-chart {
+      height: 70px;
+      margin: 0.75rem 0.75rem 0.35rem;
+      position: relative;
+    }
+    .day-legend {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 0.9rem 0.65rem;
+      font-size: 0.625rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: rgba(255, 255, 255, 0.75);
+      text-transform: uppercase;
+      font-variant-numeric: tabular-nums;
+    }
+    .notes {
+      max-width: 1120px;
+      margin: 1.5rem auto 0;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .notes code {
+      font-size: 0.75rem;
+      background: #e2e8f0;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      color: #0f172a;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-banner">
+    <strong>Preview only</strong> — not wired into <code>index.html</code>.
+    Hover a node: day + count. Each node = one day of the current week (Lun→Dom).
+  </div>
+  <h1>Estadísticas de la semana — preview Chart.js</h1>
+  <p class="sub" id="week-label">Semana del …</p>
+
+  <div class="metrics-grid">
+    <div class="metric-card m-total">
+      <div class="metric-card-body">
+        <div>
+          <div class="metric-value-row">
+            <span class="metric-value" id="kpi-total">28</span>
+            <span class="metric-trend" id="kpi-total-trend">(+12% <span class="trend-arrow">↑</span>)</span>
+          </div>
+          <div class="metric-label">Total solicitudes</div>
+        </div>
+        <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
+      </div>
+      <div class="metric-chart"><canvas id="chart-total"></canvas></div>
+      <div class="day-legend" data-legend></div>
+    </div>
+
+    <div class="metric-card m-confirmados">
+      <div class="metric-card-body">
+        <div>
+          <div class="metric-value-row">
+            <span class="metric-value">18</span>
+            <span class="metric-trend">(+8% <span class="trend-arrow">↑</span>)</span>
+          </div>
+          <div class="metric-label">Confirmados</div>
+        </div>
+        <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
+      </div>
+      <div class="metric-chart"><canvas id="chart-confirmados"></canvas></div>
+      <div class="day-legend" data-legend></div>
+    </div>
+
+    <div class="metric-card m-reprogramados">
+      <div class="metric-card-body">
+        <div>
+          <div class="metric-value-row">
+            <span class="metric-value">3</span>
+            <span class="metric-trend">(-2 <span class="trend-arrow">↓</span>)</span>
+          </div>
+          <div class="metric-label">Reprogramaciones</div>
+        </div>
+        <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
+      </div>
+      <div class="metric-chart"><canvas id="chart-reprog"></canvas></div>
+      <div class="day-legend" data-legend></div>
+    </div>
+
+    <div class="metric-card m-cancelados">
+      <div class="metric-card-body">
+        <div>
+          <div class="metric-value-row">
+            <span class="metric-value">1</span>
+            <span class="metric-trend">(4% del total)</span>
+          </div>
+          <div class="metric-label">Cancelaciones</div>
+        </div>
+        <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
+      </div>
+      <div class="metric-chart"><canvas id="chart-cancel"></canvas></div>
+      <div class="day-legend" data-legend></div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <p><strong>Qué cambia vs lo actual en Index:</strong> Chart.js (como CoreUI), puntos blancos visibles, labels Lun–Dom bajo el gráfico, tooltip al pasar el mouse con día + cantidad. Mock data por ahora; al portar haría falta serie diaria real desde la API.</p>
+    <p>Decí si aprobás este preview (o pedí ajustes) antes de tocar <code>dashboard/templates/index.html</code>.</p>
+  </div>
+
+  <script>
+    const DAY_SHORT = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    const DAY_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+    function mondayOf(d) {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+      return x;
+    }
+
+    const weekStart = mondayOf(new Date());
+    const weekDates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      return d;
+    });
+    const labels = weekDates.map((d, i) => DAY_SHORT[i]);
+    const fullLabels = weekDates.map((d, i) =>
+      DAY_FULL[i] + ' ' + String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0')
+    );
+
+    document.getElementById('week-label').textContent =
+      'Semana del ' + weekDates[0].getDate() + ' al ' + weekDates[6].getDate() +
+      ' · cada nodo = un día';
+
+    document.querySelectorAll('[data-legend]').forEach(el => {
+      el.innerHTML = labels.map(l => '<span>' + l + '</span>').join('');
+    });
+
+    // Mock daily counts for the week (sum = card total)
+    const series = {
+      total: [3, 5, 4, 6, 4, 4, 2],
+      confirmados: [2, 3, 2, 4, 3, 3, 1],
+      reprog: [0, 1, 0, 1, 0, 1, 0],
+      cancel: [0, 0, 1, 0, 0, 0, 0],
+    };
+
+    function lineOpts(pointFill) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+            titleFont: { size: 12, weight: '600' },
+            bodyFont: { size: 12 },
+            padding: 8,
+            displayColors: false,
+            callbacks: {
+              title: (items) => fullLabels[items[0].dataIndex],
+              label: (item) => item.parsed.y + ' solicitudes',
+            },
+          },
+        },
+        scales: {
+          x: {
+            border: { display: false },
+            grid: { display: false },
+            ticks: { display: false },
+          },
+          y: {
+            display: false,
+            grid: { display: false },
+            beginAtZero: true,
+          },
+        },
+        elements: {
+          line: { borderWidth: 1.5, tension: 0.35 },
+          point: {
+            radius: 4,
+            hitRadius: 12,
+            hoverRadius: 5,
+            backgroundColor: pointFill,
+            borderColor: 'rgba(255,255,255,0.95)',
+            borderWidth: 1,
+          },
+        },
+      };
+    }
+
+    function makeLine(canvasId, data, borderAlpha, pointFill) {
+      return new Chart(document.getElementById(canvasId), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            borderColor: 'rgba(255,255,255,' + borderAlpha + ')',
+            backgroundColor: 'transparent',
+            pointBackgroundColor: pointFill,
+          }],
+        },
+        options: lineOpts(pointFill),
+      });
+    }
+
+    makeLine('chart-total', series.total, 0.55, '#6261cc');
+    makeLine('chart-confirmados', series.confirmados, 0.55, '#3d99f5');
+
+    new Chart(document.getElementById('chart-reprog'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: series.reprog,
+          borderColor: 'rgba(255,255,255,0.55)',
+          backgroundColor: 'rgba(255,255,255,0.18)',
+          fill: true,
+          pointBackgroundColor: '#edad21',
+          pointRadius: 4,
+          pointHoverRadius: 5,
+        }],
+      },
+      options: {
+        ...lineOpts('#edad21'),
+        elements: {
+          line: { borderWidth: 2, tension: 0.4 },
+          point: {
+            radius: 4,
+            hitRadius: 12,
+            hoverRadius: 5,
+            backgroundColor: '#edad21',
+            borderColor: '#fff',
+            borderWidth: 1,
+          },
+        },
+      },
+    });
+
+    new Chart(document.getElementById('chart-cancel'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: series.cancel,
+          backgroundColor: 'rgba(255,255,255,0.35)',
+          hoverBackgroundColor: 'rgba(255,255,255,0.7)',
+          borderRadius: 2,
+          barPercentage: 0.55,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+            displayColors: false,
+            callbacks: {
+              title: (items) => fullLabels[items[0].dataIndex],
+              label: (item) => item.parsed.y + ' cancelaciones',
+            },
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { display: false } },
+          y: { display: false, beginAtZero: true, grid: { display: false } },
+        },
+      },
+    });
+  </script>
+</body>
+</html>

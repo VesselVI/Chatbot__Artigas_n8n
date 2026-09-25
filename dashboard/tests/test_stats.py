@@ -87,6 +87,14 @@ def test_compute_solicitudes_week_stats_counts_and_trends():
     # cancelaciones share of current total: 1/5 → 20%
     assert out["trends"]["cancelaciones"]["label"] == "20% del total"
     assert "septiembre" in out["week_label"]
+    daily = out["daily"]
+    assert daily["labels"] == ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+    assert daily["dates"][0] == "2026-09-21"
+    # Mon 21: 1 confirmed estudio; Tue 22: 2; Wed 23: 1 reprog; Thu 24: 1 cancel
+    assert daily["total"] == [1, 2, 1, 1, 0, 0, 0]
+    assert daily["confirmados"] == [1, 1, 0, 0, 0, 0, 0]
+    assert daily["reprogramaciones"] == [0, 0, 1, 0, 0, 0, 0]
+    assert daily["cancelaciones"] == [0, 0, 0, 1, 0, 0, 0]
 
 
 def test_count_rows_string_created_at():
