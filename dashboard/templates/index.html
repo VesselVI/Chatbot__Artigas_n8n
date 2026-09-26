@@ -1102,6 +1102,18 @@
       position: relative;
       z-index: 35;
     }
+    /* Acciones tips must stack above Chat (col-chat is the next cell). */
+    .solicitud-row:hover .col-acciones,
+    .solicitud-row:focus-within .col-acciones,
+    .col-acciones:hover,
+    .col-acciones:focus-within {
+      position: relative;
+      z-index: 45;
+    }
+    .solicitud-row:hover .acciones-strip,
+    .solicitud-row:focus-within .acciones-strip {
+      z-index: 46;
+    }
 
     .btn-confirmar {
       color: #fff;
@@ -2080,6 +2092,31 @@
         </div>
       </div>
 
+      <!-- Respuesta a consulta desde el panel -->
+      <div class="modal fade" id="respuestaConsultaModal" tabindex="-1" aria-labelledby="respuestaConsultaModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="respuestaConsultaModalLabel">Responder consulta</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <div id="respuesta-consulta-alert"></div>
+              <input type="hidden" id="respuesta-consulta-id">
+              <p class="mb-2 text-muted small" id="respuesta-consulta-meta"></p>
+              <div class="mb-0">
+                <div class="wa-preview-label">Vista previa (libre o plantilla respuesta_consulta)</div>
+                <div class="wa-bubble" id="respuesta-consulta-preview" aria-live="polite"></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cerrar</button>
+              <button type="button" class="btn btn-primary" id="respuesta-consulta-submit">Enviar respuesta</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- CLINICA -->
       <section class="pane d-none" id="clinic-pane">
         <div class="card card-da">
@@ -2557,6 +2594,32 @@
       return solicitudesCache.find(s => s.id === id) || null;
     }
 
+    let cancelModal;
+    let respuestaConsultaModal;
+
+    function mensajeRespuestaConsultaPreview(nombre) {
+      const name = String(nombre || '').trim() || 'paciente';
+      return `Hola ${name}, recibimos tu consulta. Te respondemos por este chat en breve.`;
+    }
+
+    function openRespuestaConsultaModal(b) {
+      const alertEl = document.getElementById('respuesta-consulta-alert');
+      if (alertEl) alertEl.innerHTML = '';
+      document.getElementById('respuesta-consulta-id').value = String(b.id || '');
+      const nombre = b.nombre || '';
+      const tipo = b.tipo || 'estudio';
+      document.getElementById('respuesta-consulta-meta').textContent =
+        `${nombre || 'Sin nombre'} · tipo ${tipo}`;
+      document.getElementById('respuesta-consulta-preview').textContent =
+        mensajeRespuestaConsultaPreview(nombre);
+      if (!respuestaConsultaModal) {
+        respuestaConsultaModal = new bootstrap.Modal(
+          document.getElementById('respuestaConsultaModal')
+        );
+      }
+      respuestaConsultaModal.show();
+    }
+
     
     function getSchedMode() {
       const checked = document.querySelector('input[name="sched-mode"]:checked');
@@ -2989,29 +3052,9 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
         });
       });
       tbody.querySelectorAll('[data-responder-consulta-id]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id = btn.getAttribute('data-responder-consulta-id');
-          btn.disabled = true;
-          try {
-            const res = await fetch(
-              '/api/solicitudes/' + encodeURIComponent(id) + '/responder-consulta',
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: '{}'
-              }
-            );
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.error || 'No se pudo responder');
-            if (data.whatsapp_warning) {
-              alert(data.whatsapp_warning);
-            }
-            await loadSolicitudes();
-          } catch (err) {
-            alert(err.message || 'Error al responder consulta');
-          } finally {
-            btn.disabled = false;
-          }
+        btn.addEventListener('click', () => {
+          const flat = findSolicitud(Number(btn.getAttribute('data-responder-consulta-id')));
+          if (flat) openRespuestaConsultaModal(flat);
         });
       });
       tbody.querySelectorAll('[data-mark-contactado-id]').forEach(link => {
@@ -3578,8 +3621,46 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
       updateCancelPreview();
       syncCancelSubmitEnabled();
     });
+    document.getElementById('respuesta-consulta-submit')?.addEventListener('click', async () => {
+      const btn = document.getElementById('respuesta-consulta-submit');
+      const alertEl = document.getElementById('respuesta-consulta-alert');
+      const id = document.getElementById('respuesta-consulta-id').value;
+      if (!id) return;
+      btn.disabled = true;
+      if (alertEl) alertEl.innerHTML = '';
+      try {
+        const res = await fetch(
+          '/api/solicitudes/' + encodeURIComponent(id) + '/responder-consulta',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}'
+          }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'No se pudo responder');
+        if (data.whatsapp_warning && alertEl) {
+          alertEl.innerHTML = `<div class="alert alert-warning py-2">${escapeHtml(data.whatsapp_warning)}</div>`;
+        }
+        if (data.whatsapp_send_status === 'failed' && alertEl) {
+          alertEl.innerHTML = `<div class="alert alert-danger py-2">Fallo al enviar: ${escapeHtml(data.whatsapp_warning || 'error')}</div>`;
+        }
+        if (respuestaConsultaModal && data.whatsapp_send_status !== 'failed') {
+          respuestaConsultaModal.hide();
+        }
+        await loadSolicitudes();
+      } catch (err) {
+        if (alertEl) {
+          alertEl.innerHTML = `<div class="alert alert-danger py-2">${escapeHtml(err.message || 'Error')}</div>`;
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
     document.getElementById('cancel-submit')?.addEventListener('click', async () => {
       const btn = document.getElementById('cancel-submit');
+
       const alertEl = document.getElementById('cancel-alert');
       btn.disabled = true;
       alertEl.innerHTML = '';
