@@ -271,6 +271,29 @@ def send_cancelacion(
     )
 
 
+def send_recordatorio(
+    conversation_id: Any,
+    *,
+    nombre: str,
+    medico: str,
+    dia_hora_display: str,
+    template_name: str = "recordatorio_turno",
+    opener: Callable[..., Any] | None = None,
+) -> SendResult:
+    """
+    Recordatorio automatico (~24h) — always Meta utility plantilla.
+    WABA: recordatorio_turno (es_AR), numbered body vars:
+      {{1}} = nombre, {{2}} = día y hora, {{3}} = médico.
+    Address is fixed in the approved template body (not a variable).
+    """
+    return send_utility_template(
+        conversation_id,
+        template_name=template_name or "recordatorio_turno",
+        body_params=[nombre, dia_hora_display, medico],
+        opener=opener,
+    )
+
+
 def send_private_note(
     conversation_id: Any,
     content: str,

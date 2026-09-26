@@ -87,6 +87,10 @@ _Avoid_: Disponibilidad, día/hora del turno, appointment time
 The appointment datetime Secretaría assigns in Confirmación desde el panel; stored as a structured field on the solicitud (not free-text preference).
 _Avoid_: Horario preferido, Disponibilidad, Turno de agenda (those are doctor windows, not the patient's slot)
 
+**Recordatorio automatico**:
+Utility WhatsApp plantilla `recordatorio_turno` sent ~24h before Día/hora del turno for Turnos confirmados that have a linked Chatwoot conversation. n8n Schedule (hourly) calls the dashboard cron endpoint; the dashboard selects due rows, sends via Chatwoot `template_params`, and sets `reminder_sent_at`. Quiet hours 8–20 local; text-only (no quick-reply buttons in v1). Only turnos that live in this system — never DrApp bulk.
+_Avoid_: Recordatorio (alone), reminder blast, CRM sync
+
 **Cancelación de solicitud**:
 Aborting an in-progress booking flow before a completed new-appointment solicitud; may still leave a cancel-labelled solicitud with partial data for secretaries.
 _Avoid_: Cancelación (alone), cancelar turno (when meaning mid-flow abort)

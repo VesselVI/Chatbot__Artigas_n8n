@@ -1,0 +1,72 @@
+{
+  "name": "06 - Recordatorio turnos (24h)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-320, 300],
+      "id": "rec-schedule",
+      "name": "Every hour",
+      "notesInFlow": true,
+      "notes": "Dashboard enforces 8–20 ART quiet hours. Keep GENERIC_TIMEZONE=America/Argentina/Buenos_Aires."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://dashboard:8000/api/internal/recordatorios",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Cron-Secret",
+              "value": "={{ $env.DASHBOARD_CRON_SECRET }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-40, 300],
+      "id": "rec-http",
+      "name": "POST recordatorios",
+      "notesInFlow": true,
+      "notes": "Requires DASHBOARD_CRON_SECRET in compose for both dashboard and n8n. Plantilla Meta recordatorio_turno must be Approved (es_AR)."
+    }
+  ],
+  "connections": {
+    "Every hour": {
+      "main": [
+        [
+          {
+            "node": "POST recordatorios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Argentina/Buenos_Aires"
+  },
+  "staticData": null,
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

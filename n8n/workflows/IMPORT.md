@@ -6,6 +6,7 @@
 2. `03-booking-flow.json`
 3. `04-faq-ia.json`
 4. `01-entry-router.json` (depends on 02/03/04)
+5. Optional: `06-recordatorio-24h.json` (hourly cron → dashboard; needs Approved plantilla `recordatorio_turno` + `DASHBOARD_CRON_SECRET`)
 
 In n8n: **Workflows → Import from File** for each JSON. Leave them **inactive** until credentials and links are set.
 
@@ -408,6 +409,34 @@ Su turno ha sido reprogramado. Agende este nuevo horario. Escribí menú para vo
 ```text
 Su turno ha sido cancelado. Comuníquese de nuevo por este chat si desea agendar otro.
 ```
+
+### Recordatorio automatico (~24h) — (`recordatorio_turno`)
+
+- Name: `recordatorio_turno` (es_AR, **UTILITY**)
+- Header: `RECORDATORIO DE TURNO`
+- Dashboard `body_params` (numbered): `{{1}}` = nombre, `{{2}}` = día y hora, `{{3}}` = médico
+- Address is **fixed** in the template body (not a variable)
+- No buttons in v1 (patient replies cancelar/reprogramar as today)
+- Job: n8n workflow `06-recordatorio-24h.json` → `POST http://dashboard:8000/api/internal/recordatorios` with header `X-Cron-Secret`
+
+**Meta Templates Manager — create / submit:**
+
+1. Meta Business Suite → WhatsApp Manager → Message templates → Create template  
+2. Category: **Utility** · Language: **Spanish (ARG)** (`es_AR`) · Name: `recordatorio_turno`  
+3. Header (text): `RECORDATORIO DE TURNO`  
+4. Body (exact):
+
+```text
+Hola {{1}}, le recordamos su turno en Clínica Oftalmológica Artigas el {{2}} con {{3}}.
+
+Dirección: Avenida Nicolas Avellaneda 347.
+
+Si necesita reprogramar o cancelar, responda por este chat. Escribí menú para volver.
+```
+
+5. Variable samples for review: `1` = `Ana Pérez`, `2` = `26/09/2026 10:30`, `3` = `Adrian Artigas`  
+6. Footer: leave empty · Buttons: none  
+7. Submit for review; wait until **Approved** before activating workflow **06**
 
 ### Booking smoke (no día/hora step)
 

@@ -1,4 +1,5 @@
 import json
+import hmac
 import os
 from datetime import date, datetime, timedelta, time
 from functools import wraps
@@ -28,6 +29,7 @@ from chatwoot_send import (
     send_cancelacion,
     send_confirmacion,
     send_private_note,
+    send_recordatorio,
     send_reprogramacion,
 )
 from mensajes import build_outbound_message, format_dia_hora_display
@@ -45,6 +47,7 @@ from reprogramacion import (
     can_reprogram,
     validate_reprogram_payload,
 )
+from recordatorio import body_params_for_row, select_due
 
 DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 DAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
@@ -151,6 +154,20 @@ async def favicon_ico():
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+@app.post("/api/internal/recordatorios")
+async def api_internal_recordatorios(request: Request):
+    """
+    n8n Schedule Trigger → Recordatorio automatico.
+    Auth: header X-Cron-Secret must match DASHBOARD_CRON_SECRET.
+    """
+    expected = (env("DASHBOARD_CRON_SECRET") or "").strip()
+    got = (request.headers.get("X-Cron-Secret") or "").strip()
+    if not expected or not hmac.compare_digest(got, expected):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    result = run_recordatorios_job()
+    return result
 
 
 @app.get("/privacidad", response_class=HTMLResponse)
@@ -442,6 +459,7 @@ def fetch_solicitud(solicitud_id: int) -> dict[str, Any] | None:
         has_nota = _column_exists(cur, "turno_solicitudes", "nota_paciente")
         has_orden = _column_exists(cur, "turno_solicitudes", "por_orden_de_llegada")
         has_send = _column_exists(cur, "turno_solicitudes", "whatsapp_send_status")
+        has_reminder = _column_exists(cur, "turno_solicitudes", "reminder_sent_at")
         tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
         appointment_sql = "appointment_at" if has_appointment else "NULL AS appointment_at"
         nota_sql = "nota_paciente" if has_nota else "NULL AS nota_paciente"
@@ -459,12 +477,15 @@ def fetch_solicitud(solicitud_id: int) -> dict[str, Any] | None:
                 "NULL AS whatsapp_send_status, NULL AS whatsapp_send_channel, "
                 "0 AS whatsapp_nota_omitted"
             )
+        reminder_sql = (
+            "reminder_sent_at" if has_reminder else "NULL AS reminder_sent_at"
+        )
         cur.execute(
             f"""
             SELECT id, created_at, phone, nombre, dni, obra_social,
                    telefono_contacto, medico, horario_preferido, status,
                    conversation_id, {tipo_sql}, {appointment_sql}, {orden_sql},
-                   {nota_sql}, {send_sql}
+                   {nota_sql}, {send_sql}, {reminder_sql}
             FROM turno_solicitudes
             WHERE id = %s
             """,
@@ -484,6 +505,7 @@ def list_solicitudes_rows() -> list[dict[str, Any]]:
         has_nota = _column_exists(cur, "turno_solicitudes", "nota_paciente")
         has_orden = _column_exists(cur, "turno_solicitudes", "por_orden_de_llegada")
         has_send = _column_exists(cur, "turno_solicitudes", "whatsapp_send_status")
+        has_reminder = _column_exists(cur, "turno_solicitudes", "reminder_sent_at")
         tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
         appointment_sql = "appointment_at" if has_appointment else "NULL AS appointment_at"
         nota_sql = "nota_paciente" if has_nota else "NULL AS nota_paciente"
@@ -501,12 +523,15 @@ def list_solicitudes_rows() -> list[dict[str, Any]]:
                 "NULL AS whatsapp_send_status, NULL AS whatsapp_send_channel, "
                 "0 AS whatsapp_nota_omitted"
             )
+        reminder_sql = (
+            "reminder_sent_at" if has_reminder else "NULL AS reminder_sent_at"
+        )
         cur.execute(
             f"""
             SELECT id, created_at, phone, nombre, dni, obra_social,
                    telefono_contacto, medico, horario_preferido, status,
                    conversation_id, {tipo_sql}, {appointment_sql}, {orden_sql},
-                   {nota_sql}, {send_sql}
+                   {nota_sql}, {send_sql}, {reminder_sql}
             FROM turno_solicitudes
             ORDER BY created_at DESC
             LIMIT 200
@@ -515,6 +540,97 @@ def list_solicitudes_rows() -> list[dict[str, Any]]:
         return list(cur.fetchall() or [])
     finally:
         conn.close()
+
+
+def list_reminder_candidates() -> list[dict[str, Any]]:
+    """Confirmed solicitudes with a future appointment and no reminder yet."""
+    conn = get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        if not _column_exists(cur, "turno_solicitudes", "appointment_at"):
+            return []
+        has_tipo = _column_exists(cur, "turno_solicitudes", "tipo")
+        has_orden = _column_exists(cur, "turno_solicitudes", "por_orden_de_llegada")
+        has_reminder = _column_exists(cur, "turno_solicitudes", "reminder_sent_at")
+        tipo_sql = "tipo" if has_tipo else "'turno' AS tipo"
+        orden_sql = (
+            "por_orden_de_llegada"
+            if has_orden
+            else "0 AS por_orden_de_llegada"
+        )
+        reminder_sql = (
+            "reminder_sent_at" if has_reminder else "NULL AS reminder_sent_at"
+        )
+        reminder_filter = (
+            "AND reminder_sent_at IS NULL" if has_reminder else ""
+        )
+        cur.execute(
+            f"""
+            SELECT id, created_at, phone, nombre, dni, obra_social,
+                   telefono_contacto, medico, horario_preferido, status,
+                   conversation_id, appointment_at, {tipo_sql}, {orden_sql},
+                   {reminder_sql}
+            FROM turno_solicitudes
+            WHERE status = %s
+              AND appointment_at IS NOT NULL
+              AND appointment_at > NOW()
+              {reminder_filter}
+            ORDER BY appointment_at ASC
+            LIMIT 500
+            """,
+            (CONFIRMED_STATUS,),
+        )
+        return list(cur.fetchall() or [])
+    finally:
+        conn.close()
+
+
+def mark_reminder_sent(solicitud_id: int, sent_at: datetime) -> None:
+    conn = get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        if not _column_exists(cur, "turno_solicitudes", "reminder_sent_at"):
+            return
+        cur.execute(
+            """
+            UPDATE turno_solicitudes
+            SET reminder_sent_at = %s
+            WHERE id = %s AND reminder_sent_at IS NULL
+            """,
+            (sent_at, solicitud_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def run_recordatorios_job(*, now: datetime | None = None) -> dict[str, int]:
+    """Send Recordatorio automatico for due Turnos confirmados. Idempotent."""
+    clock = now if now is not None else datetime.now()
+    candidates = list_reminder_candidates()
+    due = select_due(candidates, now=clock)
+    sent = 0
+    failed = 0
+    for row in due:
+        try:
+            params = body_params_for_row(row)
+            send_recordatorio(
+                row.get("conversation_id"),
+                nombre=params[0],
+                dia_hora_display=params[1],
+                medico=params[2],
+            )
+            mark_reminder_sent(int(row["id"]), clock)
+            sent += 1
+        except Exception:
+            failed += 1
+    return {
+        "checked": len(candidates),
+        "due": len(due),
+        "sent": sent,
+        "failed": failed,
+        "skipped": max(0, len(candidates) - len(due)),
+    }
 
 
 def save_solicitud_confirmacion(solicitud_id: int, fields: dict[str, Any]) -> None:
@@ -544,6 +660,9 @@ def save_solicitud_confirmacion(solicitud_id: int, fields: dict[str, Any]) -> No
         if has_appointment and "appointment_at" in fields:
             sets.append("appointment_at = %s")
             params.append(fields["appointment_at"])
+            # New Día/hora → allow a fresh Recordatorio automatico for the new slot.
+            if _column_exists(cur, "turno_solicitudes", "reminder_sent_at"):
+                sets.append("reminder_sent_at = NULL")
         if has_orden and "por_orden_de_llegada" in fields:
             sets.append("por_orden_de_llegada = %s")
             params.append(1 if fields["por_orden_de_llegada"] else 0)
@@ -746,6 +865,8 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
     is_cancelled = status.lower() == CANCELLED_STATUS
     can_confirm = status.lower() == "pending" and tipo in CONFIRMABLE_TIPOS
     appointment_date = appointment_at[:10] if appointment_at and len(appointment_at) >= 10 else None
+    reminder_sent_at = _format_appointment_at(r.get("reminder_sent_at"))
+    reminder_sent = reminder_sent_at is not None
     return {
         "id": r["id"],
         "tipo": tipo,
@@ -777,10 +898,13 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
         "whatsapp_send_channel": send_channel,
         "whatsapp_nota_omitted": nota_omitted,
         "fallo_al_enviar": send_status == "failed",
+        "reminder_sent": reminder_sent,
+        "reminder_sent_at": reminder_sent_at,
         "conversation_id": r.get("conversation_id") or None,
         "chat_url": chatwoot_conversation_url(r.get("conversation_id")),
         "detalle": detalle if isinstance(detalle, str) else str(detalle),
     }
+
 
 
 def chatwoot_conversation_url(conversation_id: Any) -> str | None:

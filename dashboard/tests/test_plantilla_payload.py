@@ -73,3 +73,34 @@ def test_cancelacion_sends_no_body_params(monkeypatch):
     assert tp["name"] == "cancelacion_turno"
     assert tp["language"] == "es_AR"
     assert tp["processed_params"] == {}
+
+
+def test_recordatorio_sends_numbered_body_params(monkeypatch):
+    captured: dict[str, Any] = {}
+
+    def fake_open(req, timeout=30):
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        return _FakeResp()
+
+    monkeypatch.setenv("CHATWOOT_HOST", "example.com")
+    monkeypatch.setenv("CHATWOOT_API_TOKEN", "tok")
+    monkeypatch.setenv("CHATWOOT_ACCOUNT_ID", "2")
+
+    cw.send_recordatorio(
+        "42",
+        nombre="Ana Pérez",
+        medico="Adrian Artigas",
+        dia_hora_display="26/09/2026 10:30",
+        opener=fake_open,
+    )
+    tp = captured["payload"]["template_params"]
+    assert tp["name"] == "recordatorio_turno"
+    assert tp["language"] == "es_AR"
+    assert tp["category"] == "UTILITY"
+    assert tp["processed_params"] == {
+        "body": {
+            "1": "Ana Pérez",
+            "2": "26/09/2026 10:30",
+            "3": "Adrian Artigas",
+        }
+    }

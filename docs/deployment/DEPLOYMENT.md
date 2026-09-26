@@ -128,6 +128,47 @@ Test conversations can stay on the old inbox and disappear with it. Do not bulk-
 
 If welcome never arrives: bot not on the **new** inbox, Meta webhook still on the test callback, or the number is still on the phone app.
 
+## Update VPS after a major push
+
+Repo on the server: `/opt/Chatbot__Artigas_n8n`. Prefer pulling the branch you just pushed (often `main`).
+
+### Dashboard-only (templates / `app.py` / stats API)
+
+```bash
+cd /opt/Chatbot__Artigas_n8n
+git fetch origin
+git checkout main
+git pull origin main
+docker compose build dashboard
+docker compose up -d dashboard
+docker compose logs --tail=80 dashboard
+```
+
+Smoke: `https://dash.<DOMAIN>` → log in → **Solicitudes** → KPI strip loads → **Actualizar** → confirm/reprogram/cancel still work.
+
+### MySQL migration also in the commit
+
+After `git pull`, before or after rebuild:
+
+```bash
+set -a && source .env && set +a
+docker compose exec -T mysql mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" \
+  < mysql/<migration_file>.sql
+```
+
+### Compose / Caddy / env keys changed
+
+```bash
+cd /opt/Chatbot__Artigas_n8n
+git pull origin main
+# merge any new keys from .env.example into .env by hand
+docker compose up -d
+```
+
+### n8n workflow Code nodes
+
+Do **not** full-reimport workflow `01`. Paste Code nodes per [n8n/workflows/IMPORT.md](../n8n/workflows/IMPORT.md). Wider Solicitudes + handoff infra script (migrations + dashboard + n8n restart): [scripts/deploy-solicitudes-vps.sh](../scripts/deploy-solicitudes-vps.sh) — check `BRANCH` at the top before running.
+
 ## Backups
 
 ```bash
@@ -140,6 +181,6 @@ Also snapshot Chatwoot/n8n Docker volumes periodically.
 
 ## Local notes
 
-- First MySQL start runs [mysql/init.sql](../mysql/init.sql) (schema + seed doctors / obras). Existing VPS DBs need [mysql/migrate_shifts.sql](../mysql/migrate_shifts.sql) before the dashboard can save mañana/noche rows, and [mysql/migrate_solicitudes_tipo.sql](../mysql/migrate_solicitudes_tipo.sql) for solicitud labels (`turno` / `cancelar` / `estudio` / `reprogramar`). Before clinic go-live, dump with [scripts/backup-mysql.sh](../scripts/backup-mysql.sh) then [mysql/wipe_test_data.sql](../mysql/wipe_test_data.sql) (solicitudes + conversation_state only).
+- First MySQL start runs [mysql/init.sql](../mysql/init.sql) (schema + seed doctors / obras). Existing VPS DBs need [mysql/migrate_shifts.sql](../mysql/migrate_shifts.sql) before the dashboard can save mañana/noche rows, [mysql/migrate_solicitudes_tipo.sql](../mysql/migrate_solicitudes_tipo.sql) for solicitud labels (`turno` / `cancelar` / `estudio` / `reprogramar`), and [mysql/migrate_recordatorio.sql](../mysql/migrate_recordatorio.sql) for Recordatorio automatico (`reminder_sent_at`). Before clinic go-live, dump with [scripts/backup-mysql.sh](../scripts/backup-mysql.sh) then [mysql/wipe_test_data.sql](../mysql/wipe_test_data.sql) (solicitudes + conversation_state only).
 - Caddy issues Let’s Encrypt certs automatically once DNS points to the VPS.
 - Memory limits in `docker-compose.yml` keep Chatwoot + n8n within ~8 GB with swap.

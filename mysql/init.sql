@@ -54,11 +54,13 @@ CREATE TABLE IF NOT EXISTS turno_solicitudes (
   whatsapp_send_status VARCHAR(20) NULL DEFAULT NULL,
   whatsapp_send_channel VARCHAR(20) NULL DEFAULT NULL,
   whatsapp_nota_omitted TINYINT(1) NOT NULL DEFAULT 0,
+  reminder_sent_at DATETIME NULL DEFAULT NULL,
   status VARCHAR(40) NOT NULL DEFAULT 'pending',
   conversation_id VARCHAR(64) DEFAULT NULL,
   tipo ENUM('turno','cancelar','estudio','reprogramar','solicitud') NOT NULL DEFAULT 'turno'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- Existing VPS DBs: run mysql/migrate_solicitudes_tipo.sql (init.sql is only applied on first MySQL volume).
+-- Recordatorio: run mysql/migrate_recordatorio.sql on existing volumes.
 
 INSERT INTO clinic_settings (id, address, clinic_hours, obras_sociales, welcome_text) VALUES (
   1,

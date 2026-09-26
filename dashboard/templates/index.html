@@ -679,6 +679,17 @@
       border-color: #cbd5e1;
     }
     .badge-pendiente::before { opacity: 0.45; }
+    .badge-recordatorio {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      padding: 0.1rem 0.35rem;
+      border-radius: 0.25rem;
+    }
 
     .estado-cell {
       display: flex;
@@ -2431,6 +2442,10 @@
       }
       if (b.whatsapp_nota_omitted) {
         html += `<span class="nota-omitida-warn" title="Nota omitida en utility">nota omitida</span>`;
+      }
+      if (b.reminder_sent) {
+        const when = b.reminder_sent_at ? ` · ${escapeHtml(b.reminder_sent_at)}` : '';
+        html += `<span class="badge-recordatorio" title="Recordatorio enviado${when}">Recordatorio</span>`;
       }
       return `<div class="estado-cell">${html}</div>`;
     }
