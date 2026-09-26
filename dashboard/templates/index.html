@@ -748,7 +748,8 @@
 
     /* —— Table —— */
     .solicitudes-scroll {
-      overflow: visible;
+      overflow-x: auto;
+      overflow-y: visible;
       max-width: 100%;
       min-width: 0;
       /* Room for hover tips above the first row and past the Chat column */
@@ -757,7 +758,7 @@
     }
     .solicitudes-table {
       width: 100%;
-      min-width: 0;
+      min-width: 68rem;
       margin: 0;
       border-collapse: separate;
       border-spacing: 0;
@@ -829,14 +830,14 @@
     }
 
     /* Fixed rem widths on badge/action cols so leftover % does not inflate them.
-       Paciente absorbs remainder; Detalle is capped so short cells are not a void. */
+       Paciente keeps a floor so it cannot be crushed to 0 (names vanishing). */
     .solicitudes-table col.c-tipo { width: 6.9rem; }
     .solicitudes-table col.c-hora { width: 3.25rem; }
-    .solicitudes-table col.c-paciente { width: auto; }
+    .solicitudes-table col.c-paciente { width: 9.5rem; }
     .solicitudes-table col.c-dni { width: 7.25rem; }
     .solicitudes-table col.c-tel { width: 8.75rem; }
     .solicitudes-table col.c-medico { width: 8.25rem; }
-    .solicitudes-table col.c-detalle { width: 12.5rem; }
+    .solicitudes-table col.c-detalle { width: 11rem; }
     .solicitudes-table col.c-obra { width: 7.25rem; }
     .solicitudes-table col.c-estado { width: 6.35rem; }
     .solicitudes-table col.c-acciones { width: 4.75rem; }
@@ -880,6 +881,10 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .col-paciente {
+      min-width: 7.5rem;
+      font-weight: 700;
     }
     .col-detalle {
       white-space: normal;
@@ -1095,24 +1100,14 @@
           visibility 0s linear 0s;
       }
     }
-    .solicitud-row:hover .col-chat,
-    .solicitud-row:focus-within .col-chat,
+    /* Tip stacking: only the active cell rises. Never boost both on row-hover
+       (that buried Chat under Acciones, then Acciones under Chat). */
+    .col-acciones:hover,
+    .col-acciones:focus-within,
     .col-chat:hover,
     .col-chat:focus-within {
       position: relative;
-      z-index: 35;
-    }
-    /* Acciones tips must stack above Chat (col-chat is the next cell). */
-    .solicitud-row:hover .col-acciones,
-    .solicitud-row:focus-within .col-acciones,
-    .col-acciones:hover,
-    .col-acciones:focus-within {
-      position: relative;
-      z-index: 45;
-    }
-    .solicitud-row:hover .acciones-strip,
-    .solicitud-row:focus-within .acciones-strip {
-      z-index: 46;
+      z-index: 50;
     }
 
     .btn-confirmar {
@@ -2105,7 +2100,7 @@
               <input type="hidden" id="respuesta-consulta-id">
               <p class="mb-2 text-muted small" id="respuesta-consulta-meta"></p>
               <div class="mb-0">
-                <div class="wa-preview-label">Vista previa (libre o plantilla respuesta_consulta)</div>
+                <div class="wa-preview-label">Vista previa</div>
                 <div class="wa-bubble" id="respuesta-consulta-preview" aria-live="polite"></div>
               </div>
             </div>
@@ -2595,8 +2590,14 @@
       return solicitudesCache.find(s => s.id === id) || null;
     }
 
+    function displayNombrePaciente(raw) {
+      const name = String(raw || '').trim();
+      if (!name || name === '-' || name.toLowerCase() === 'sin nombre') return '';
+      return name;
+    }
+
     function mensajeRespuestaConsultaPreview(nombre) {
-      const name = String(nombre || '').trim() || 'paciente';
+      const name = displayNombrePaciente(nombre) || 'paciente';
       return `Hola ${name}, recibimos tu consulta. Te respondemos por este chat en breve.`;
     }
 
@@ -2604,12 +2605,13 @@
       const alertEl = document.getElementById('respuesta-consulta-alert');
       if (alertEl) alertEl.innerHTML = '';
       document.getElementById('respuesta-consulta-id').value = String(b.id || '');
-      const nombre = b.nombre || '';
+      const nombre = displayNombrePaciente(b.nombre);
       const tipo = b.tipo || 'estudio';
-      document.getElementById('respuesta-consulta-meta').textContent =
-        `${nombre || 'Sin nombre'} · tipo ${tipo}`;
+      const tel = String(b.telefono_contacto || b.phone || '').trim();
+      const who = nombre || (tel ? tel : 'Sin nombre');
+      document.getElementById('respuesta-consulta-meta').textContent = `${who} · ${tipo}`;
       document.getElementById('respuesta-consulta-preview').textContent =
-        mensajeRespuestaConsultaPreview(nombre);
+        mensajeRespuestaConsultaPreview(b.nombre);
       if (!respuestaConsultaModal) {
         respuestaConsultaModal = new bootstrap.Modal(
           document.getElementById('respuestaConsultaModal')

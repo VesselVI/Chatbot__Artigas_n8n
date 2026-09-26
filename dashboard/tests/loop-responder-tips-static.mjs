@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Feedback loop (no Playwright): static checks against live index.html
- * matching the two user symptoms.
+ * Feedback loop for Responder modal + Acciones/Chat tip stacking.
  *
  * RED when:
- *  1) Responder consulta click path does not open a modal
- *  2) CSS stacking predicts acciones tips bury under Chat
+ *  1) Responder consulta has no modal path
+ *  2) Row-hover asymmetrically boosts one of Acciones/Chat over the other
+ *     (tips bury under the sibling column)
+ *  3) Missing equal cell-only :hover/:focus-within boost for both columns
  *
  * Usage: node dashboard/tests/loop-responder-tips-static.mjs
  */
@@ -22,64 +23,53 @@ const responderBind = html.match(
 const bindBlock = responderBind ? responderBind[0] : '';
 const opensModal =
   /openRespuestaConsultaModal/.test(bindBlock) ||
-  /openConfirmModal/.test(bindBlock) ||
-  /respuestaConsultaModal/.test(bindBlock) ||
-  /confirmModal/.test(bindBlock);
+  /respuestaConsultaModal/.test(bindBlock);
 const hasModalDom = /id="respuestaConsultaModal"/.test(html);
 const postsApi =
   /responder-consulta/.test(html) && /respuesta-consulta-submit/.test(html);
 
-function zAfter(pattern) {
-  const m = html.match(pattern);
-  if (!m) return null;
-  const z = m[0].match(/z-index:\s*(\d+)/);
-  return z ? Number(z[1]) : null;
-}
-
-const tipZ = zAfter(/\.btn-action \.btn-tip \{[\s\S]*?z-index:\s*\d+/);
-const stripHoverZ = zAfter(
-  /\.solicitud-row:hover \.acciones-strip,[\s\S]*?z-index:\s*\d+/
-);
-// Prefer the Acciones-specific boost if present (must be > col-chat).
-const colAccionesHoverZ = zAfter(
-  /\.solicitud-row:hover \.col-acciones,[\s\S]*?z-index:\s*\d+/
-);
-const colChatHoverZ = zAfter(
-  /\.solicitud-row:hover \.col-chat,[\s\S]*?z-index:\s*\d+/
+const rowBoostAcciones = /\.solicitud-row:hover\s+\.col-acciones/.test(html);
+const rowBoostChat = /\.solicitud-row:hover\s+\.col-chat/.test(html);
+const rowBoostStripHigh = /\.solicitud-row:hover\s+\.acciones-strip[\s\S]{0,80}z-index:\s*(4[6-9]|[5-9]\d)/.test(
+  html
 );
 
-const tipBuriedByStacking =
-  colChatHoverZ != null &&
-  (colAccionesHoverZ == null || colAccionesHoverZ <= colChatHoverZ) &&
-  (stripHoverZ == null || stripHoverZ < colChatHoverZ);
+// Shared cell-only rule with equal z for both columns.
+const cellOnlyBlock = html.match(
+  /\.col-acciones:hover,[\s\S]*?\.col-chat:hover,[\s\S]*?\.col-chat:focus-within\s*\{[\s\S]*?z-index:\s*(\d+)[\s\S]*?\}/
+);
+const cellOnlyZ = cellOnlyBlock ? Number(cellOnlyBlock[1]) : null;
+const equalCellBoost = cellOnlyZ != null && cellOnlyZ >= 40;
+
+const tipsAsymmetric =
+  rowBoostAcciones || rowBoostChat || rowBoostStripHigh || !equalCellBoost;
 
 const report = {
-  responder_bind_found: Boolean(bindBlock),
-  posts_responder_api: postsApi,
   opens_modal: opensModal,
   has_modal_dom: hasModalDom,
-  tipZ,
-  stripHoverZ,
-  colAccionesHoverZ,
-  colChatHoverZ,
-  tipBuriedByStacking,
+  posts_api: postsApi,
+  rowBoostAcciones,
+  rowBoostChat,
+  rowBoostStripHigh,
+  cellOnlyZ,
+  equalCellBoost,
 };
 
 console.log(JSON.stringify(report, null, 2));
 console.log('---');
 
-const failModal = !(opensModal && hasModalDom);
-const failTip = tipBuriedByStacking;
+const failModal = !(opensModal && hasModalDom && postsApi);
+const failTip = tipsAsymmetric;
 
 console.log(
   failModal
-    ? 'RED modal: Responder consulta has no modal open path / DOM'
-    : 'GREEN modal: openRespuestaConsultaModal + #respuestaConsultaModal'
+    ? 'RED modal: missing Responder consulta modal wiring'
+    : 'GREEN modal: openRespuestaConsultaModal + DOM + submit'
 );
 console.log(
   failTip
-    ? `RED tip: Chat stacking still wins (acciones=${colAccionesHoverZ} chat=${colChatHoverZ} strip=${stripHoverZ})`
-    : `GREEN tip: col-acciones z (${colAccionesHoverZ}) > col-chat z (${colChatHoverZ})`
+    ? `RED tip: asymmetric/row stacking (rowAcciones=${rowBoostAcciones} rowChat=${rowBoostChat} stripHigh=${rowBoostStripHigh} cellOnlyZ=${cellOnlyZ})`
+    : `GREEN tip: equal cell-only boost z=${cellOnlyZ} (no row-hover column race)`
 );
 
 process.exit(failModal || failTip ? 1 : 0);
