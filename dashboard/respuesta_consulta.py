@@ -31,20 +31,23 @@ def mensaje_respuesta_consulta(nombre: Any) -> str:
     )
 
 
-def assert_responder_consulta(row: dict[str, Any] | None) -> dict[str, Any]:
-    """Ensure the solicitud may receive Respuesta a consulta desde el panel."""
+def _assert_consulta_row(
+    row: dict[str, Any] | None,
+    *,
+    verb: str,
+) -> dict[str, Any]:
     if not row:
         raise RespuestaConsultaError("Solicitud no encontrada.", code="not_found")
     tipo = normalize_tipo(row.get("tipo"))
     if tipo not in RESPUESTA_CONSULTA_TIPOS:
         raise RespuestaConsultaError(
-            f"No se puede responder una solicitud de tipo «{tipo}».",
+            f"No se puede {verb} una solicitud de tipo «{tipo}».",
             code="ineligible_tipo",
         )
     status = str(row.get("status") or PENDING_STATUS).strip().lower()
     if status not in _OPEN_STATUSES:
         raise RespuestaConsultaError(
-            f"Estado «{status}» no admite Respuesta a consulta.",
+            f"Estado «{status}» no admite {verb}.",
             code="invalid_status",
         )
     cid = str(row.get("conversation_id") or "").strip()
@@ -54,6 +57,11 @@ def assert_responder_consulta(row: dict[str, Any] | None) -> dict[str, Any]:
             code="missing_conversation",
         )
     return row
+
+
+def assert_responder_consulta(row: dict[str, Any] | None) -> dict[str, Any]:
+    """Ensure the solicitud may receive Respuesta a consulta desde el panel."""
+    return _assert_consulta_row(row, verb="responder")
 
 
 def can_responder_consulta(row: dict[str, Any]) -> bool:
@@ -66,27 +74,7 @@ def can_responder_consulta(row: dict[str, Any]) -> bool:
 
 def assert_mark_contactado(row: dict[str, Any] | None) -> dict[str, Any]:
     """Abrir Chat may set Contactado for estudio/solicitud with a conversation."""
-    if not row:
-        raise RespuestaConsultaError("Solicitud no encontrada.", code="not_found")
-    tipo = normalize_tipo(row.get("tipo"))
-    if tipo not in RESPUESTA_CONSULTA_TIPOS:
-        raise RespuestaConsultaError(
-            f"No se puede marcar Contactado una solicitud de tipo «{tipo}».",
-            code="ineligible_tipo",
-        )
-    status = str(row.get("status") or PENDING_STATUS).strip().lower()
-    if status not in _OPEN_STATUSES:
-        raise RespuestaConsultaError(
-            f"Estado «{status}» no admite Contactado.",
-            code="invalid_status",
-        )
-    cid = str(row.get("conversation_id") or "").strip()
-    if not cid:
-        raise RespuestaConsultaError(
-            "Solicitud sin conversation_id.",
-            code="missing_conversation",
-        )
-    return row
+    return _assert_consulta_row(row, verb="marcar Contactado")
 
 
 def can_mark_contactado(row: dict[str, Any]) -> bool:

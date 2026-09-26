@@ -51,6 +51,7 @@ from reprogramacion import (
 )
 from recordatorio import body_params_for_row, select_due
 from respuesta_consulta import (
+    RESPUESTA_TEMPLATE,
     assert_mark_contactado,
     assert_responder_consulta,
     can_mark_contactado,
@@ -1823,6 +1824,7 @@ def _attempt_respuesta_consulta_send(
             conversation_id,
             nombre=nombre,
             freeform_content=message,
+            template_name=RESPUESTA_TEMPLATE,
         )
         return {
             "whatsapp_send_status": "sent",
