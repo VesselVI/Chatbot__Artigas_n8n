@@ -673,6 +673,11 @@
       color: #dc2626;
       border-color: #fecaca;
     }
+    .badge-contactado {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-color: #bfdbfe;
+    }
     .badge-pendiente {
       background: #f1f5f9;
       color: #475569;
@@ -1105,6 +1110,15 @@
     }
     @media (hover: hover) and (pointer: fine) {
       .btn-confirmar:hover { background: #156640; border-color: #156640; }
+    }
+
+    .btn-responder-consulta {
+      color: #fff;
+      background: #1d4ed8;
+      border: 1px solid #1d4ed8;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-responder-consulta:hover { background: #1e40af; border-color: #1e40af; }
     }
 
     .btn-marcar-confirmado {
@@ -1879,6 +1893,7 @@
             <span class="badge-estado badge-confirmado">Confirmado</span>
             <span class="badge-estado badge-estado-reprogramado">Reprogramado</span>
             <span class="badge-estado badge-cancelado">Cancelado</span>
+            <span class="badge-estado badge-contactado">Contactado</span>
           </div>
           <div class="solicitudes-scroll" tabindex="0" aria-label="Tabla de solicitudes">
             <table class="solicitudes-table">
@@ -2412,6 +2427,7 @@
       calendarClock: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 14v2.2l1.6 1"/><path d="M16 2v4"/><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M3 10h5"/><path d="M8 2v4"/><circle cx="16" cy="16" r="6"/></svg>',
       ban: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>',
       send: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>',
+      messageSquare: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
       messages: '<svg class="btn-ico" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>'
     };
 
@@ -2434,7 +2450,9 @@
       } else {
         const cls = b.status_badge === 'Reprogramado'
           ? 'badge-estado-reprogramado'
-          : (b.status_badge === 'Cancelado' ? 'badge-cancelado' : 'badge-confirmado');
+          : (b.status_badge === 'Cancelado'
+            ? 'badge-cancelado'
+            : (b.status_badge === 'Contactado' ? 'badge-contactado' : 'badge-confirmado'));
         html = `<span class="badge-estado ${cls}">${escapeHtml(b.status_badge)}</span>`;
       }
       if (b.fallo_al_enviar) {
@@ -2452,7 +2470,10 @@
 
     function chatAction(b) {
       if (b.chat_url) {
-        return `<a class="btn-abrir-chat" href="${escapeHtml(b.chat_url)}" target="chatwoot" rel="noopener" aria-label="Abrir Chat">${ICO.messages}<span class="btn-tip" aria-hidden="true">Abrir Chat</span></a>`;
+        const markAttr = b.can_mark_contactado
+          ? ` data-mark-contactado-id="${b.id}"`
+          : '';
+        return `<a class="btn-abrir-chat" href="${escapeHtml(b.chat_url)}" target="chatwoot" rel="noopener"${markAttr} aria-label="Abrir Chat">${ICO.messages}<span class="btn-tip" aria-hidden="true">Abrir Chat</span></a>`;
       }
       return `<span class="btn-abrir-chat is-disabled" aria-label="Sin conversación vinculada" title="Sin conversación vinculada">${ICO.messages}</span>`;
     }
@@ -2464,6 +2485,9 @@
       }
       if (b.can_mark_confirmed) {
         parts.push(`<button type="button" class="btn-action btn-marcar-confirmado" data-mark-confirmed-id="${b.id}" aria-label="Marcar confirmado">${ICO.clipboardCheck}<span class="btn-tip" aria-hidden="true">Marcar confirmado</span></button>`);
+      }
+      if (b.can_responder_consulta) {
+        parts.push(`<button type="button" class="btn-action btn-responder-consulta" data-responder-consulta-id="${b.id}" aria-label="Responder consulta">${ICO.messageSquare}<span class="btn-tip" aria-hidden="true">Responder consulta</span></button>`);
       }
       if (b.can_reprogramar) {
         parts.push(`<button type="button" class="btn-action btn-reprogramar" data-reprogramar-id="${b.id}" aria-label="Reprogramar">${ICO.calendarClock}<span class="btn-tip" aria-hidden="true">Reprogramar</span></button>`);
@@ -2962,6 +2986,57 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
           } finally {
             btn.disabled = false;
           }
+        });
+      });
+      tbody.querySelectorAll('[data-responder-consulta-id]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-responder-consulta-id');
+          btn.disabled = true;
+          try {
+            const res = await fetch(
+              '/api/solicitudes/' + encodeURIComponent(id) + '/responder-consulta',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}'
+              }
+            );
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'No se pudo responder');
+            if (data.whatsapp_warning) {
+              alert(data.whatsapp_warning);
+            }
+            await loadSolicitudes();
+          } catch (err) {
+            alert(err.message || 'Error al responder consulta');
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+      tbody.querySelectorAll('[data-mark-contactado-id]').forEach(link => {
+        link.addEventListener('click', async (ev) => {
+          ev.preventDefault();
+          const id = link.getAttribute('data-mark-contactado-id');
+          const href = link.getAttribute('href');
+          try {
+            await fetch(
+              '/api/solicitudes/' + encodeURIComponent(id) + '/mark-contactado',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}'
+              }
+            );
+          } catch (_) {
+            /* still open chat */
+          }
+          if (href) {
+            window.open(href, 'chatwoot');
+          }
+          try {
+            await loadSolicitudes();
+          } catch (_) { /* ignore */ }
         });
       });
     }

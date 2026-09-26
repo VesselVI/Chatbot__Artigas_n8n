@@ -386,6 +386,37 @@ IMPORTANTE: este mensaje confirma su turno. Por favor no vaya a la clínica hast
 Escribí menú para volver.
 ```
 
+### Confirmación — panel utility fallback (`confirmacion_turno`)
+
+- Name: `confirmacion_turno` (es_AR, UTILITY)
+- Header: `TURNO CONFIRMADO`
+- Dashboard `body_params` (numbered): `{{1}}` = nombre, `{{2}}` = médico, `{{3}}` = día y hora
+- Used when Confirmación desde el panel cannot free-form (Meta customer-service window closed). No Nota variable (ADR-0003).
+
+```text
+Nombre: {{1}}
+Médico: {{2}}
+Día y hora: {{3}}
+
+Te esperamos unos minutos antes del horario. Si necesitás reprogramar o cancelar, escribinos por acá. Escribí menú para volver.
+```
+
+Variable samples: `1` = `Ana Pérez`, `2` = `Adrian Artigas`, `3` = `29/09/2026 10:30`
+
+### Respuesta a consulta — panel (`respuesta_consulta`)
+
+- Name: `respuesta_consulta` (es_AR, UTILITY)
+- Header: optional / none (or short `CONSULTA RECIBIDA` if Meta requires a header)
+- Dashboard `body_params`: `{{1}}` = nombre
+- Row action on pending `tipo=estudio` / `tipo=solicitud` when the customer-service window is closed; same copy as free-form when the window is open.
+
+```text
+Hola {{1}}, recibimos tu consulta. Te respondemos por este chat en breve.
+```
+
+Variable sample: `1` = `Ana Pérez`  
+Footer: empty · Buttons: none
+
 ### Reprogramación — panel (`confirmacion_reprogramacion`)
 
 - Name: `confirmacion_reprogramacion` (es_AR, UTILITY)

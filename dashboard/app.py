@@ -16,6 +16,7 @@ from confirmacion import (
     CANCELLED_STATUS,
     CONFIRMABLE_TIPOS,
     CONFIRMED_STATUS,
+    CONTACTADO_STATUS,
     ConfirmError,
     assert_confirmable,
     can_mark_confirmed,
@@ -31,6 +32,7 @@ from chatwoot_send import (
     send_private_note,
     send_recordatorio,
     send_reprogramacion,
+    send_respuesta_consulta,
 )
 from mensajes import build_outbound_message, format_dia_hora_display
 from busqueda import filter_solicitudes_by_query, normalize_phone_e164
@@ -48,6 +50,13 @@ from reprogramacion import (
     validate_reprogram_payload,
 )
 from recordatorio import body_params_for_row, select_due
+from respuesta_consulta import (
+    assert_mark_contactado,
+    assert_responder_consulta,
+    can_mark_contactado,
+    can_responder_consulta,
+    mensaje_respuesta_consulta,
+)
 
 DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 DAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
@@ -891,6 +900,8 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
         "can_mark_confirmed": can_mark_confirmed(r),
         "can_reprogramar": can_reprogram(r),
         "can_cancelar": can_cancel(r),
+        "can_responder_consulta": can_responder_consulta(r),
+        "can_mark_contactado": can_mark_contactado(r),
         "can_reenviar": (
             (is_confirmed or is_cancelled) and send_status == "failed"
         ),
@@ -1131,6 +1142,99 @@ async def api_mark_confirmed_solicitud(request: Request, solicitud_id: int):
             "whatsapp_send_channel": "external",
             "whatsapp_nota_omitted": False,
             "whatsapp_warning": None,
+            "marked_only": True,
+        }
+    except ConfirmError as e:
+        status = 404 if e.code == "not_found" else 400
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code},
+            status_code=status,
+        )
+
+
+@app.post("/api/solicitudes/{solicitud_id}/responder-consulta")
+@login_required
+async def api_responder_consulta(request: Request, solicitud_id: int):
+    """Respuesta a consulta: ack WhatsApp (free-form/utility) → Contactado."""
+    try:
+        existing = fetch_solicitud(solicitud_id)
+        row = assert_responder_consulta(existing)
+        tipo = normalize_tipo(row.get("tipo"))
+        nombre = str(row.get("nombre") or "").strip()
+        medico = str(row.get("medico") or "").strip()
+        message = mensaje_respuesta_consulta(nombre)
+        fields = {
+            "nombre": nombre,
+            "medico": medico,
+            "status": CONTACTADO_STATUS,
+        }
+        save_solicitud_confirmacion(solicitud_id, fields)
+
+        send_outcome = _attempt_respuesta_consulta_send(
+            row.get("conversation_id"),
+            nombre=nombre or "paciente",
+            message=message,
+        )
+        save_solicitud_confirmacion(
+            solicitud_id,
+            {
+                **fields,
+                "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+                "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+                "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+            },
+        )
+        note = (
+            "Respuesta a consulta desde el panel — "
+            f"{nombre or 'paciente'}. WhatsApp: {send_outcome['whatsapp_send_status']}."
+        )
+        try:
+            send_private_note(row.get("conversation_id"), note)
+        except ChatwootSendError as e:
+            if not send_outcome.get("whatsapp_warning"):
+                send_outcome["whatsapp_warning"] = f"Nota privada: {e}"
+
+        return {
+            "ok": True,
+            "id": solicitud_id,
+            "status": CONTACTADO_STATUS,
+            "status_badge": status_badge_label(CONTACTADO_STATUS, tipo),
+            "nombre": nombre,
+            "whatsapp_sent": send_outcome["whatsapp_send_status"] == "sent",
+            "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+            "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+            "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+            "whatsapp_warning": send_outcome.get("whatsapp_warning"),
+            "message_preview": message,
+        }
+    except ConfirmError as e:
+        status = 404 if e.code == "not_found" else 400
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code},
+            status_code=status,
+        )
+
+
+@app.post("/api/solicitudes/{solicitud_id}/mark-contactado")
+@login_required
+async def api_mark_contactado(request: Request, solicitud_id: int):
+    """Abrir Chat side effect: set Contactado without WhatsApp send."""
+    try:
+        existing = fetch_solicitud(solicitud_id)
+        row = assert_mark_contactado(existing)
+        tipo = normalize_tipo(row.get("tipo"))
+        fields = {
+            "nombre": str(row.get("nombre") or "").strip(),
+            "medico": str(row.get("medico") or "").strip(),
+            "status": CONTACTADO_STATUS,
+        }
+        save_solicitud_confirmacion(solicitud_id, fields)
+        return {
+            "ok": True,
+            "id": solicitud_id,
+            "status": CONTACTADO_STATUS,
+            "status_badge": status_badge_label(CONTACTADO_STATUS, tipo),
+            "whatsapp_sent": False,
             "marked_only": True,
         }
     except ConfirmError as e:
@@ -1697,6 +1801,34 @@ def _attempt_whatsapp_send(
             "whatsapp_send_channel": result.channel,
             "whatsapp_nota_omitted": result.nota_omitted,
             "whatsapp_warning": warning,
+        }
+    except ChatwootSendError as e:
+        return {
+            "whatsapp_send_status": "failed",
+            "whatsapp_send_channel": None,
+            "whatsapp_nota_omitted": False,
+            "whatsapp_warning": str(e),
+        }
+
+
+def _attempt_respuesta_consulta_send(
+    conversation_id: Any,
+    *,
+    nombre: str,
+    message: str,
+) -> dict[str, Any]:
+    """Free-form when CSW open; utility respuesta_consulta when closed. Never raises."""
+    try:
+        result = send_respuesta_consulta(
+            conversation_id,
+            nombre=nombre,
+            freeform_content=message,
+        )
+        return {
+            "whatsapp_send_status": "sent",
+            "whatsapp_send_channel": result.channel,
+            "whatsapp_nota_omitted": result.nota_omitted,
+            "whatsapp_warning": None,
         }
     except ChatwootSendError as e:
         return {

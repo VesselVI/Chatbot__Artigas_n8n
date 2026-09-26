@@ -111,6 +111,18 @@ _Avoid_: Consulta de precio, FAQ answer (these need Secretaría)
 A human-needed question about prices or fees. Domain-distinct from Solicitud de estudio even if the bot currently stores both under one queue label.
 _Avoid_: Solicitud de estudio, FAQ answer
 
+**Respuesta a consulta desde el panel**:
+Row action on a pending solicitud with `tipo=estudio` or `tipo=solicitud`: sends a short patient ack (free-form inside Meta’s customer-service window; utility plantilla `respuesta_consulta` when that window is closed), then sets Contactado. Same plantilla and copy for both tipos. Re-send and Abrir Chat remain allowed after Contactado. No board-level control.
+_Avoid_: Bienvenida, Saludo, Confirmar estudio, Menú de bienvenida (bot screen), Confirmación desde el panel
+
+**Mensaje de respuesta a consulta**:
+Patient-facing ack for Respuesta a consulta desde el panel — same wording whether free-form or utility: “Hola …, recibimos tu consulta. Te respondemos por este chat en breve.” (nombre only). Not the real estudio/precio answer; that stays free-form in Chatwoot after the window allows it.
+_Avoid_: Mensaje de confirmación, Menú de bienvenida, Texto de bienvenida (Settings)
+
+**Contactado**:
+Solicitud status (`status=contactado`, badge **Contactado**) for `tipo=estudio` or `tipo=solicitud` after Secretaría starts the WhatsApp thread via Respuesta a consulta desde el panel or Abrir Chat. Means “thread opened / ack sent,” not that the consulta is finished. Never used for pending turnos (those stay pending until Confirmación desde el panel).
+_Avoid_: Confirmado, En curso, Avisada, contacted (in domain prose), Turno confirmado
+
 **Obra social**:
 The paciente's health coverage or insurer as recorded on a solicitud (including free-text when they choose Otras).
 _Avoid_: Seguro, prepaga (unless that is what the paciente said), insurance

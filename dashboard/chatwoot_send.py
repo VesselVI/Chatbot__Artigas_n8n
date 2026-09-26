@@ -226,6 +226,39 @@ def send_confirmacion(
     )
 
 
+def send_respuesta_consulta(
+    conversation_id: Any,
+    *,
+    nombre: str,
+    freeform_content: str,
+    template_name: str = "respuesta_consulta",
+    window_open: bool | None = None,
+    opener: Callable[..., Any] | None = None,
+) -> SendResult:
+    """
+    Respuesta a consulta desde el panel — free-form inside CSW; utility when closed.
+    WABA: respuesta_consulta (es_AR), {{1}} = nombre.
+    """
+    open_win = is_customer_service_window_open(
+        conversation_id, force=window_open, opener=opener
+    )
+    if open_win:
+        try:
+            return send_freeform_message(
+                conversation_id, freeform_content, opener=opener
+            )
+        except ChatwootSendError as e:
+            if not e.window_closed:
+                raise
+    name = str(nombre or "").strip() or "paciente"
+    return send_utility_template(
+        conversation_id,
+        template_name=template_name or "respuesta_consulta",
+        body_params=[name],
+        opener=opener,
+    )
+
+
 def send_reprogramacion(
     conversation_id: Any,
     *,
