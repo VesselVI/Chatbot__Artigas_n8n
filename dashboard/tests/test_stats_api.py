@@ -78,7 +78,7 @@ def test_stats_api_aggregates_rows(client: TestClient, monkeypatch):
     assert body["week_start"] == "2026-09-21"
     assert body["week_end"] == "2026-09-27"
     assert body["current"]["total"] == 2
-    assert body["current"]["confirmados"] == 1
+    assert body["current"]["turnos"] == 1
     assert body["current"]["cancelaciones"] == 1
     assert body["previous"]["total"] == 1
     assert body["trends"]["cancelaciones"]["label"] == "50% del total"

@@ -29,14 +29,16 @@ def test_week_label_same_month():
 
 
 def test_classify_row_buckets():
-    assert classify_row({"status": "confirmed", "tipo": "turno"}) == "confirmados"
+    assert classify_row({"status": "confirmed", "tipo": "turno"}) == "turnos"
+    assert classify_row({"status": "pending", "tipo": "turno"}) == "turnos"
+    assert classify_row({"status": "cancelled", "tipo": "turno"}) == "turnos"
     assert classify_row({"status": "pending", "tipo": "reprogramar"}) == "reprogramaciones"
     assert classify_row({"status": "confirmed", "tipo": "reprogramar"}) == "reprogramaciones"
     assert classify_row({"status": "pending", "tipo": "cancelar"}) == "cancelaciones"
     assert classify_row({"status": "cancelled", "tipo": "cancelar"}) == "cancelaciones"
-    # Panel cancel of a turno is not a cancelación solicitud
-    assert classify_row({"status": "cancelled", "tipo": "turno"}) is None
-    assert classify_row({"status": "pending", "tipo": "turno"}) is None
+    # estudio / solicitud are not a tipo KPI bucket
+    assert classify_row({"status": "confirmed", "tipo": "estudio"}) is None
+    assert classify_row({"status": "pending", "tipo": "solicitud"}) is None
 
 
 def test_pct_change_trend():
@@ -71,13 +73,13 @@ def test_compute_solicitudes_week_stats_counts_and_trends():
     assert out["week_end"] == "2026-09-27"
     assert out["current"] == {
         "total": 5,
-        "confirmados": 2,
+        "turnos": 2,
         "reprogramaciones": 1,
         "cancelaciones": 1,
     }
     assert out["previous"] == {
         "total": 3,
-        "confirmados": 2,
+        "turnos": 2,
         "reprogramaciones": 0,
         "cancelaciones": 1,
     }
@@ -90,9 +92,9 @@ def test_compute_solicitudes_week_stats_counts_and_trends():
     daily = out["daily"]
     assert daily["labels"] == ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
     assert daily["dates"][0] == "2026-09-21"
-    # Mon 21: 1 confirmed estudio; Tue 22: 2; Wed 23: 1 reprog; Thu 24: 1 cancel
+    # Mon 21: 1 estudio; Tue 22: 2 turnos; Wed 23: 1 reprog; Thu 24: 1 cancel
     assert daily["total"] == [1, 2, 1, 1, 0, 0, 0]
-    assert daily["confirmados"] == [1, 1, 0, 0, 0, 0, 0]
+    assert daily["turnos"] == [0, 2, 0, 0, 0, 0, 0]
     assert daily["reprogramaciones"] == [0, 0, 1, 0, 0, 0, 0]
     assert daily["cancelaciones"] == [0, 0, 0, 1, 0, 0, 0]
 
@@ -106,4 +108,4 @@ def test_count_rows_string_created_at():
     ]
     counts = count_rows_in_week(rows, start, end)
     assert counts["total"] == 1
-    assert counts["confirmados"] == 1
+    assert counts["turnos"] == 1

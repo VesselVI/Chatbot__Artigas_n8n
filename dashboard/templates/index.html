@@ -414,7 +414,7 @@
       box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
     }
     .metric-card.m-total { background: #6261cc; }
-    .metric-card.m-confirmados { background: #3d99f5; }
+    .metric-card.m-turnos { background: #3d99f5; }
     .metric-card.m-reprogramados { background: #edad21; }
     .metric-card.m-cancelados { background: #db5d5d; }
 
@@ -1852,18 +1852,18 @@
             <div class="metric-chart"><canvas id="kpi-total-chart" aria-hidden="true"></canvas></div>
             <div class="metric-day-legend" data-kpi-legend></div>
           </div>
-          <div class="metric-card m-confirmados">
+          <div class="metric-card m-turnos">
             <div class="metric-card-body">
               <div class="metric-info">
                 <div class="metric-value-row">
-                  <span class="metric-value" id="kpi-confirmados">—</span>
-                  <span class="metric-trend" id="kpi-confirmados-trend"></span>
+                  <span class="metric-value" id="kpi-turnos">—</span>
+                  <span class="metric-trend" id="kpi-turnos-trend"></span>
                 </div>
-                <span class="metric-label">Confirmados</span>
+                <span class="metric-label">Turnos</span>
               </div>
               <span class="metric-opts" aria-hidden="true"><i class="bi bi-three-dots-vertical"></i></span>
             </div>
-            <div class="metric-chart"><canvas id="kpi-confirmados-chart" aria-hidden="true"></canvas></div>
+            <div class="metric-chart"><canvas id="kpi-turnos-chart" aria-hidden="true"></canvas></div>
             <div class="metric-day-legend" data-kpi-legend></div>
           </div>
           <div class="metric-card m-reprogramados">
@@ -3279,7 +3279,7 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
     const kpiCharts = {};
     const KPI_POINT_COLORS = {
       total: '#6261cc',
-      confirmados: '#3d99f5',
+      turnos: '#3d99f5',
       reprogramaciones: '#edad21',
       cancelaciones: '#db5d5d',
     };
@@ -3400,7 +3400,10 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
       }
 
       const fill = style === 'smooth';
-      const opts = lineChartOptions(fullLabels, key === 'reprogramaciones' ? 'reprogramaciones' : 'solicitudes');
+      const opts = lineChartOptions(
+        fullLabels,
+        key === 'reprogramaciones' ? 'reprogramaciones' : (key === 'turnos' ? 'turnos' : 'solicitudes')
+      );
       if (fill) {
         opts.elements.line.borderWidth = 2;
         opts.elements.line.tension = 0.4;
@@ -3427,7 +3430,7 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
         labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
         labels_full: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
         total: [0, 0, 0, 0, 0, 0, 0],
-        confirmados: [0, 0, 0, 0, 0, 0, 0],
+        turnos: [0, 0, 0, 0, 0, 0, 0],
         reprogramaciones: [0, 0, 0, 0, 0, 0, 0],
         cancelaciones: [0, 0, 0, 0, 0, 0, 0],
       };
@@ -3444,22 +3447,22 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
         const daily = data.daily || emptyDaily;
         updateDayLegends(daily.labels);
         setKpiText('kpi-total', 'kpi-total-trend', cur.total, trends.total, 'total');
-        setKpiText('kpi-confirmados', 'kpi-confirmados-trend', cur.confirmados, trends.confirmados, 'confirmados');
+        setKpiText('kpi-turnos', 'kpi-turnos-trend', cur.turnos, trends.turnos, 'turnos');
         setKpiText('kpi-reprog', 'kpi-reprog-trend', cur.reprogramaciones, trends.reprogramaciones, 'reprogramaciones');
         setKpiText('kpi-cancelados', 'kpi-cancelados-trend', cur.cancelaciones, trends.cancelaciones, 'cancelaciones');
         upsertKpiChart('total', 'kpi-total-chart', daily, 'dots');
-        upsertKpiChart('confirmados', 'kpi-confirmados-chart', daily, 'dots');
+        upsertKpiChart('turnos', 'kpi-turnos-chart', daily, 'dots');
         upsertKpiChart('reprogramaciones', 'kpi-reprog-chart', daily, 'smooth');
         upsertKpiChart('cancelaciones', 'kpi-cancelados-chart', daily, 'bars');
       } catch (err) {
         if (weekLabel) weekLabel.textContent = 'No se pudieron cargar';
         updateDayLegends(emptyDaily.labels);
         setKpiText('kpi-total', 'kpi-total-trend', '—', null, 'total');
-        setKpiText('kpi-confirmados', 'kpi-confirmados-trend', '—', null, 'confirmados');
+        setKpiText('kpi-turnos', 'kpi-turnos-trend', '—', null, 'turnos');
         setKpiText('kpi-reprog', 'kpi-reprog-trend', '—', null, 'reprogramaciones');
         setKpiText('kpi-cancelados', 'kpi-cancelados-trend', '—', null, 'cancelaciones');
         upsertKpiChart('total', 'kpi-total-chart', emptyDaily, 'dots');
-        upsertKpiChart('confirmados', 'kpi-confirmados-chart', emptyDaily, 'dots');
+        upsertKpiChart('turnos', 'kpi-turnos-chart', emptyDaily, 'dots');
         upsertKpiChart('reprogramaciones', 'kpi-reprog-chart', emptyDaily, 'smooth');
         upsertKpiChart('cancelaciones', 'kpi-cancelados-chart', emptyDaily, 'bars');
       }
