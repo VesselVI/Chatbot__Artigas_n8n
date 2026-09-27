@@ -2001,7 +2001,7 @@
                 >
                 <div class="patient-suggest" id="patient-suggest" role="listbox" hidden></div>
                 <div class="form-text" id="patient-search-hint">
-                  Elegí una solicitud, o un teléfono nuevo para abrir conversación en Chatwoot.
+                  Elegí cualquier paciente (cualquier tipo o estado), o un teléfono nuevo para Chatwoot.
                 </div>
               </div>
 
@@ -2102,7 +2102,7 @@
                 >
                 <div class="patient-suggest" id="cancel-patient-suggest" role="listbox" hidden></div>
                 <div class="form-text">
-                  Elegí una solicitud, o un teléfono nuevo para abrir conversación en Chatwoot.
+                  Elegí cualquier paciente (cualquier tipo o estado), o un teléfono nuevo para Chatwoot.
                 </div>
               </div>
               <div class="mb-3">
@@ -2924,25 +2924,27 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
 
     function bindPatientFromSearchHit(hit) {
       if (!hit || !hit.id) return;
-      if (hit.can_reprogramar === false) {
-        const alertEl = document.getElementById('confirm-alert');
-        if (alertEl) {
-          alertEl.innerHTML =
-            '<div class="alert alert-warning py-2">Esa solicitud no admite Reprogramar (usá Confirmar si es un turno pendiente).</div>';
-        }
+      const tel = hit.telefono_contacto || hit.phone || '';
+      const phoneDigits = digitsOnly(tel);
+      const updateExisting = hit.can_reprogramar !== false;
+      // Ineligible rows (pending turno, estudio, cancelado, …): use identity + phone
+      // so submit INSERTs a new reprogramación instead of rejecting the pick.
+      if (!updateExisting && phoneDigits.length < 8) {
+        document.getElementById('confirm-alert').innerHTML =
+          '<div class="alert alert-warning py-2">Esa solicitud no tiene teléfono para notificar. Escribí un teléfono nuevo.</div>';
         return;
       }
       confirmDraft = Object.assign({}, hit, {
         _mode: 'reprogram',
         _searchFirst: true,
-        _coldPhone: null,
+        _coldPhone: updateExisting ? null : phoneDigits,
       });
-      document.getElementById('confirm-id').value = hit.id;
+      document.getElementById('confirm-id').value = updateExisting ? hit.id : '';
       document.getElementById('confirm-nombre').value =
         (hit.nombre && hit.nombre !== '-') ? hit.nombre : '';
       document.getElementById('confirm-medico').value =
         (hit.medico && hit.medico !== '-') ? hit.medico : '';
-      fillConfirmSchedule(hit);
+      fillConfirmSchedule(updateExisting ? hit : {});
       updateConfirmPreview();
       syncReprogramSubmitEnabled();
       const suggest = document.getElementById('patient-suggest');
@@ -2952,10 +2954,14 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
       }
       const searchInput = document.getElementById('patient-search');
       if (searchInput) {
-        const tel = hit.telefono_contacto || hit.phone || '';
         searchInput.value = `${hit.nombre || ''} · ${tel}`.trim();
       }
-      document.getElementById('confirm-alert').innerHTML = '';
+      const alertEl = document.getElementById('confirm-alert');
+      if (alertEl) {
+        alertEl.innerHTML = updateExisting
+          ? ''
+          : '<div class="alert alert-info py-2">Se creará una reprogramación nueva para este paciente (la solicitud original no se modifica).</div>';
+      }
     }
 
     function looksLikePhoneQuery(q) {
@@ -3009,12 +3015,8 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
             const badge = s.status_badge
               ? escapeHtml(s.status_badge)
               : escapeHtml(s.status || 'pending');
-            const disabled = s.can_reprogramar ? '' : ' is-disabled';
-            const title = s.can_reprogramar
-              ? ''
-              : ' title="No admite Reprogramar"';
             return (
-              `<button type="button" class="patient-suggest-item${disabled}" data-hit-id="${s.id}" role="option"${title}>` +
+              `<button type="button" class="patient-suggest-item" data-hit-id="${s.id}" role="option">` +
               `<span class="patient-suggest-name">${nombre}</span>` +
               `<span class="patient-suggest-meta">${tel} · ${escapeHtml(s.tipo || '')} · ${badge}</span>` +
               `</button>`
@@ -3536,13 +3538,19 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
 
     function bindCancelFromHit(hit) {
       if (!hit || !hit.id) return;
-      if (hit.can_cancelar === false) {
+      const tel = hit.telefono_contacto || hit.phone || '';
+      const phoneDigits = digitsOnly(tel);
+      const updateExisting = hit.can_cancelar !== false;
+      if (!updateExisting && phoneDigits.length < 8) {
         document.getElementById('cancel-alert').innerHTML =
-          '<div class="alert alert-warning py-2">Esa solicitud no admite Cancelar.</div>';
+          '<div class="alert alert-warning py-2">Esa solicitud no tiene teléfono para notificar. Escribí un teléfono nuevo.</div>';
         return;
       }
-      cancelDraft = Object.assign({}, hit, { _searchFirst: true, _coldPhone: null });
-      document.getElementById('cancel-id').value = hit.id;
+      cancelDraft = Object.assign({}, hit, {
+        _searchFirst: true,
+        _coldPhone: updateExisting ? null : phoneDigits,
+      });
+      document.getElementById('cancel-id').value = updateExisting ? hit.id : '';
       document.getElementById('cancel-nombre').value =
         (hit.nombre && hit.nombre !== '-') ? hit.nombre : '';
       const suggest = document.getElementById('cancel-patient-suggest');
@@ -3552,10 +3560,11 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
       }
       const searchInput = document.getElementById('cancel-patient-search');
       if (searchInput) {
-        const tel = hit.telefono_contacto || hit.phone || '';
         searchInput.value = `${hit.nombre || ''} · ${tel}`.trim();
       }
-      document.getElementById('cancel-alert').innerHTML = '';
+      document.getElementById('cancel-alert').innerHTML = updateExisting
+        ? ''
+        : '<div class="alert alert-info py-2">Se creará una cancelación nueva para este paciente (la solicitud original no se modifica).</div>';
       updateCancelPreview();
       syncCancelSubmitEnabled();
     }
@@ -3623,9 +3632,8 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
           const badge = s.status_badge
             ? escapeHtml(s.status_badge)
             : escapeHtml(s.status || 'pending');
-          const disabled = s.can_cancelar ? '' : ' is-disabled';
           return (
-            `<button type="button" class="patient-suggest-item${disabled}" data-cancel-hit-id="${s.id}" role="option">` +
+            `<button type="button" class="patient-suggest-item" data-cancel-hit-id="${s.id}" role="option">` +
             `<span class="patient-suggest-name">${nombre}</span>` +
             `<span class="patient-suggest-meta">${tel} · ${escapeHtml(s.tipo || '')} · ${badge}</span>` +
             `</button>`
