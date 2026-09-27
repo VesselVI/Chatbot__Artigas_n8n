@@ -26,7 +26,7 @@ if (!buildRecepcion || !prepareInput || !parseBlob || !buildPedido) {
 
 function isOutsideClinicHours(now) {
   const h = now.getHours();
-  const inMorning = h >= 8 && h < 12;
+  const inMorning = h >= 9 && h < 12;
   const inAfternoon = h >= 16 && h < 20;
   return !(inMorning || inAfternoon);
 }
@@ -49,7 +49,8 @@ const br = buildRecepcion.parameters.jsCode;
 check('Build recepcion has isOutsideClinicHours', br.includes('isOutsideClinicHours'));
 check('Recepcion mentions Recibimos', br.includes('Recibimos tu solicitud'));
 check('Recepcion has Corregir datos button', br.includes('corregir_datos'));
-check('Recepcion supports UPDATE when solicitud_id', br.includes('UPDATE turno_solicitudes'));
+check('Recepcion UPDATE only when is_correction + solicitud_id', /isUpdate = !!\(datos\.solicitud_id && datos\.is_correction\)/.test(br));
+check('Recepcion supports UPDATE branch', br.includes('UPDATE turno_solicitudes'));
 check('Private ficha still has solicitud', br.includes('solicitud de turno'));
 check('horario fixed A confirmar', br.includes('A confirmar por secretaría'));
 check(
@@ -57,6 +58,46 @@ check(
   /state\s*=\s*'idle'/.test(br) &&
     !/state\s*=\s*'post_solicitud'/.test(br)
 );
+check(
+  'Insert persists solicitud_id via LAST_INSERT_ID in same Run query',
+  br.includes('LAST_INSERT_ID()') && br.includes('SELECT LAST_INSERT_ID() AS insertId')
+);
+
+const runSql = workflow.nodes.find((n) => n.name === 'Run solicitud sql');
+check(
+  'Run solicitud sql uses independently batching (same MySQL session)',
+  !!(runSql && runSql.parameters.options && runSql.parameters.options.queryBatching === 'independently')
+);
+
+const bindSid = workflow.nodes.find((n) => n.name === 'Bind solicitud_id');
+check('Bind solicitud_id node exists', !!bindSid);
+check(
+  'Bind solicitud_id scans all MySQL items for insertId',
+  !!(bindSid && bindSid.parameters.jsCode.includes('$input.all()') && bindSid.parameters.jsCode.includes('insertId'))
+);
+check(
+  'Run solicitud sql wires to Bind solicitud_id',
+  conns['Run solicitud sql'] &&
+    conns['Run solicitud sql'].main[0] &&
+    conns['Run solicitud sql'].main[0][0].node === 'Bind solicitud_id'
+);
+check(
+  'Set post_solicitud uses Bind solicitud_id sql_state',
+  workflow.nodes
+    .find((n) => n.name === 'Set post_solicitud')
+    .parameters.query.includes('Bind solicitud_id')
+);
+
+// Feedback loop: n8n executeQuery INSERT shape drops OkPacket → {success:true}
+function pickInsertId(row) {
+  if (row == null) return 0;
+  if (Array.isArray(row)) return pickInsertId(row[0]);
+  const n = Number(row.insertId ?? row.insert_id ?? row.INSERT_ID ?? 0);
+  if (n > 0) return n;
+  return 0;
+}
+check('n8n {success:true} yields insertId 0 (OkPacket discarded)', pickInsertId({ success: true }) === 0);
+check('SELECT LAST_INSERT_ID row yields insertId', pickInsertId({ insertId: 77 }) === 77);
 
 const pi = prepareInput.parameters.jsCode;
 check('Prepare Input uses awaiting_pedido_datos', pi.includes('awaiting_pedido_datos'));
@@ -123,7 +164,9 @@ if (handleMedico) {
 }
 
 check('07:59 outside', isOutsideClinicHours(atHour(7, 59)) === true);
-check('08:00 open', isOutsideClinicHours(atHour(8, 0)) === false);
+check('08:00 outside', isOutsideClinicHours(atHour(8, 0)) === true);
+check('08:59 outside', isOutsideClinicHours(atHour(8, 59)) === true);
+check('09:00 open', isOutsideClinicHours(atHour(9, 0)) === false);
 
 console.log(failed ? `\n${failed} test(s) failed` : '\nAll tests passed');
 process.exit(failed ? 1 : 0);

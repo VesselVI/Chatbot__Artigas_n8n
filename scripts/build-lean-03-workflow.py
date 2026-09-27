@@ -169,10 +169,15 @@ class WorkflowBuilder:
         y: int,
         always: bool = True,
         node_id: str | None = None,
+        options: dict | None = None,
     ) -> str:
         return self.add(
             {
-                "parameters": {"operation": "executeQuery", "query": query, "options": {}},
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": query,
+                    "options": options if options is not None else {},
+                },
                 "type": "n8n-nodes-base.mySql",
                 "typeVersion": 2.5,
                 "position": [x, y],
@@ -321,12 +326,21 @@ const ctx = parseCtx(j.datos_json);
 
 let step = estado;
 if (/^(idle|menu_shown)$/.test(estado)) {
-  if (/\b\d{7,10}\b/.test(texto) && fold(texto).length > 12) step = 'awaiting_pedido_datos';
-  else step = 'Empezar';
+  if (/\b\d{7,10}\b/.test(texto) && fold(texto).length > 12) {
+    step = 'awaiting_pedido_datos';
+    // New Pedido from idle — never treat leftover recepción id as Corrección.
+    delete ctx.solicitud_id;
+    delete ctx.is_correction;
+    ctx.correction_count = 0;
+  } else {
+    step = 'Empezar';
+  }
 }
 if (boton === 'corregir_datos' && (estado === 'post_solicitud' || ctx.solicitud_id)) {
   step = 'post_solicitud';
 }
+const correcting =
+  step === 'awaiting_correccion_datos' || !!ctx.is_correction;
 return [{
   json: {
     telefono: j.telefono,
@@ -339,7 +353,7 @@ return [{
     is_repetir: isRepetir,
     step,
     correction_count: Number(ctx.correction_count || 0),
-    solicitud_id: ctx.solicitud_id || null,
+    solicitud_id: correcting ? (ctx.solicitud_id || null) : null,
   }
 }];
 """
@@ -385,7 +399,7 @@ return [{
         self.mysql(
             "Start awaiting_pedido_datos",
             "UPDATE conversation_state SET state = 'awaiting_pedido_datos', "
-            "context = COALESCE(context, JSON_OBJECT()) "
+            "context = JSON_OBJECT('correction_count', 0) "
             "WHERE phone = '{{ $('Prepare Input').item.json.telefono }}';",
             x1,
             y,
@@ -456,6 +470,8 @@ if (typeof obras === 'string') { try { obras = JSON.parse(obras); } catch(e) { o
 if (!Array.isArray(obras)) obras = [];
 const doctors = $input.all().map(i => i.json).filter(d => d && d.id && d.name);
 const parsed = parsePedidoDatos(m.texto, { doctors, obras });
+const correcting =
+  m.step === 'awaiting_correccion_datos' || !!ctx.is_correction;
 const merged = {
   ...m,
   ...parsed,
@@ -466,9 +482,9 @@ const merged = {
   doctor_id: parsed.doctor_id != null ? parsed.doctor_id : (ctx.doctor_id ?? null),
   medico_cualquiera: parsed.medico_cualquiera || !!ctx.medico_cualquiera,
   telefono_contacto: m.telefono,
-  solicitud_id: ctx.solicitud_id || null,
+  solicitud_id: correcting ? (ctx.solicitud_id || null) : null,
   correction_count: Number(ctx.correction_count || 0),
-  is_correction: m.step === 'awaiting_correccion_datos' || !!ctx.solicitud_id,
+  is_correction: correcting,
 };
 return [{ json: merged }];
 """
@@ -500,6 +516,7 @@ const sql = `UPDATE conversation_state SET
     '$.medico_cualquiera', ${j.medico_cualquiera ? 'true' : 'false'},
     '$.telefono_contacto', '${esc(j.telefono)}',
     '$.solicitud_id', ${j.solicitud_id ? Number(j.solicitud_id) : 'null'},
+    '$.is_correction', ${j.is_correction ? 'true' : 'false'},
     '$.correction_count', ${Number(j.correction_count || 0)}
   ),
   state = 'awaiting_obra_social'
@@ -520,6 +537,7 @@ const sql = `UPDATE conversation_state SET
     '$.medico_cualquiera', ${j.medico_cualquiera ? 'true' : 'false'},
     '$.telefono_contacto', '${esc(j.telefono)}',
     '$.solicitud_id', ${j.solicitud_id ? Number(j.solicitud_id) : 'null'},
+    '$.is_correction', ${j.is_correction ? 'true' : 'false'},
     '$.correction_count', ${Number(j.correction_count || 0)}
   ),
   state = 'awaiting_medico'
@@ -589,6 +607,7 @@ const sql = `UPDATE conversation_state SET
     '$.medico_cualquiera', ${j.medico_cualquiera ? 'true' : 'false'},
     '$.telefono_contacto', '${esc(j.telefono)}',
     '$.solicitud_id', ${j.solicitud_id ? Number(j.solicitud_id) : 'null'},
+    '$.is_correction', ${j.is_correction ? 'true' : 'false'},
     '$.correction_count', ${Number(j.correction_count || 0)}
   )
 WHERE phone = '${phone}';`;
@@ -611,7 +630,7 @@ return [{ json: { ...j, sql_ctx: sql } }];
         recepcion_js = COMMON_HELPERS + r"""
 function isOutsideClinicHours(now) {
   const h = now.getHours();
-  const inMorning = h >= 8 && h < 12;
+  const inMorning = h >= 9 && h < 12;
   const inAfternoon = h >= 16 && h < 20;
   return !(inMorning || inAfternoon);
 }
@@ -622,7 +641,7 @@ datos.telefono_contacto = datos.telefono_contacto || m.telefono;
 const horarioFijo = 'A confirmar por secretaría';
 const phone = esc(m.telefono);
 const priceLine = consultaPriceLine(datos);
-const isUpdate = !!(datos.solicitud_id);
+const isUpdate = !!(datos.solicitud_id && datos.is_correction);
 let sql;
 if (isUpdate) {
   sql = `UPDATE turno_solicitudes SET
@@ -631,8 +650,12 @@ if (isUpdate) {
     horario_preferido='${esc(horarioFijo)}'
     WHERE id=${Number(datos.solicitud_id)};`;
 } else {
+  // n8n executeQuery discards OkPacket insertId (returns {success:true}). Persist id in the
+  // SAME MySQL session via multi-statement + queryBatching=independently on Run solicitud sql.
   sql = `INSERT INTO turno_solicitudes (phone, nombre, dni, obra_social, telefono_contacto, medico, horario_preferido, status, conversation_id)
-VALUES ('${phone}', '${esc(datos.nombre)}', '${esc(datos.dni)}', '${esc(datos.obra_social)}', '${esc(datos.telefono_contacto)}', '${esc(datos.medico)}', '${esc(horarioFijo)}', 'pending', '${esc(m.conversation_id)}');`;
+VALUES ('${phone}', '${esc(datos.nombre)}', '${esc(datos.dni)}', '${esc(datos.obra_social)}', '${esc(datos.telefono_contacto)}', '${esc(datos.medico)}', '${esc(horarioFijo)}', 'pending', '${esc(m.conversation_id)}');
+UPDATE conversation_state SET state='idle', context=JSON_SET(JSON_REMOVE(COALESCE(context, JSON_OBJECT()), '$.is_correction'), '$.solicitud_id', LAST_INSERT_ID(), '$.correction_count', ${Number(datos.correction_count || 0)}) WHERE phone='${phone}';
+SELECT LAST_INSERT_ID() AS insertId;`;
 }
 const ficha = `🗒️ ${isUpdate ? 'Corrección' : 'Nueva'} solicitud de turno
 Nombre: ${datos.nombre || '-'}
@@ -656,14 +679,14 @@ try {
     ? $now.setZone('America/Argentina/Buenos_Aires').toJSDate()
     : new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
   if (isOutsideClinicHours(now)) {
-    patientBody.push('', 'Su solicitud fue enviada fuera del horario de atención de la clínica (8 a 12 hs y 16 a 20 hs). Una secretaria la confirmará dentro de ese horario.');
+    patientBody.push('', 'Su solicitud fue enviada fuera del horario de atención de la clínica (9hs a 12 hs y 16hs a 20 hs). Una secretaria la confirmará dentro de ese horario.');
   }
 } catch (e) {}
 const recepcion = cwSelect(patientBody.join('\n'), [{ title: 'Corregir datos', value: 'corregir_datos' }], m);
 const newCorrection = isUpdate ? Number(datos.correction_count || 0) + 1 : Number(datos.correction_count || 0);
-const sqlState = isUpdate
-  ? `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.correction_count', ${newCorrection}) WHERE phone='${phone}';`
-  : `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.solicitud_id', LAST_INSERT_ID(), '$.correction_count', ${newCorrection}) WHERE phone='${phone}';`;
+// sql_state must NOT call LAST_INSERT_ID on a later pooled connection (id becomes 0).
+// Inserts already wrote solicitud_id in Run solicitud sql; this only refreshes correction_count.
+const sqlState = `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.correction_count', ${newCorrection}) WHERE phone='${phone}';`;
 return [{
   json: {
     telefono: m.telefono,
@@ -672,30 +695,64 @@ return [{
     sql_solicitud: sql,
     sql_state: sqlState,
     is_update: isUpdate,
+    new_correction: newCorrection,
+    phone_esc: phone,
     cw_private: { content: ficha, message_type: 'outgoing', private: true },
     recepcion,
   }
 }];
 """
         self.code("Build recepcion + sql", recepcion_js, x1 + 224, y_fin)
-        self.mysql("Run solicitud sql", "{{ $json.sql_solicitud }}", x1 + 448, y_fin)
+        self.mysql(
+            "Run solicitud sql",
+            "{{ $json.sql_solicitud }}",
+            x1 + 448,
+            y_fin,
+            options={"queryBatching": "independently"},
+        )
+        bind_js = r"""
+function pickInsertId(row) {
+  if (row == null) return 0;
+  if (Array.isArray(row)) return pickInsertId(row[0]);
+  const n = Number(row.insertId ?? row.insert_id ?? row.INSERT_ID ?? 0);
+  if (n > 0) return n;
+  if (row.json && typeof row.json === 'object') return pickInsertId(row.json);
+  return 0;
+}
+const j = $('Build recepcion + sql').first().json;
+// n8n may emit {success:true} for INSERT OkPacket; SELECT LAST_INSERT_ID AS insertId is the real id.
+let insertId = 0;
+for (const item of $input.all()) {
+  insertId = pickInsertId(item.json);
+  if (insertId > 0) break;
+}
+const phone = j.phone_esc || String(j.telefono || '').replace(/'/g, "''");
+const corr = Number(j.new_correction || 0);
+// Prefer not to overwrite solicitud_id with 0. Inserts already set it in Run (same session).
+let sql_state = `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.correction_count', ${corr}) WHERE phone='${phone}';`;
+if (!j.is_update && insertId > 0) {
+  sql_state = `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.solicitud_id', ${insertId}, '$.correction_count', ${corr}) WHERE phone='${phone}';`;
+}
+return [{ json: { ...j, sql_state, bound_solicitud_id: insertId } }];
+"""
+        self.code("Bind solicitud_id", bind_js, x1 + 560, y_fin)
+        self.mysql("Set post_solicitud", "{{ $('Bind solicitud_id').first().json.sql_state }}", x1 + 672, y_fin)
         self.code(
             "Prep private note",
-            "const j = $('Build recepcion + sql').first().json;\n"
+            "const j = $('Bind solicitud_id').first().json;\n"
             "return [{ json: { conversation_id: j.conversation_id, account_id: j.account_id, cw_body: j.cw_private } }];",
-            x1 + 672,
+            x1 + 896,
             y_fin,
         )
-        self.http("Send private note", x1 + 896, y_fin)
+        self.http("Send private note", x1 + 1120, y_fin)
         self.code(
             "Prep recepcion",
-            "const j = $('Build recepcion + sql').first().json;\n"
+            "const j = $('Bind solicitud_id').first().json;\n"
             "return [{ json: j.recepcion }];",
-            x1 + 1120,
+            x1 + 1344,
             y_fin,
         )
-        self.http("Send recepcion", x1 + 1344, y_fin)
-        self.mysql("Set post_solicitud", "{{ $('Build recepcion + sql').first().json.sql_state }}", x1 + 1568, y_fin)
+        self.http("Send recepcion", x1 + 1568, y_fin)
 
         # --- Obra social flow (reuse handlers) ---
         y_obra = y0
@@ -962,7 +1019,8 @@ return [{
 
         self.mysql(
             "Start awaiting_correccion",
-            "UPDATE conversation_state SET state = 'awaiting_correccion_datos' "
+            "UPDATE conversation_state SET state = 'awaiting_correccion_datos', "
+            "context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.is_correction', true) "
             "WHERE phone = '{{ $('Prepare Input').item.json.telefono }}';",
             x1 + 448,
             y_post + 80,
@@ -1012,11 +1070,12 @@ return [{
         # Finalize chain
         self.wire("Load ctx final", "Build recepcion + sql")
         self.wire("Build recepcion + sql", "Run solicitud sql")
-        self.wire("Run solicitud sql", "Prep private note")
+        self.wire("Run solicitud sql", "Bind solicitud_id")
+        self.wire("Bind solicitud_id", "Set post_solicitud")
+        self.wire("Set post_solicitud", "Prep private note")
         self.wire("Prep private note", "Send private note")
         self.wire("Send private note", "Prep recepcion")
         self.wire("Prep recepcion", "Send recepcion")
-        self.wire("Send recepcion", "Set post_solicitud")
 
         # Obra
         self.wire("Handle obra social", "Obra action")

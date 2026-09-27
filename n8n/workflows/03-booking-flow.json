@@ -40,7 +40,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst j = $input.first().json;\nconst estado = j.estado || 'idle';\nconst boton = String(j.boton_id || '').trim();\nlet texto = String(j.texto || '').trim();\ntexto = texto.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst isNavLine = (l) => /^(repetir|repetir pregunta)$/i.test(fold(l));\nconst isRepetir = boton === 'repetir_pregunta' || isNavLine(last) || lines.some(isNavLine);\nconst ctx = parseCtx(j.datos_json);\n\nlet step = estado;\nif (/^(idle|menu_shown)$/.test(estado)) {\n  if (/\\b\\d{7,10}\\b/.test(texto) && fold(texto).length > 12) step = 'awaiting_pedido_datos';\n  else step = 'Empezar';\n}\nif (boton === 'corregir_datos' && (estado === 'post_solicitud' || ctx.solicitud_id)) {\n  step = 'post_solicitud';\n}\nreturn [{\n  json: {\n    telefono: j.telefono,\n    texto,\n    boton_id: boton,\n    estado,\n    datos_json: ctx,\n    conversation_id: j.conversation_id,\n    account_id: j.account_id,\n    is_repetir: isRepetir,\n    step,\n    correction_count: Number(ctx.correction_count || 0),\n    solicitud_id: ctx.solicitud_id || null,\n  }\n}];\n\n"
+        "jsCode": "\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst j = $input.first().json;\nconst estado = j.estado || 'idle';\nconst boton = String(j.boton_id || '').trim();\nlet texto = String(j.texto || '').trim();\ntexto = texto.replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\nconst isNavLine = (l) => /^(repetir|repetir pregunta)$/i.test(fold(l));\nconst isRepetir = boton === 'repetir_pregunta' || isNavLine(last) || lines.some(isNavLine);\nconst ctx = parseCtx(j.datos_json);\n\nlet step = estado;\nif (/^(idle|menu_shown)$/.test(estado)) {\n  if (/\\b\\d{7,10}\\b/.test(texto) && fold(texto).length > 12) {\n    step = 'awaiting_pedido_datos';\n    // New Pedido from idle — never treat leftover recepción id as Corrección.\n    delete ctx.solicitud_id;\n    delete ctx.is_correction;\n    ctx.correction_count = 0;\n  } else {\n    step = 'Empezar';\n  }\n}\nif (boton === 'corregir_datos' && (estado === 'post_solicitud' || ctx.solicitud_id)) {\n  step = 'post_solicitud';\n}\nconst correcting =\n  step === 'awaiting_correccion_datos' || !!ctx.is_correction;\nreturn [{\n  json: {\n    telefono: j.telefono,\n    texto,\n    boton_id: boton,\n    estado,\n    datos_json: ctx,\n    conversation_id: j.conversation_id,\n    account_id: j.account_id,\n    is_repetir: isRepetir,\n    step,\n    correction_count: Number(ctx.correction_count || 0),\n    solicitud_id: correcting ? (ctx.solicitud_id || null) : null,\n  }\n}];\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -283,7 +283,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE conversation_state SET state = 'awaiting_pedido_datos', context = COALESCE(context, JSON_OBJECT()) WHERE phone = '{{ $('Prepare Input').item.json.telefono }}';",
+        "query": "UPDATE conversation_state SET state = 'awaiting_pedido_datos', context = JSON_OBJECT('correction_count', 0) WHERE phone = '{{ $('Prepare Input').item.json.telefono }}';",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -292,7 +292,7 @@
         27456,
         36976
       ],
-      "id": "0f3cd104-4b56-4a71-8b4f-49059d41ada6",
+      "id": "1caf7f76-6f4e-4f6f-b192-5238bd255d31",
       "name": "Start awaiting_pedido_datos",
       "alwaysOutputData": true,
       "credentials": {
@@ -314,7 +314,7 @@
         27680,
         36976
       ],
-      "id": "ac03f8bf-9ff9-4515-9f20-e9a8e1c9b24f",
+      "id": "ba1e085d-3ce1-480c-a40d-50fc7f1e2454",
       "name": "Load doctors for pedido",
       "alwaysOutputData": true,
       "credentials": {
@@ -334,7 +334,7 @@
         27904,
         36976
       ],
-      "id": "21eb72ad-87b9-419b-8743-ce9b793ef0a1",
+      "id": "23f9fd10-13f8-4bf1-bdaa-995fe3fc9d57",
       "name": "Build Pedido de datos"
     },
     {
@@ -354,7 +354,7 @@
         28128,
         36976
       ],
-      "id": "4de188bd-5f56-4fb3-92f9-38eca118b2ef",
+      "id": "d634b227-60df-4ef0-9e6d-6ce29593300d",
       "name": "Send Pedido de datos",
       "credentials": {
         "httpHeaderAuth": {
@@ -375,7 +375,7 @@
         27456,
         37376
       ],
-      "id": "2f16bcb3-f48a-4939-af1d-82ef3a240546",
+      "id": "eee55828-0b30-438e-989c-11f2891557ab",
       "name": "Load obras for parse",
       "alwaysOutputData": true,
       "credentials": {
@@ -397,7 +397,7 @@
         27680,
         37376
       ],
-      "id": "d708b089-4c6a-41f7-8d48-d3e55b019b57",
+      "id": "6924d18a-2ab5-4bce-8ec1-b617ef410939",
       "name": "Load doctors for parse",
       "alwaysOutputData": true,
       "credentials": {
@@ -409,7 +409,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular', 'sin obra', 'sin obras', 'sin obra social', 'sin obras sociales',\n    'particular sin obra', 'particular sin obra social', 'sin obra particular',\n    'no tengo obra', 'no tengo obra social', 'como particular', 'soy particular',\n    'voy particular', 'pago particular', 'paciente particular', 'consulta particular',\n    'obra particular', 'sin cobertura', 'no tengo cobertura', 'ninguna obra',\n    'ninguna obra social', 'no tengo', 'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\nfunction esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\n}\nfunction fold(s) {\n  return String(s || '')\n    .trim()\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '');\n}\n\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\n\nfunction stripTurnoPrefix(texto) {\n  return String(texto || '')\n    .replace(/\\n?__cw_in_reply_to__:\\S+/g, '')\n    // Common typos: qiero, kiero, quero for quiero\n    .replace(/^(quiero|necesito|qiero|kiero|quero|preciso)\\s+(un\\s+)?(turno|cita)\\b[:\\s]*/i, '')\n    .replace(/^(sacar|pedir|solicitar)\\s+(un\\s+)?(turno|cita)\\b[:\\s]*/i, '')\n    .trim();\n}\n\nfunction parseNameDni(t) {\n  const raw = String(t || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  const stripped = stripTurnoPrefix(raw);\n  const m = stripped.match(/^(.*?)\\b(\\d{7,10})\\b([\\s\\S]*)$/);\n  if (!m) return null;\n  let nombre = m[1].replace(/[,:;|]+/g, ' ').replace(/\\s+/g, ' ').trim();\n  nombre = nombre.replace(/^(dni|nombre|soy|me llamo|mi nombre es)\\s+/i, '').trim();\n  if (!nombre) return null;\n  return { nombre: nombre.slice(0, 120), dni: m[2], after: m[3].trim() };\n}\n\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'pago particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'particular por favor',\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\n\nfunction remainderAfterNameDni(texto, nombre, dni) {\n  let t = stripTurnoPrefix(texto);\n  const dniRe = new RegExp('\\\\b' + dni + '\\\\b');\n  t = t.replace(dniRe, ' ');\n  const parts = String(nombre || '').split(/\\s+/).filter(Boolean);\n  for (const p of parts) {\n    t = t.replace(new RegExp('\\\\b' + p.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + '\\\\b', 'i'), ' ');\n  }\n  return t.replace(/[,:;|]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\n\nfunction matchObra(remainder, obras, doctors) {\n  if (!remainder) return null;\n  if (isParticular(remainder) || /\\bparticular\\b/i.test(remainder)) {\n    return 'Particular / Sin Obra Social';\n  }\n  const fRem = compact(remainder);\n  const sorted = [...(obras || [])].filter(Boolean).sort((a, b) => b.length - a.length);\n  for (const o of sorted) {\n    if (isParticular(o)) continue;\n    const fo = compact(o);\n    if (!fo) continue;\n    if (fRem === fo || fRem.includes(fo)) return String(o);\n  }\n  // Unknown tokens are unclear — caller should send obra list (need_obra).\n  // Free-text obra is only accepted later via \"Otras\" in that list flow.\n  return null;\n}\n\nfunction extractObraMedico(remainder, obras, doctors) {\n  let rest = String(remainder || '').trim();\n  let obra = null;\n  if (isParticular(rest) || /\\bparticular\\b/i.test(rest)) {\n    obra = 'Particular / Sin Obra Social';\n    rest = rest.replace(/\\bparticular\\b/gi, ' ').replace(/\\s+/g, ' ').trim();\n  }\n  if (!obra) {\n    const sorted = [...(obras || [])].filter(Boolean).sort((a, b) => b.length - a.length);\n    for (const o of sorted) {\n      if (isParticular(o)) continue;\n      const fo = compact(o);\n      if (!fo) continue;\n      if (compact(rest).includes(fo)) {\n        obra = String(o);\n        rest = rest.replace(new RegExp(o.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'), 'i'), ' ').replace(/\\s+/g, ' ').trim();\n        break;\n      }\n    }\n  }\n  let medHit = matchMedico(rest, doctors);\n  if (!medHit && !obra) medHit = matchMedico(remainder, doctors);\n  if (!obra && medHit) {\n    const afterMed = remainder.replace(new RegExp(medHit.medico, 'i'), '').trim();\n    obra = matchObra(afterMed, obras, doctors);\n  }\n  return { obra, medHit, rest };\n}\n\nfunction isCabecera(text) {\n  const f = compact(text);\n  return (\n    f === 'medico cabecera' ||\n    f === 'mi medico de cabecera' ||\n    f === 'cabecera' ||\n    f === 'medico_cabecera' ||\n    /\\b(medico|doctor)\\s+de\\s+cabecera\\b/.test(f) ||\n    /\\bmi\\s+(medico|doctor)\\s+de\\s+cabecera\\b/.test(f)\n  );\n}\n\nfunction matchMedico(remainder, doctors) {\n  if (!remainder) return null;\n  if (isCabecera(remainder)) {\n    return { medico: 'Mi médico de cabecera', doctor_id: null, medico_cualquiera: true };\n  }\n  const docs = [...(doctors || [])].filter((d) => d && d.name).sort((a, b) => b.name.length - a.name.length);\n  const fRem = fold(remainder);\n  for (const d of docs) {\n    const fn = fold(d.name);\n    if (!fn) continue;\n    if (fRem === fn || fRem.includes(fn) || fn.includes(fRem)) {\n      return { medico: d.name, doctor_id: d.id, medico_cualquiera: false };\n    }\n  }\n  for (const d of docs) {\n    const fn = fold(d.name);\n    const last = fn.split(/\\s+/).pop();\n    if (last && last.length > 3 && fRem.includes(last)) {\n      return { medico: d.name, doctor_id: d.id, medico_cualquiera: false };\n    }\n  }\n  return null;\n}\n\n/**\n * @param {string} texto\n * @param {{ doctors?: Array<{id:number,name:string}>, obras?: string[] }} opts\n */\nfunction parsePedidoDatos(texto, opts = {}) {\n  const doctors = opts.doctors || [];\n  const obras = opts.obras || [];\n  const raw = String(texto || '').trim();\n  if (!raw) {\n    return {\n      parse_action: 'incomplete',\n      missing: ['nombre', 'dni', 'obra_social', 'medico'],\n      nombre: '',\n      dni: '',\n      obra_social: '',\n      medico: '',\n      doctor_id: null,\n      medico_cualquiera: false,\n    };\n  }\n\n  const nd = parseNameDni(raw);\n  if (!nd) {\n    const hasDigit = /\\d{5,}/.test(stripTurnoPrefix(raw).replace(/[. -]/g, ''));\n    return {\n      parse_action: hasDigit ? 'invalid_dni' : 'incomplete',\n      missing: ['nombre', 'dni', 'obra_social', 'medico'],\n      nombre: '',\n      dni: '',\n      obra_social: '',\n      medico: '',\n      doctor_id: null,\n      medico_cualquiera: false,\n    };\n  }\n\n  const remainder = nd.after || remainderAfterNameDni(raw, nd.nombre, nd.dni);\n  const extracted = extractObraMedico(remainder, obras, doctors);\n  let obra = extracted.obra;\n  let medHit = extracted.medHit;\n\n  const missing = [];\n  if (!obra) missing.push('obra_social');\n  if (!medHit) missing.push('medico');\n\n  const base = {\n    nombre: nd.nombre,\n    dni: nd.dni,\n    obra_social: obra || '',\n    medico: medHit ? medHit.medico : '',\n    doctor_id: medHit ? medHit.doctor_id : null,\n    medico_cualquiera: medHit ? !!medHit.medico_cualquiera : false,\n    missing,\n  };\n\n  if (missing.length === 0) {\n    return { ...base, parse_action: 'complete' };\n  }\n  if (missing.length === 1 && missing[0] === 'obra_social') {\n    return { ...base, parse_action: 'need_obra' };\n  }\n  if (missing.length === 1 && missing[0] === 'medico') {\n    return { ...base, parse_action: 'need_medico' };\n  }\n  return { ...base, parse_action: 'incomplete' };\n}\n\nfunction missingLabels(missing) {\n  const map = {\n    nombre: 'nombre completo',\n    dni: 'DNI',\n    obra_social: 'obra social',\n    medico: 'médico',\n  };\n  return (missing || []).map((k) => map[k] || k);\n}\n\nfunction missingLabels(missing) {\n  const map = {\n    nombre: 'nombre completo',\n    dni: 'DNI',\n    obra_social: 'obra social',\n    medico: 'médico',\n  };\n  return (missing || []).map((k) => map[k] || k);\n}\n\nconst m = $('Prepare Input').first().json;\nconst ctx = parseCtx(m.datos_json);\nlet obras = $('Load obras for parse').first().json.obras_sociales;\nif (typeof obras === 'string') { try { obras = JSON.parse(obras); } catch(e) { obras = []; } }\nif (!Array.isArray(obras)) obras = [];\nconst doctors = $input.all().map(i => i.json).filter(d => d && d.id && d.name);\nconst parsed = parsePedidoDatos(m.texto, { doctors, obras });\nconst merged = {\n  ...m,\n  ...parsed,\n  nombre: parsed.nombre || ctx.nombre || '',\n  dni: parsed.dni || ctx.dni || '',\n  obra_social: parsed.obra_social || ctx.obra_social || '',\n  medico: parsed.medico || ctx.medico || '',\n  doctor_id: parsed.doctor_id != null ? parsed.doctor_id : (ctx.doctor_id ?? null),\n  medico_cualquiera: parsed.medico_cualquiera || !!ctx.medico_cualquiera,\n  telefono_contacto: m.telefono,\n  solicitud_id: ctx.solicitud_id || null,\n  correction_count: Number(ctx.correction_count || 0),\n  is_correction: m.step === 'awaiting_correccion_datos' || !!ctx.solicitud_id,\n};\nreturn [{ json: merged }];\n\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular', 'sin obra', 'sin obras', 'sin obra social', 'sin obras sociales',\n    'particular sin obra', 'particular sin obra social', 'sin obra particular',\n    'no tengo obra', 'no tengo obra social', 'como particular', 'soy particular',\n    'voy particular', 'pago particular', 'paciente particular', 'consulta particular',\n    'obra particular', 'sin cobertura', 'no tengo cobertura', 'ninguna obra',\n    'ninguna obra social', 'no tengo', 'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\nfunction esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\n}\nfunction fold(s) {\n  return String(s || '')\n    .trim()\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '');\n}\n\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\n\nfunction stripTurnoPrefix(texto) {\n  return String(texto || '')\n    .replace(/\\n?__cw_in_reply_to__:\\S+/g, '')\n    // Common typos: qiero, kiero, quero for quiero\n    .replace(/^(quiero|necesito|qiero|kiero|quero|preciso)\\s+(un\\s+)?(turno|cita)\\b[:\\s]*/i, '')\n    .replace(/^(sacar|pedir|solicitar)\\s+(un\\s+)?(turno|cita)\\b[:\\s]*/i, '')\n    .trim();\n}\n\nfunction parseNameDni(t) {\n  const raw = String(t || '').replace(/\\n?__cw_in_reply_to__:\\S+/g, '').trim();\n  const stripped = stripTurnoPrefix(raw);\n  // [\\s\\S] so WhatsApp multiline blobs (nombre\\nDNI\\nobra\\n…) still match —\n  // JS `.` does not cross newlines, which produced live invalid_dni (2026-08-31).\n  const m = stripped.match(/^([\\s\\S]*?)\\b(\\d{7,10})\\b([\\s\\S]*)$/);\n  if (!m) return null;\n  let nombre = m[1].replace(/[,:;|]+/g, ' ').replace(/\\s+/g, ' ').trim();\n  nombre = nombre.replace(/^(dni|nombre|soy|me llamo|mi nombre es)\\s+/i, '').trim();\n  // Label on its own line before the digits: \"Carolina\\nDNI 28681450\"\n  nombre = nombre.replace(/\\b(dni|nombre)\\s*$/i, '').trim();\n  if (!nombre) return null;\n  return { nombre: nombre.slice(0, 120), dni: m[2], after: m[3].trim() };\n}\n\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'pago particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'particular por favor',\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\n\nfunction remainderAfterNameDni(texto, nombre, dni) {\n  let t = stripTurnoPrefix(texto);\n  const dniRe = new RegExp('\\\\b' + dni + '\\\\b');\n  t = t.replace(dniRe, ' ');\n  const parts = String(nombre || '').split(/\\s+/).filter(Boolean);\n  for (const p of parts) {\n    t = t.replace(new RegExp('\\\\b' + p.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + '\\\\b', 'i'), ' ');\n  }\n  return t.replace(/[,:;|]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\n\nfunction matchObra(remainder, obras, doctors) {\n  if (!remainder) return null;\n  if (isParticular(remainder) || /\\bparticular\\b/i.test(remainder)) {\n    return 'Particular / Sin Obra Social';\n  }\n  const fRem = compact(remainder);\n  const sorted = [...(obras || [])].filter(Boolean).sort((a, b) => b.length - a.length);\n  for (const o of sorted) {\n    if (isParticular(o)) continue;\n    const fo = compact(o);\n    if (!fo) continue;\n    if (fRem === fo || fRem.includes(fo)) return String(o);\n  }\n  // Unknown tokens are unclear — caller should send obra list (need_obra).\n  // Free-text obra is only accepted later via \"Otras\" in that list flow.\n  return null;\n}\n\nfunction extractObraMedico(remainder, obras, doctors) {\n  let rest = String(remainder || '').trim();\n  let obra = null;\n  if (isParticular(rest) || /\\bparticular\\b/i.test(rest)) {\n    obra = 'Particular / Sin Obra Social';\n    rest = rest.replace(/\\bparticular\\b/gi, ' ').replace(/\\s+/g, ' ').trim();\n  }\n  if (!obra) {\n    const sorted = [...(obras || [])].filter(Boolean).sort((a, b) => b.length - a.length);\n    for (const o of sorted) {\n      if (isParticular(o)) continue;\n      const fo = compact(o);\n      if (!fo) continue;\n      if (compact(rest).includes(fo)) {\n        obra = String(o);\n        rest = rest.replace(new RegExp(o.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'), 'i'), ' ').replace(/\\s+/g, ' ').trim();\n        break;\n      }\n    }\n  }\n  let medHit = matchMedico(rest, doctors);\n  if (!medHit && !obra) medHit = matchMedico(remainder, doctors);\n  if (!obra && medHit) {\n    const afterMed = remainder.replace(new RegExp(medHit.medico, 'i'), '').trim();\n    obra = matchObra(afterMed, obras, doctors);\n  }\n  return { obra, medHit, rest };\n}\n\nfunction isCabecera(text) {\n  const f = compact(text);\n  return (\n    f === 'medico cabecera' ||\n    f === 'mi medico de cabecera' ||\n    f === 'cabecera' ||\n    f === 'medico_cabecera' ||\n    /\\b(medico|doctor)\\s+de\\s+cabecera\\b/.test(f) ||\n    /\\bmi\\s+(medico|doctor)\\s+de\\s+cabecera\\b/.test(f)\n  );\n}\n\nfunction matchMedico(remainder, doctors) {\n  if (!remainder) return null;\n  if (isCabecera(remainder)) {\n    return { medico: 'Mi médico de cabecera', doctor_id: null, medico_cualquiera: true };\n  }\n  const docs = [...(doctors || [])].filter((d) => d && d.name).sort((a, b) => b.name.length - a.name.length);\n  const fRem = fold(remainder);\n  for (const d of docs) {\n    const fn = fold(d.name);\n    if (!fn) continue;\n    if (fRem === fn || fRem.includes(fn) || fn.includes(fRem)) {\n      return { medico: d.name, doctor_id: d.id, medico_cualquiera: false };\n    }\n  }\n  for (const d of docs) {\n    const fn = fold(d.name);\n    const last = fn.split(/\\s+/).pop();\n    if (last && last.length > 3 && fRem.includes(last)) {\n      return { medico: d.name, doctor_id: d.id, medico_cualquiera: false };\n    }\n  }\n  return null;\n}\n\n/**\n * @param {string} texto\n * @param {{ doctors?: Array<{id:number,name:string}>, obras?: string[] }} opts\n */\nfunction parsePedidoDatos(texto, opts = {}) {\n  const doctors = opts.doctors || [];\n  const obras = opts.obras || [];\n  const raw = String(texto || '').trim();\n  if (!raw) {\n    return {\n      parse_action: 'incomplete',\n      missing: ['nombre', 'dni', 'obra_social', 'medico'],\n      nombre: '',\n      dni: '',\n      obra_social: '',\n      medico: '',\n      doctor_id: null,\n      medico_cualquiera: false,\n    };\n  }\n\n  const nd = parseNameDni(raw);\n  if (!nd) {\n    const hasDigit = /\\d{5,}/.test(stripTurnoPrefix(raw).replace(/[. -]/g, ''));\n    return {\n      parse_action: hasDigit ? 'invalid_dni' : 'incomplete',\n      missing: ['nombre', 'dni', 'obra_social', 'medico'],\n      nombre: '',\n      dni: '',\n      obra_social: '',\n      medico: '',\n      doctor_id: null,\n      medico_cualquiera: false,\n    };\n  }\n\n  const remainder = nd.after || remainderAfterNameDni(raw, nd.nombre, nd.dni);\n  const extracted = extractObraMedico(remainder, obras, doctors);\n  let obra = extracted.obra;\n  let medHit = extracted.medHit;\n\n  const missing = [];\n  if (!obra) missing.push('obra_social');\n  if (!medHit) missing.push('medico');\n\n  const base = {\n    nombre: nd.nombre,\n    dni: nd.dni,\n    obra_social: obra || '',\n    medico: medHit ? medHit.medico : '',\n    doctor_id: medHit ? medHit.doctor_id : null,\n    medico_cualquiera: medHit ? !!medHit.medico_cualquiera : false,\n    missing,\n  };\n\n  if (missing.length === 0) {\n    return { ...base, parse_action: 'complete' };\n  }\n  if (missing.length === 1 && missing[0] === 'obra_social') {\n    return { ...base, parse_action: 'need_obra' };\n  }\n  if (missing.length === 1 && missing[0] === 'medico') {\n    return { ...base, parse_action: 'need_medico' };\n  }\n  return { ...base, parse_action: 'incomplete' };\n}\n\nfunction missingLabels(missing) {\n  const map = {\n    nombre: 'nombre completo',\n    dni: 'DNI',\n    obra_social: 'obra social',\n    medico: 'médico',\n  };\n  return (missing || []).map((k) => map[k] || k);\n}\n\nfunction missingLabels(missing) {\n  const map = {\n    nombre: 'nombre completo',\n    dni: 'DNI',\n    obra_social: 'obra social',\n    medico: 'médico',\n  };\n  return (missing || []).map((k) => map[k] || k);\n}\n\nconst m = $('Prepare Input').first().json;\nconst ctx = parseCtx(m.datos_json);\nlet obras = $('Load obras for parse').first().json.obras_sociales;\nif (typeof obras === 'string') { try { obras = JSON.parse(obras); } catch(e) { obras = []; } }\nif (!Array.isArray(obras)) obras = [];\nconst doctors = $input.all().map(i => i.json).filter(d => d && d.id && d.name);\nconst parsed = parsePedidoDatos(m.texto, { doctors, obras });\nconst correcting =\n  m.step === 'awaiting_correccion_datos' || !!ctx.is_correction;\nconst merged = {\n  ...m,\n  ...parsed,\n  nombre: parsed.nombre || ctx.nombre || '',\n  dni: parsed.dni || ctx.dni || '',\n  obra_social: parsed.obra_social || ctx.obra_social || '',\n  medico: parsed.medico || ctx.medico || '',\n  doctor_id: parsed.doctor_id != null ? parsed.doctor_id : (ctx.doctor_id ?? null),\n  medico_cualquiera: parsed.medico_cualquiera || !!ctx.medico_cualquiera,\n  telefono_contacto: m.telefono,\n  solicitud_id: correcting ? (ctx.solicitud_id || null) : null,\n  correction_count: Number(ctx.correction_count || 0),\n  is_correction: correcting,\n};\nreturn [{ json: merged }];\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -417,7 +417,7 @@
         27904,
         37376
       ],
-      "id": "aaf08b6b-7066-4b57-b317-7370f5357e6a",
+      "id": "63a183b4-2054-4c8d-9904-0c828fdbe0fa",
       "name": "Parse blob"
     },
     {
@@ -561,12 +561,12 @@
         28128,
         37376
       ],
-      "id": "d81d2944-caca-47cb-ac02-a52a0623cc3e",
+      "id": "7b14f85a-cb7f-42e3-9380-e5cab0016fdb",
       "name": "Parse action"
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular', 'sin obra', 'sin obras', 'sin obra social', 'sin obras sociales',\n    'particular sin obra', 'particular sin obra social', 'sin obra particular',\n    'no tengo obra', 'no tengo obra social', 'como particular', 'soy particular',\n    'voy particular', 'pago particular', 'paciente particular', 'consulta particular',\n    'obra particular', 'sin cobertura', 'no tengo cobertura', 'ninguna obra',\n    'ninguna obra social', 'no tengo', 'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\nfunction esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\n}\nconst j = $input.first().json;\nconst phone = esc(j.telefono);\nconst sql = `UPDATE conversation_state SET\n  context = JSON_SET(\n    COALESCE(context, JSON_OBJECT()),\n    '$.nombre', '${esc(j.nombre)}',\n    '$.dni', '${esc(j.dni)}',\n    '$.obra_social', '${esc(j.obra_social || '')}',\n    '$.medico', '${esc(j.medico || '')}',\n    '$.doctor_id', ${j.doctor_id ? Number(j.doctor_id) : 'null'},\n    '$.medico_cualquiera', ${j.medico_cualquiera ? 'true' : 'false'},\n    '$.telefono_contacto', '${esc(j.telefono)}',\n    '$.solicitud_id', ${j.solicitud_id ? Number(j.solicitud_id) : 'null'},\n    '$.correction_count', ${Number(j.correction_count || 0)}\n  ),\n  state = 'awaiting_obra_social'\nWHERE phone = '${phone}';`;\nreturn [{ json: { ...j, sql_partial: sql } }];\n\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular', 'sin obra', 'sin obras', 'sin obra social', 'sin obras sociales',\n    'particular sin obra', 'particular sin obra social', 'sin obra particular',\n    'no tengo obra', 'no tengo obra social', 'como particular', 'soy particular',\n    'voy particular', 'pago particular', 'paciente particular', 'consulta particular',\n    'obra particular', 'sin cobertura', 'no tengo cobertura', 'ninguna obra',\n    'ninguna obra social', 'no tengo', 'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\nfunction esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\n}\nconst j = $input.first().json;\nconst phone = esc(j.telefono);\nconst sql = `UPDATE conversation_state SET\n  context = JSON_SET(\n    COALESCE(context, JSON_OBJECT()),\n    '$.nombre', '${esc(j.nombre)}',\n    '$.dni', '${esc(j.dni)}',\n    '$.obra_social', '${esc(j.obra_social || '')}',\n    '$.medico', '${esc(j.medico || '')}',\n    '$.doctor_id', ${j.doctor_id ? Number(j.doctor_id) : 'null'},\n    '$.medico_cualquiera', ${j.medico_cualquiera ? 'true' : 'false'},\n    '$.telefono_contacto', '${esc(j.telefono)}',\n    '$.solicitud_id', ${j.solicitud_id ? Number(j.solicitud_id) : 'null'},\n    '$.is_correction', ${j.is_correction ? 'true' : 'false'},\n    '$.correction_count', ${Number(j.correction_count || 0)}\n  ),\n  state = 'awaiting_obra_social'\nWHERE phone = '${phone}';`;\nreturn [{ json: { ...j, sql_partial: sql } }];\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -574,7 +574,7 @@
         28352,
         37216
       ],
-      "id": "7d9331f8-6e2c-4392-af9e-5e88b536041a",
+      "id": "1d3833e2-842b-498c-b03a-c4fb4ba063c3",
       "name": "Prep save partial obra"
     },
     {
@@ -589,7 +589,7 @@
         28576,
         37216
       ],
-      "id": "96dff1aa-80d7-4666-8b9c-3e8821e2dbca",
+      "id": "fbeb153c-de1f-4be8-8987-25fbf6900d68",
       "name": "Save partial obra",
       "alwaysOutputData": true,
       "credentials": {
@@ -601,7 +601,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular', 'sin obra', 'sin obras', 'sin obra social', 'sin obras sociales',\n    'particular sin obra', 'particular sin obra social', 'sin obra particular',\n    'no tengo obra', 'no tengo obra social', 'como particular', 'soy particular',\n    'voy particular', 'pago particular', 'paciente particular', 'consulta particular',\n    'obra particular', 'sin cobertura', 'no tengo cobertura', 'ninguna obra',\n    'ninguna obra social', 'no tengo', 'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\nfunction esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\n}\nconst j = $input.first().json;\nconst phone = esc(j.telefono);\nconst sql = `UPDATE conversation_state SET\n  context = JSON_SET(\n    COALESCE(context, JSON_OBJECT()),\n    '$.nombre', '${esc(j.nombre)}',\n    '$.dni', '${esc(j.dni)}',\n    '$.obra_social', '${esc(j.obra_social || '')}',\n    '$.medico', '${esc(j.medico || '')}',\n    '$.doctor_id', ${j.doctor_id ? Number(j.doctor_id) : 'null'},\n    '$.medico_cualquiera', ${j.medico_cualquiera ? 'true' : 'false'},\n    '$.telefono_contacto', '${esc(j.telefono)}',\n    '$.solicitud_id', ${j.solicitud_id ? Number(j.solicitud_id) : 'null'},\n    '$.correction_count', ${Number(j.correction_count || 0)}\n  ),\n  state = 'awaiting_medico'\nWHERE phone = '${phone}';`;\nreturn [{ json: { ...j, sql_partial: sql } }];\n\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular', 'sin obra', 'sin obras', 'sin obra social', 'sin obras sociales',\n    'particular sin obra', 'particular sin obra social', 'sin obra particular',\n    'no tengo obra', 'no tengo obra social', 'como particular', 'soy particular',\n    'voy particular', 'pago particular', 'paciente particular', 'consulta particular',\n    'obra particular', 'sin cobertura', 'no tengo cobertura', 'ninguna obra',\n    'ninguna obra social', 'no tengo', 'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\nfunction esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\n}\nconst j = $input.first().json;\nconst phone = esc(j.telefono);\nconst sql = `UPDATE conversation_state SET\n  context = JSON_SET(\n    COALESCE(context, JSON_OBJECT()),\n    '$.nombre', '${esc(j.nombre)}',\n    '$.dni', '${esc(j.dni)}',\n    '$.obra_social', '${esc(j.obra_social || '')}',\n    '$.medico', '${esc(j.medico || '')}',\n    '$.doctor_id', ${j.doctor_id ? Number(j.doctor_id) : 'null'},\n    '$.medico_cualquiera', ${j.medico_cualquiera ? 'true' : 'false'},\n    '$.telefono_contacto', '${esc(j.telefono)}',\n    '$.solicitud_id', ${j.solicitud_id ? Number(j.solicitud_id) : 'null'},\n    '$.is_correction', ${j.is_correction ? 'true' : 'false'},\n    '$.correction_count', ${Number(j.correction_count || 0)}\n  ),\n  state = 'awaiting_medico'\nWHERE phone = '${phone}';`;\nreturn [{ json: { ...j, sql_partial: sql } }];\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -609,7 +609,7 @@
         28352,
         37536
       ],
-      "id": "ce5007a6-1d8d-47a5-b8ec-ab3b6723d1c8",
+      "id": "e1e3991b-5755-4afd-9de9-22e137e95431",
       "name": "Prep save partial medico"
     },
     {
@@ -624,7 +624,7 @@
         28576,
         37536
       ],
-      "id": "4242acfc-27ee-4ed8-a7a2-af2b8f829b37",
+      "id": "70453da4-84d8-4149-92e3-76bdce7e060e",
       "name": "Save partial medico",
       "alwaysOutputData": true,
       "credentials": {
@@ -644,7 +644,7 @@
         28352,
         37536
       ],
-      "id": "255c6ef0-91ac-4c2a-9307-4108b64686db",
+      "id": "d92b21d9-2f6a-42fd-a5c2-e211e0859895",
       "name": "Build need medico msg"
     },
     {
@@ -664,7 +664,7 @@
         28576,
         37536
       ],
-      "id": "9c4d9b77-9eba-41d9-a2bd-49be3ac99fae",
+      "id": "ba74bc11-99a7-4fa8-b8da-8be40ba43852",
       "name": "Send need medico msg",
       "credentials": {
         "httpHeaderAuth": {
@@ -683,7 +683,7 @@
         28352,
         37776
       ],
-      "id": "1f9c662b-0222-480d-9779-5792ada01ce1",
+      "id": "fd8d1b02-d622-4d93-bade-97b1f6c71703",
       "name": "Build incomplete reply"
     },
     {
@@ -703,7 +703,7 @@
         28576,
         37776
       ],
-      "id": "3e46b38e-7a52-4c8b-b87d-79075507a4f4",
+      "id": "843b1189-8e76-4ccc-b532-55ca8f6a794d",
       "name": "Send incomplete reply",
       "credentials": {
         "httpHeaderAuth": {
@@ -714,7 +714,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular', 'sin obra', 'sin obras', 'sin obra social', 'sin obras sociales',\n    'particular sin obra', 'particular sin obra social', 'sin obra particular',\n    'no tengo obra', 'no tengo obra social', 'como particular', 'soy particular',\n    'voy particular', 'pago particular', 'paciente particular', 'consulta particular',\n    'obra particular', 'sin cobertura', 'no tengo cobertura', 'ninguna obra',\n    'ninguna obra social', 'no tengo', 'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\nfunction esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\n}\nconst j = $input.first().json;\nconst phone = esc(j.telefono);\nconst sql = `UPDATE conversation_state SET\n  context = JSON_SET(\n    COALESCE(context, JSON_OBJECT()),\n    '$.nombre', '${esc(j.nombre)}',\n    '$.dni', '${esc(j.dni)}',\n    '$.obra_social', '${esc(j.obra_social)}',\n    '$.medico', '${esc(j.medico)}',\n    '$.doctor_id', ${j.doctor_id ? Number(j.doctor_id) : 'null'},\n    '$.medico_cualquiera', ${j.medico_cualquiera ? 'true' : 'false'},\n    '$.telefono_contacto', '${esc(j.telefono)}',\n    '$.solicitud_id', ${j.solicitud_id ? Number(j.solicitud_id) : 'null'},\n    '$.correction_count', ${Number(j.correction_count || 0)}\n  )\nWHERE phone = '${phone}';`;\nreturn [{ json: { ...j, sql_ctx: sql } }];\n\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular', 'sin obra', 'sin obras', 'sin obra social', 'sin obras sociales',\n    'particular sin obra', 'particular sin obra social', 'sin obra particular',\n    'no tengo obra', 'no tengo obra social', 'como particular', 'soy particular',\n    'voy particular', 'pago particular', 'paciente particular', 'consulta particular',\n    'obra particular', 'sin cobertura', 'no tengo cobertura', 'ninguna obra',\n    'ninguna obra social', 'no tengo', 'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\nfunction esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\n}\nconst j = $input.first().json;\nconst phone = esc(j.telefono);\nconst sql = `UPDATE conversation_state SET\n  context = JSON_SET(\n    COALESCE(context, JSON_OBJECT()),\n    '$.nombre', '${esc(j.nombre)}',\n    '$.dni', '${esc(j.dni)}',\n    '$.obra_social', '${esc(j.obra_social)}',\n    '$.medico', '${esc(j.medico)}',\n    '$.doctor_id', ${j.doctor_id ? Number(j.doctor_id) : 'null'},\n    '$.medico_cualquiera', ${j.medico_cualquiera ? 'true' : 'false'},\n    '$.telefono_contacto', '${esc(j.telefono)}',\n    '$.solicitud_id', ${j.solicitud_id ? Number(j.solicitud_id) : 'null'},\n    '$.is_correction', ${j.is_correction ? 'true' : 'false'},\n    '$.correction_count', ${Number(j.correction_count || 0)}\n  )\nWHERE phone = '${phone}';`;\nreturn [{ json: { ...j, sql_ctx: sql } }];\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -722,7 +722,7 @@
         28352,
         36976
       ],
-      "id": "b85ba2a8-2004-4916-b166-0589c546ccb6",
+      "id": "3bc49519-5219-4672-8e7d-3eda2820b47f",
       "name": "Prep save complete ctx"
     },
     {
@@ -737,7 +737,7 @@
         28576,
         36976
       ],
-      "id": "ad69cf02-e35f-4135-8090-db932877f61f",
+      "id": "44f0e319-55dc-4ebf-b76f-a837c57fa44a",
       "name": "Save complete context",
       "alwaysOutputData": true,
       "credentials": {
@@ -771,7 +771,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular', 'sin obra', 'sin obras', 'sin obra social', 'sin obras sociales',\n    'particular sin obra', 'particular sin obra social', 'sin obra particular',\n    'no tengo obra', 'no tengo obra social', 'como particular', 'soy particular',\n    'voy particular', 'pago particular', 'paciente particular', 'consulta particular',\n    'obra particular', 'sin cobertura', 'no tengo cobertura', 'ninguna obra',\n    'ninguna obra social', 'no tengo', 'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\nfunction esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\n}\nfunction isOutsideClinicHours(now) {\n  const h = now.getHours();\n  const inMorning = h >= 8 && h < 12;\n  const inAfternoon = h >= 16 && h < 20;\n  return !(inMorning || inAfternoon);\n}\n\nconst m = $('Prepare Input').first().json;\nconst datos = parseCtx($input.first().json.context);\ndatos.telefono_contacto = datos.telefono_contacto || m.telefono;\nconst horarioFijo = 'A confirmar por secretaría';\nconst phone = esc(m.telefono);\nconst priceLine = consultaPriceLine(datos);\nconst isUpdate = !!(datos.solicitud_id);\nlet sql;\nif (isUpdate) {\n  sql = `UPDATE turno_solicitudes SET\n    nombre='${esc(datos.nombre)}', dni='${esc(datos.dni)}', obra_social='${esc(datos.obra_social)}',\n    telefono_contacto='${esc(datos.telefono_contacto)}', medico='${esc(datos.medico)}',\n    horario_preferido='${esc(horarioFijo)}'\n    WHERE id=${Number(datos.solicitud_id)};`;\n} else {\n  sql = `INSERT INTO turno_solicitudes (phone, nombre, dni, obra_social, telefono_contacto, medico, horario_preferido, status, conversation_id)\nVALUES ('${phone}', '${esc(datos.nombre)}', '${esc(datos.dni)}', '${esc(datos.obra_social)}', '${esc(datos.telefono_contacto)}', '${esc(datos.medico)}', '${esc(horarioFijo)}', 'pending', '${esc(m.conversation_id)}');`;\n}\nconst ficha = `🗒️ ${isUpdate ? 'Corrección' : 'Nueva'} solicitud de turno\nNombre: ${datos.nombre || '-'}\nDNI: ${datos.dni || '-'}\nObra social: ${datos.obra_social || '-'}\nTeléfono: ${datos.telefono_contacto || '-'}\nMédico: ${datos.medico || '-'}\nDía/hora: ${horarioFijo}${priceLine ? '\\n' + priceLine : ''}`;\nlet patientBody = [\n  'Recibimos tu solicitud de turno.',\n  '',\n  `👤 ${datos.nombre || '-'}`,\n  `🪪 ${datos.dni || '-'}`,\n  `🏥 ${datos.obra_social || '-'}`,\n  `🩺 ${datos.medico || '-'}`,\n];\nif (priceLine) patientBody.push(priceLine);\npatientBody.push('', 'Espere a que la secretaria le indique el día y hora.');\ntry {\n  const now = ($now && typeof $now.toDate === 'function')\n    ? $now.setZone('America/Argentina/Buenos_Aires').toJSDate()\n    : new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));\n  if (isOutsideClinicHours(now)) {\n    patientBody.push('', 'Su solicitud fue enviada fuera del horario de atención de la clínica (8 a 12 hs y 16 a 20 hs). Una secretaria la confirmará dentro de ese horario.');\n  }\n} catch (e) {}\nconst recepcion = cwSelect(patientBody.join('\\n'), [{ title: 'Corregir datos', value: 'corregir_datos' }], m);\nconst newCorrection = isUpdate ? Number(datos.correction_count || 0) + 1 : Number(datos.correction_count || 0);\nconst sqlState = isUpdate\n  ? `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.correction_count', ${newCorrection}) WHERE phone='${phone}';`\n  : `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.solicitud_id', LAST_INSERT_ID(), '$.correction_count', ${newCorrection}) WHERE phone='${phone}';`;\nreturn [{\n  json: {\n    telefono: m.telefono,\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    sql_solicitud: sql,\n    sql_state: sqlState,\n    is_update: isUpdate,\n    cw_private: { content: ficha, message_type: 'outgoing', private: true },\n    recepcion,\n  }\n}];\n\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular', 'sin obra', 'sin obras', 'sin obra social', 'sin obras sociales',\n    'particular sin obra', 'particular sin obra social', 'sin obra particular',\n    'no tengo obra', 'no tengo obra social', 'como particular', 'soy particular',\n    'voy particular', 'pago particular', 'paciente particular', 'consulta particular',\n    'obra particular', 'sin cobertura', 'no tengo cobertura', 'ninguna obra',\n    'ninguna obra social', 'no tengo', 'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|cuento con)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  return false;\n}\nfunction consultaPriceLine(datos) {\n  if (!isParticular(datos.obra_social)) return '';\n  const medico = String(datos.medico || '');\n  const fm = fold(medico);\n  if (datos.medico_cualquiera || !datos.doctor_id || fm.includes('medico de cabecera') || !medico || medico === '-') return '';\n  const price = fm === 'adrian artigas' ? '70 mil pesos' : '40 mil pesos';\n  return 'Precio de consulta: ' + price;\n}\nfunction esc(s) {\n  return String(s ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");\n}\nfunction isOutsideClinicHours(now) {\n  const h = now.getHours();\n  const inMorning = h >= 9 && h < 12;\n  const inAfternoon = h >= 16 && h < 20;\n  return !(inMorning || inAfternoon);\n}\n\nconst m = $('Prepare Input').first().json;\nconst datos = parseCtx($input.first().json.context);\ndatos.telefono_contacto = datos.telefono_contacto || m.telefono;\nconst horarioFijo = 'A confirmar por secretaría';\nconst phone = esc(m.telefono);\nconst priceLine = consultaPriceLine(datos);\nconst isUpdate = !!(datos.solicitud_id && datos.is_correction);\nlet sql;\nif (isUpdate) {\n  sql = `UPDATE turno_solicitudes SET\n    nombre='${esc(datos.nombre)}', dni='${esc(datos.dni)}', obra_social='${esc(datos.obra_social)}',\n    telefono_contacto='${esc(datos.telefono_contacto)}', medico='${esc(datos.medico)}',\n    horario_preferido='${esc(horarioFijo)}'\n    WHERE id=${Number(datos.solicitud_id)};`;\n} else {\n  // n8n executeQuery discards OkPacket insertId (returns {success:true}). Persist id in the\n  // SAME MySQL session via multi-statement + queryBatching=independently on Run solicitud sql.\n  sql = `INSERT INTO turno_solicitudes (phone, nombre, dni, obra_social, telefono_contacto, medico, horario_preferido, status, conversation_id)\nVALUES ('${phone}', '${esc(datos.nombre)}', '${esc(datos.dni)}', '${esc(datos.obra_social)}', '${esc(datos.telefono_contacto)}', '${esc(datos.medico)}', '${esc(horarioFijo)}', 'pending', '${esc(m.conversation_id)}');\nUPDATE conversation_state SET state='idle', context=JSON_SET(JSON_REMOVE(COALESCE(context, JSON_OBJECT()), '$.is_correction'), '$.solicitud_id', LAST_INSERT_ID(), '$.correction_count', ${Number(datos.correction_count || 0)}) WHERE phone='${phone}';\nSELECT LAST_INSERT_ID() AS insertId;`;\n}\nconst ficha = `🗒️ ${isUpdate ? 'Corrección' : 'Nueva'} solicitud de turno\nNombre: ${datos.nombre || '-'}\nDNI: ${datos.dni || '-'}\nObra social: ${datos.obra_social || '-'}\nTeléfono: ${datos.telefono_contacto || '-'}\nMédico: ${datos.medico || '-'}\nDía/hora: ${horarioFijo}${priceLine ? '\\n' + priceLine : ''}`;\nlet patientBody = [\n  'Recibimos tu solicitud de turno.',\n  '',\n  `👤 ${datos.nombre || '-'}`,\n  `🪪 ${datos.dni || '-'}`,\n  `🏥 ${datos.obra_social || '-'}`,\n  `🩺 ${datos.medico || '-'}`,\n];\nif (priceLine) patientBody.push(priceLine);\npatientBody.push('', 'Espere a que la secretaria le indique el día y hora.');\ntry {\n  const now = ($now && typeof $now.toDate === 'function')\n    ? $now.setZone('America/Argentina/Buenos_Aires').toJSDate()\n    : new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));\n  if (isOutsideClinicHours(now)) {\n    patientBody.push('', 'Su solicitud fue enviada fuera del horario de atención de la clínica (9hs a 12 hs y 16hs a 20 hs). Una secretaria la confirmará dentro de ese horario.');\n  }\n} catch (e) {}\nconst recepcion = cwSelect(patientBody.join('\\n'), [{ title: 'Corregir datos', value: 'corregir_datos' }], m);\nconst newCorrection = isUpdate ? Number(datos.correction_count || 0) + 1 : Number(datos.correction_count || 0);\n// sql_state must NOT call LAST_INSERT_ID on a later pooled connection (id becomes 0).\n// Inserts already wrote solicitud_id in Run solicitud sql; this only refreshes correction_count.\nconst sqlState = `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.correction_count', ${newCorrection}) WHERE phone='${phone}';`;\nreturn [{\n  json: {\n    telefono: m.telefono,\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    sql_solicitud: sql,\n    sql_state: sqlState,\n    is_update: isUpdate,\n    new_correction: newCorrection,\n    phone_esc: phone,\n    cw_private: { content: ficha, message_type: 'outgoing', private: true },\n    recepcion,\n  }\n}];\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -779,14 +779,16 @@
         27680,
         38176
       ],
-      "id": "3aaaa284-c953-45bd-bb87-c518f6e99ac2",
+      "id": "b3426bd3-b398-4857-b884-6f97032266f9",
       "name": "Build recepcion + sql"
     },
     {
       "parameters": {
         "operation": "executeQuery",
         "query": "{{ $json.sql_solicitud }}",
-        "options": {}
+        "options": {
+          "queryBatching": "independently"
+        }
       },
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
@@ -794,7 +796,7 @@
         27904,
         38176
       ],
-      "id": "e7776f00-2a2a-471c-9f5a-eafb34620a4c",
+      "id": "5c257ea4-8f1e-43be-a9b4-c40d220cf63d",
       "name": "Run solicitud sql",
       "alwaysOutputData": true,
       "credentials": {
@@ -806,15 +808,50 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst j = $('Build recepcion + sql').first().json;\nreturn [{ json: { conversation_id: j.conversation_id, account_id: j.account_id, cw_body: j.cw_private } }];\n"
+        "jsCode": "\nfunction pickInsertId(row) {\n  if (row == null) return 0;\n  if (Array.isArray(row)) return pickInsertId(row[0]);\n  const n = Number(row.insertId ?? row.insert_id ?? row.INSERT_ID ?? 0);\n  if (n > 0) return n;\n  if (row.json && typeof row.json === 'object') return pickInsertId(row.json);\n  return 0;\n}\nconst j = $('Build recepcion + sql').first().json;\n// n8n may emit {success:true} for INSERT OkPacket; SELECT LAST_INSERT_ID AS insertId is the real id.\nlet insertId = 0;\nfor (const item of $input.all()) {\n  insertId = pickInsertId(item.json);\n  if (insertId > 0) break;\n}\nconst phone = j.phone_esc || String(j.telefono || '').replace(/'/g, \"''\");\nconst corr = Number(j.new_correction || 0);\n// Prefer not to overwrite solicitud_id with 0. Inserts already set it in Run (same session).\nlet sql_state = `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.correction_count', ${corr}) WHERE phone='${phone}';`;\nif (!j.is_update && insertId > 0) {\n  sql_state = `UPDATE conversation_state SET state='idle', context=JSON_SET(COALESCE(context, JSON_OBJECT()), '$.solicitud_id', ${insertId}, '$.correction_count', ${corr}) WHERE phone='${phone}';`;\n}\nreturn [{ json: { ...j, sql_state, bound_solicitud_id: insertId } }];\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
+        28016,
+        38176
+      ],
+      "id": "87fd2e61-c7aa-4e21-bf2e-06c63635e4ba",
+      "name": "Bind solicitud_id"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $('Bind solicitud_id').first().json.sql_state }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
         28128,
         38176
       ],
-      "id": "2ba64287-0c62-4c81-8def-989081e879f4",
+      "id": "c9167574-2259-44fd-8a54-49750c6a1343",
+      "name": "Set post_solicitud",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "ADbEKvwG8sz2lY2H",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst j = $('Bind solicitud_id').first().json;\nreturn [{ json: { conversation_id: j.conversation_id, account_id: j.account_id, cw_body: j.cw_private } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28352,
+        38176
+      ],
+      "id": "07280f7c-c052-41a2-a869-60da87e25b17",
       "name": "Prep private note"
     },
     {
@@ -831,10 +868,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        28352,
+        28576,
         38176
       ],
-      "id": "e20cb119-252b-487b-9cf0-b1872a4d3709",
+      "id": "1c25dcc6-0137-4908-9d40-8c9bcf4a7667",
       "name": "Send private note",
       "credentials": {
         "httpHeaderAuth": {
@@ -845,15 +882,15 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst j = $('Build recepcion + sql').first().json;\nreturn [{ json: j.recepcion }];\n"
+        "jsCode": "\nconst j = $('Bind solicitud_id').first().json;\nreturn [{ json: j.recepcion }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        28576,
+        28800,
         38176
       ],
-      "id": "d74accf5-a06c-42f2-8927-53ccdb19f244",
+      "id": "22f74ade-7159-4816-acd4-5d07664e42e4",
       "name": "Prep recepcion"
     },
     {
@@ -870,10 +907,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        28800,
+        29024,
         38176
       ],
-      "id": "b612db7f-dfb1-4a80-818f-41fa2459f609",
+      "id": "fc517d8c-eb24-4d46-920f-4510a45bd8bc",
       "name": "Send recepcion",
       "credentials": {
         "httpHeaderAuth": {
@@ -884,29 +921,7 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "{{ $('Build recepcion + sql').first().json.sql_state }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.mySql",
-      "typeVersion": 2.5,
-      "position": [
-        29024,
-        38176
-      ],
-      "id": "a4ab9ad0-16c6-4244-8572-e58b8f729ce6",
-      "name": "Set post_solicitud",
-      "alwaysOutputData": true,
-      "credentials": {
-        "mySql": {
-          "id": "ADbEKvwG8sz2lY2H",
-          "name": "MySQL account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nfunction lastLine(texto) {\n  const lines = String(texto || '').split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\n  const last = lines.length ? lines[lines.length - 1] : String(texto || '').trim();\n  return last.replace(/^[•\\-\\*]\\s*/, '');\n}\n\nconst m = $input.first().json;\nif (m.is_repetir || m.boton_id === 'repetir_pregunta') {\n  return [{ json: { ...m, obra_action: 'repetir' } }];\n}\nconst boton = String(m.boton_id || '').trim();\nconst last = lastLine(m.texto);\nconst foldedLast = compact(last);\nif (boton === 'obra_particular' || isParticular(boton) || isParticular(last)) {\n  return [{ json: { ...m, obra_action: 'save', obra_value: 'Particular / Sin Obra Social' } }];\n}\nif (boton === 'obra_otra' || foldedLast === 'otra' || foldedLast === 'otras') {\n  return [{ json: { ...m, obra_action: 'otra' } }];\n}\nconst value = boton || last;\nif (!value) {\n  return [{ json: { ...m, obra_action: 'repetir' } }];\n}\nreturn [{ json: { ...m, obra_action: 'save', obra_value: value } }];\n\n\n\n\n\n\n\n\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nfunction lastLine(texto) {\n  const lines = String(texto || '').split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\n  const last = lines.length ? lines[lines.length - 1] : String(texto || '').trim();\n  return last.replace(/^[•\\-\\*]\\s*/, '');\n}\n\nconst m = $input.first().json;\nif (m.is_repetir || m.boton_id === 'repetir_pregunta') {\n  return [{ json: { ...m, obra_action: 'repetir' } }];\n}\nconst boton = String(m.boton_id || '').trim();\nconst last = lastLine(m.texto);\nconst foldedLast = compact(last);\nif (boton === 'obra_particular' || isParticular(boton) || isParticular(last)) {\n  return [{ json: { ...m, obra_action: 'save', obra_value: 'Particular / Sin Obra Social' } }];\n}\nif (boton === 'obra_otra' || foldedLast === 'otra' || foldedLast === 'otras') {\n  return [{ json: { ...m, obra_action: 'otra' } }];\n}\nconst value = boton || last;\nif (!value) {\n  return [{ json: { ...m, obra_action: 'repetir' } }];\n}\nreturn [{ json: { ...m, obra_action: 'save', obra_value: value } }];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1023,7 +1038,7 @@
         27904,
         37616
       ],
-      "id": "9f65948c-d939-47aa-b784-47b10b971772",
+      "id": "f09f4bf3-44d6-4505-947b-f68de81a9345",
       "name": "Reload obras repetir",
       "alwaysOutputData": true,
       "credentials": {
@@ -1035,7 +1050,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nlet obras = $input.first().json.obras_sociales;\nif (typeof obras === 'string') { try { obras = JSON.parse(obras); } catch(e) { obras = []; } }\nif (!Array.isArray(obras)) obras = [];\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nconst items = [\n  { title: 'Particular/Sin Obra Social', value: 'obra_particular' }\n];\nfor (const o of obras) {\n  if (isParticular(o)) continue;\n  items.push({ title: String(o).slice(0, 24), value: String(o) });\n}\nitems.push({ title: 'Otras', value: 'obra_otra' });\nitems.push(...navItems());\nreturn [cwSelect('¿Cuál es tu obra social?', items, m)];\n\n\n\n\n\n\n\n\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nlet obras = $input.first().json.obras_sociales;\nif (typeof obras === 'string') { try { obras = JSON.parse(obras); } catch(e) { obras = []; } }\nif (!Array.isArray(obras)) obras = [];\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nconst items = [\n  { title: 'Particular/Sin Obra Social', value: 'obra_particular' }\n];\nfor (const o of obras) {\n  if (isParticular(o)) continue;\n  items.push({ title: String(o).slice(0, 24), value: String(o) });\n}\nitems.push({ title: 'Otras', value: 'obra_otra' });\nitems.push(...navItems());\nreturn [cwSelect('¿Cuál es tu obra social?', items, m)];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1063,7 +1078,7 @@
         28352,
         37616
       ],
-      "id": "ac8b1010-db60-4269-b475-7c60b4a3ee51",
+      "id": "97678bfa-5a53-4db2-b496-911111862492",
       "name": "Send obra repetir",
       "credentials": {
         "httpHeaderAuth": {
@@ -1084,7 +1099,7 @@
         27904,
         37776
       ],
-      "id": "20744df9-ab60-4bd0-8dda-508c7cad3f5f",
+      "id": "3fdab57e-29bd-4f46-9f9a-19fd749888e3",
       "name": "Set awaiting_obra_otra",
       "alwaysOutputData": true,
       "credentials": {
@@ -1104,7 +1119,7 @@
         28128,
         37776
       ],
-      "id": "be63d12b-1b11-4ef1-974d-a166d0d2fb94",
+      "id": "03d7e6aa-2ceb-4b6a-9ded-0342d7bbf809",
       "name": "Ask obra otra"
     },
     {
@@ -1124,7 +1139,7 @@
         28352,
         37776
       ],
-      "id": "48e5da1a-a49e-4aa9-aff0-99293ac40698",
+      "id": "0d2083e9-5790-481e-bed3-2f96c9985da0",
       "name": "Send obra otra",
       "credentials": {
         "httpHeaderAuth": {
@@ -1144,7 +1159,7 @@
           },
           "conditions": [
             {
-              "id": "64cc4246-b518-4898-bcc6-cbc790a45c94",
+              "id": "54f32d8d-3fd3-41e0-8710-a1da76bd2c6a",
               "leftValue": "={{ $json.is_repetir === true || $json.is_repetir === 'true' }}",
               "rightValue": true,
               "operator": {
@@ -1163,7 +1178,7 @@
         27456,
         38016
       ],
-      "id": "a5369f8b-4c56-4ccf-a666-8a192c454036",
+      "id": "a1caf88d-223a-435a-b97b-32281452d8af",
       "name": "Obra otra: repetir?"
     },
     {
@@ -1176,7 +1191,7 @@
         27680,
         37936
       ],
-      "id": "3e6afb0a-1bfe-4f0d-9fa2-5e98aad54037",
+      "id": "6f0ba6f1-b1b2-4ab7-896e-6fb8d0c0b15c",
       "name": "Re-ask obra otra"
     },
     {
@@ -1196,7 +1211,7 @@
         27904,
         37936
       ],
-      "id": "9df4ad0c-537d-4588-a6ee-874591f9a9b0",
+      "id": "e6bb97e1-d3f1-43f0-aa7f-6f686b318c72",
       "name": "Send re-ask obra otra",
       "credentials": {
         "httpHeaderAuth": {
@@ -1207,7 +1222,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nfunction lastLine(texto) {\n  const lines = String(texto || '').split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\n  const last = lines.length ? lines[lines.length - 1] : String(texto || '').trim();\n  return last.replace(/^[•\\-\\*]\\s*/, '');\n}\nconst m = $input.first().json;\nconst last = lastLine(m.texto);\nconst obra_value = (m.boton_id === 'obra_particular' || isParticular(last))\n  ? 'Particular / Sin Obra Social'\n  : last;\nif (!obra_value) {\n  return [{ json: { ...m, obra_value: last || m.texto } }];\n}\nreturn [{ json: { ...m, obra_value } }];\n\n\n\n\n\n\n\n\n"
+        "jsCode": "\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nfunction lastLine(texto) {\n  const lines = String(texto || '').split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\n  const last = lines.length ? lines[lines.length - 1] : String(texto || '').trim();\n  return last.replace(/^[•\\-\\*]\\s*/, '');\n}\nconst m = $input.first().json;\nconst last = lastLine(m.texto);\nconst obra_value = (m.boton_id === 'obra_particular' || isParticular(last))\n  ? 'Particular / Sin Obra Social'\n  : last;\nif (!obra_value) {\n  return [{ json: { ...m, obra_value: last || m.texto } }];\n}\nreturn [{ json: { ...m, obra_value } }];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1230,7 +1245,7 @@
         27904,
         38096
       ],
-      "id": "e4e2cede-641b-42b1-a75d-c8f8f04685c9",
+      "id": "1fe2240d-33e1-4c71-ab61-179a6666996b",
       "name": "Save obra otra",
       "alwaysOutputData": true,
       "credentials": {
@@ -1252,7 +1267,7 @@
         27904,
         38256
       ],
-      "id": "c078d058-f04e-4fdf-a950-28d2036ed370",
+      "id": "ef56d2bc-1e86-4170-8620-1c070ef70b86",
       "name": "Save obra listed",
       "alwaysOutputData": true,
       "credentials": {
@@ -1272,7 +1287,7 @@
         28128,
         38176
       ],
-      "id": "d4179fbb-d072-4cde-9495-6f5331a7a651",
+      "id": "008726bf-b5b9-4328-9335-fbf1a711a570",
       "name": "Route after obra"
     },
     {
@@ -1341,7 +1356,7 @@
         28352,
         38176
       ],
-      "id": "31128148-fcf4-44f3-a275-f6f8bc6a144e",
+      "id": "d6a7fdcb-8387-49bf-a870-5cb442bb960d",
       "name": "After obra route"
     },
     {
@@ -1356,7 +1371,7 @@
         28128,
         38336
       ],
-      "id": "cdaf6e64-cc68-4194-9b5f-1b1c42145360",
+      "id": "e5c77115-a695-4bdd-8f18-31a3d8806450",
       "name": "Load ctx after obra",
       "alwaysOutputData": true,
       "credentials": {
@@ -1378,7 +1393,7 @@
         28800,
         37216
       ],
-      "id": "f07e8ee3-591e-4a45-9111-519491598d5d",
+      "id": "ae3ff3cd-b4e1-49f5-b1bb-33a493c1e333",
       "name": "Load obras list",
       "alwaysOutputData": true,
       "credentials": {
@@ -1390,7 +1405,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nlet obras = $input.first().json.obras_sociales;\nif (typeof obras === 'string') { try { obras = JSON.parse(obras); } catch(e) { obras = []; } }\nif (!Array.isArray(obras)) obras = [];\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nconst items = [\n  { title: 'Particular/Sin Obra Social', value: 'obra_particular' }\n];\nfor (const o of obras) {\n  if (isParticular(o)) continue;\n  items.push({ title: String(o).slice(0, 24), value: String(o) });\n}\nitems.push({ title: 'Otras', value: 'obra_otra' });\nitems.push(...navItems());\nreturn [cwSelect('¿Cuál es tu obra social?', items, m)];\n\n\n\n\n\n\n\n\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nlet obras = $input.first().json.obras_sociales;\nif (typeof obras === 'string') { try { obras = JSON.parse(obras); } catch(e) { obras = []; } }\nif (!Array.isArray(obras)) obras = [];\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\nfunction compact(s) {\n  return fold(s).replace(/[\\/]+/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction isParticular(s) {\n  const f = compact(String(s || '').replace(/^[•\\-\\*]\\s*/, ''));\n  if (!f) return false;\n  if (f === 'obra_particular') return true;\n  const exact = new Set([\n    'particular',\n    'sin obra',\n    'sin obras',\n    'sin obra social',\n    'sin obras sociales',\n    'particular sin obra',\n    'particular sin obra social',\n    'sin obra particular',\n    'no tengo obra',\n    'no tengo obras',\n    'no tengo obra social',\n    'no tengo obras sociales',\n    'no tiene obra',\n    'no tiene obra social',\n    'no cuento con obra',\n    'no cuento con obra social',\n    'como particular',\n    'soy particular',\n    'voy particular',\n    'voy como particular',\n    'pago particular',\n    'pago como particular',\n    'atiendo particular',\n    'atiendo como particular',\n    'paciente particular',\n    'consulta particular',\n    'obra particular',\n    'sin cobertura',\n    'no tengo cobertura',\n    'ninguna obra',\n    'ninguna obra social',\n    'no tengo',\n    'no posee obra',\n    'no posee obra social',\n    'particular por favor'\n  ]);\n  if (exact.has(f)) return true;\n  if (/\\b(soy|como|voy|pago|atiendo|paciente|consulta|obra)\\s+particular\\b/.test(f)) return true;\n  if (/\\bparticular\\s+(sin|no|pago|por|por favor)\\b/.test(f)) return true;\n  if (/^sin obras?( sociales?)?$/.test(f)) return true;\n  if (/\\bno (tengo|tiene|tengo una|cuento con|poseo|posee)\\s+obras?( sociales?)?\\b/.test(f)) return true;\n  if (/\\bno (tengo|tiene) cobertura\\b/.test(f)) return true;\n  return false;\n}\nconst items = [\n  { title: 'Particular/Sin Obra Social', value: 'obra_particular' }\n];\nfor (const o of obras) {\n  if (isParticular(o)) continue;\n  items.push({ title: String(o).slice(0, 24), value: String(o) });\n}\nitems.push({ title: 'Otras', value: 'obra_otra' });\nitems.push(...navItems());\nreturn [cwSelect('¿Cuál es tu obra social?', items, m)];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1418,7 +1433,7 @@
         29248,
         37216
       ],
-      "id": "c5152746-49cf-4057-9864-0123c0f4eb8b",
+      "id": "122d4161-0bd9-4548-9fec-489827db921a",
       "name": "Send obra list",
       "credentials": {
         "httpHeaderAuth": {
@@ -1451,7 +1466,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst m = $('Prepare Input').first().json;\nconst boton = String(m.boton_id || '').trim();\nconst texto = String(m.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nif (m.is_repetir || boton === 'repetir_pregunta') {\n  return [{ json: { ...m, med_action: 'repetir' } }];\n}\n\nlet docs = [];\ntry {\n  const items = $input.all().map(i => i.json);\n  if (items.length === 1 && items[0].doctors_json != null) {\n    let raw = items[0].doctors_json;\n    if (typeof raw === 'string') raw = JSON.parse(raw);\n    docs = Array.isArray(raw) ? raw : [];\n  } else {\n    docs = items.filter(d => d && d.id && d.name);\n  }\n} catch (e) {\n  docs = [];\n}\n\nconst cabeceraTokens = new Set([\n  'medico_cabecera',\n  'medico_cualquiera',\n  fold('Mi médico de cabecera'),\n  fold('Cualquier doctor'),\n  'cabecera',\n]);\nif (cabeceraTokens.has(boton) || cabeceraTokens.has(fold(boton)) || cabeceraTokens.has(fold(last))) {\n  return [{ json: { ...m, med_action: 'save', medico_name: 'Mi médico de cabecera', doctor_id: null, cualquiera: true } }];\n}\n\nfunction findDoc(token) {\n  const raw = String(token || '').trim();\n  if (!raw) return null;\n  if (/^medico_\\d+$/.test(raw)) {\n    const id = Number(raw.replace('medico_', ''));\n    return docs.find(d => Number(d.id) === id) || { id, name: '' };\n  }\n  const f = fold(raw);\n  return docs.find(d => {\n    const n = fold(d.name);\n    const t = fold(String(d.name).slice(0, 24));\n    return f === n || f === t;\n  }) || null;\n}\n\nfunction isPromptLine(line) {\n  const f = fold(line);\n  return /medico preferis|que medico|escribi una opcion|boton de abajo|lista completa/.test(f);\n}\n\nlet hit = findDoc(boton) || findDoc(last);\nif (!hit) {\n  for (const line of [...lines].reverse()) {\n    if (isPromptLine(line)) continue;\n    hit = findDoc(line);\n    if (hit) break;\n  }\n}\n\nif (hit) {\n  return [{ json: { ...m, med_action: 'save', medico_name: hit.name || last, doctor_id: hit.id, cualquiera: false } }];\n}\n\nfunction isDoctorListRequest(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/recomend/.test(f)) return true;\n  if (/suger/.test(f) && /medico|doctor|oculista|oftalmologo/.test(f)) return true;\n  if (/(que|cuales|cual).{0,40}(otros? )?(medicos?|doctores?|oculistas?|oftalmologos?)/.test(f)) return true;\n  if (/(lista|opciones).{0,30}(de )?(medicos?|doctores?|oculistas?)/.test(f)) return true;\n  if (/otros? (medicos?|doctores?|oculistas?|oftalmologos?)/.test(f)) return true;\n  if (/aparte del (dr|doctor|dra)/.test(f)) return true;\n  return false;\n}\n\nif (isDoctorListRequest(last) || isDoctorListRequest(texto)) {\n  return [{ json: { ...m, med_action: 'list', doctors: docs } }];\n}\n\nreturn [{ json: { ...m, med_action: 'repetir' } }];\n\n\n\n\n\n\n\n\n"
+        "jsCode": "\nfunction fold(s) {\n  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst m = $('Prepare Input').first().json;\nconst boton = String(m.boton_id || '').trim();\nconst texto = String(m.texto || '').trim();\nconst lines = texto.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);\nconst last = lines.length ? lines[lines.length - 1] : texto;\n\nif (m.is_repetir || boton === 'repetir_pregunta') {\n  return [{ json: { ...m, med_action: 'repetir' } }];\n}\n\nlet docs = [];\ntry {\n  const items = $input.all().map(i => i.json);\n  if (items.length === 1 && items[0].doctors_json != null) {\n    let raw = items[0].doctors_json;\n    if (typeof raw === 'string') raw = JSON.parse(raw);\n    docs = Array.isArray(raw) ? raw : [];\n  } else {\n    docs = items.filter(d => d && d.id && d.name);\n  }\n} catch (e) {\n  docs = [];\n}\n\nconst cabeceraTokens = new Set([\n  'medico_cabecera',\n  'medico_cualquiera',\n  fold('Mi médico de cabecera'),\n  fold('Cualquier doctor'),\n  'cabecera',\n]);\nif (cabeceraTokens.has(boton) || cabeceraTokens.has(fold(boton)) || cabeceraTokens.has(fold(last))) {\n  return [{ json: { ...m, med_action: 'save', medico_name: 'Mi médico de cabecera', doctor_id: null, cualquiera: true } }];\n}\n\nfunction findDoc(token) {\n  const raw = String(token || '').trim();\n  if (!raw) return null;\n  if (/^medico_\\d+$/.test(raw)) {\n    const id = Number(raw.replace('medico_', ''));\n    return docs.find(d => Number(d.id) === id) || { id, name: '' };\n  }\n  const f = fold(raw);\n  return docs.find(d => {\n    const n = fold(d.name);\n    const t = fold(String(d.name).slice(0, 24));\n    return f === n || f === t;\n  }) || null;\n}\n\nfunction isPromptLine(line) {\n  const f = fold(line);\n  return /medico preferis|que medico|escribi una opcion|boton de abajo|lista completa/.test(f);\n}\n\nlet hit = findDoc(boton) || findDoc(last);\nif (!hit) {\n  for (const line of [...lines].reverse()) {\n    if (isPromptLine(line)) continue;\n    hit = findDoc(line);\n    if (hit) break;\n  }\n}\n\nif (hit) {\n  return [{ json: { ...m, med_action: 'save', medico_name: hit.name || last, doctor_id: hit.id, cualquiera: false } }];\n}\n\nfunction isDoctorListRequest(t) {\n  const f = fold(t);\n  if (!f) return false;\n  if (/recomend/.test(f)) return true;\n  if (/suger/.test(f) && /medico|doctor|oculista|oftalmologo/.test(f)) return true;\n  if (/(que|cuales|cual).{0,40}(otros? )?(medicos?|doctores?|oculistas?|oftalmologos?)/.test(f)) return true;\n  if (/(lista|opciones).{0,30}(de )?(medicos?|doctores?|oculistas?)/.test(f)) return true;\n  if (/otros? (medicos?|doctores?|oculistas?|oftalmologos?)/.test(f)) return true;\n  if (/aparte del (dr|doctor|dra)/.test(f)) return true;\n  return false;\n}\n\nif (isDoctorListRequest(last) || isDoctorListRequest(texto)) {\n  return [{ json: { ...m, med_action: 'list', doctors: docs } }];\n}\n\nreturn [{ json: { ...m, med_action: 'repetir' } }];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1568,7 +1583,7 @@
         28128,
         38416
       ],
-      "id": "25c34b38-0fae-4f1c-a4fb-263cd234e321",
+      "id": "0c016729-b2dd-4973-bc81-510bb89aaaa7",
       "name": "Reload doctors repetir",
       "alwaysOutputData": true,
       "credentials": {
@@ -1580,7 +1595,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Mi médico de cabecera', value: 'medico_cabecera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: \"¿Con qué médico preferís atenderte?\\n\\nApretá el *botón de abajo* para ver la lista completa y elegir.\",\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: items.slice(0, 10) }\n    }\n  }\n}];\n\n\n\n\n\n\n\n\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Mi médico de cabecera', value: 'medico_cabecera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: \"¿Con qué médico preferís atenderte?\\n\\nApretá el *botón de abajo* para ver la lista completa y elegir.\",\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: items.slice(0, 10) }\n    }\n  }\n}];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1608,7 +1623,7 @@
         28576,
         38416
       ],
-      "id": "ccc6b0c6-5748-44c7-9f49-85b81d66d431",
+      "id": "b7311af4-4732-4ed1-a252-d38f36eb6620",
       "name": "Send medico repetir",
       "credentials": {
         "httpHeaderAuth": {
@@ -1619,7 +1634,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst m = $('Handle medico').first().json;\nlet docs = Array.isArray(m.doctors) ? m.doctors : [];\nif (!docs.length) {\n  try {\n    docs = $input.all().map(i => i.json).filter(d => d && d.name);\n  } catch (e) {\n    docs = [];\n  }\n}\nconst lines = docs.map(d => '• ' + String(d.name));\nconst body = [\n  'Estos son los oftalmólogos disponibles:',\n  ...(lines.length ? lines : ['• (sin médicos activos)']),\n  '• Mi médico de cabecera (si no tenés preferencia)',\n  '',\n  'Para elegir, apretá el botón de abajo.'\n].join('\\n');\n\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    telefono: m.telefono,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    }\n  }\n}];\n\n\n\n\n\n\n\n\n"
+        "jsCode": "\nconst m = $('Handle medico').first().json;\nlet docs = Array.isArray(m.doctors) ? m.doctors : [];\nif (!docs.length) {\n  try {\n    docs = $input.all().map(i => i.json).filter(d => d && d.name);\n  } catch (e) {\n    docs = [];\n  }\n}\nconst lines = docs.map(d => '• ' + String(d.name));\nconst body = [\n  'Estos son los oftalmólogos disponibles:',\n  ...(lines.length ? lines : ['• (sin médicos activos)']),\n  '• Mi médico de cabecera (si no tenés preferencia)',\n  '',\n  'Para elegir, apretá el botón de abajo.'\n].join('\\n');\n\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    telefono: m.telefono,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'text'\n    }\n  }\n}];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1647,7 +1662,7 @@
         28352,
         38656
       ],
-      "id": "d10ec46b-31d6-4df0-86f6-13bb076771cd",
+      "id": "4f9973f8-8700-46f4-8859-b279fb032d85",
       "name": "Send medico list reply",
       "credentials": {
         "httpHeaderAuth": {
@@ -1668,7 +1683,7 @@
         28576,
         38656
       ],
-      "id": "2854d9c4-cc70-4f12-acb1-b3b99da6b3e6",
+      "id": "68ad2e1f-403e-4349-b633-e257f2aaed5f",
       "name": "Reload doctors for list",
       "alwaysOutputData": true,
       "credentials": {
@@ -1680,7 +1695,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Mi médico de cabecera', value: 'medico_cabecera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: \"¿Con qué médico preferís atenderte?\\n\\nApretá el *botón de abajo* para ver la lista completa y elegir.\",\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: items.slice(0, 10) }\n    }\n  }\n}];\n\n\n\n\n\n\n\n\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Mi médico de cabecera', value: 'medico_cabecera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: \"¿Con qué médico preferís atenderte?\\n\\nApretá el *botón de abajo* para ver la lista completa y elegir.\",\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: items.slice(0, 10) }\n    }\n  }\n}];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1738,7 +1753,7 @@
         28800,
         38976
       ],
-      "id": "77318369-6799-4ce6-9082-1dc3f8822f7f",
+      "id": "703ed91a-e8c2-47a7-a22c-c1bd69719184",
       "name": "Load doctors list",
       "alwaysOutputData": true,
       "credentials": {
@@ -1750,7 +1765,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Mi médico de cabecera', value: 'medico_cabecera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: \"¿Con qué médico preferís atenderte?\\n\\nApretá el *botón de abajo* para ver la lista completa y elegir.\",\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: items.slice(0, 10) }\n    }\n  }\n}];\n\n\n\n\n\n\n\n\n"
+        "jsCode": "\nfunction navItems(){\n  return [\n    { title: 'Repetir pregunta', value: 'repetir_pregunta' },\n    { title: 'Cancelar turno', value: 'cancelar_turno_pedido' }\n  ];\n}\nfunction cwSelect(content, items, m){\n  items = items || [];\n  let body = content;\n  let buttons = items;\n  if (items.length > 3) {\n    const navIds = new Set(['repetir_pregunta', 'cancelar_turno_pedido']);\n    const choices = items.filter(i => !navIds.has(i.value));\n    const nav = items.filter(i => navIds.has(i.value));\n    if (choices.length) {\n      body += '\\n\\nEscribí una opción:\\n' + choices.map(c => '• ' + c.title).join('\\n');\n    }\n    buttons = (nav.length ? nav : items.slice(0, 3)).slice(0, 3);\n  }\n  \n  return {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: body,\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: buttons.slice(0, 3) }\n    }\n  };\n}\nfunction parseCtx(raw){\n  if (raw == null) return {};\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch(e){ return {}; }\n}\n\nconst m = $('Prepare Input').first().json;\nconst docs = $input.all().map(i => i.json).filter(d => d.name);\nconst items = [{ title: 'Mi médico de cabecera', value: 'medico_cabecera' }];\nfor (const d of docs) {\n  items.push({ title: String(d.name).slice(0, 24), value: 'medico_' + d.id });\n}\nreturn [{\n  json: {\n    conversation_id: m.conversation_id,\n    account_id: m.account_id,\n    cw_body: {\n      content: \"¿Con qué médico preferís atenderte?\\n\\nApretá el *botón de abajo* para ver la lista completa y elegir.\",\n      message_type: 'outgoing',\n      private: false,\n      content_type: 'input_select',\n      content_attributes: { items: items.slice(0, 10) }\n    }\n  }\n}];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1778,7 +1793,7 @@
         29248,
         38976
       ],
-      "id": "1af6f4f4-7349-472f-987f-8dcd4cd7a34d",
+      "id": "1f6510f5-48a3-40cf-afdd-77518ffe4737",
       "name": "Send medico list",
       "credentials": {
         "httpHeaderAuth": {
@@ -1797,7 +1812,7 @@
         27456,
         38976
       ],
-      "id": "c1df105c-5386-4f68-8e8f-b08345a21a66",
+      "id": "f30e7097-39e1-4ed5-8359-33dee3f74163",
       "name": "Handle post solicitud"
     },
     {
@@ -1866,7 +1881,7 @@
         27680,
         38976
       ],
-      "id": "b10848e5-af8c-435a-940b-d99f505c7b6a",
+      "id": "0d34e567-492d-4c96-b4ea-ad27c7e088e1",
       "name": "Post solicitud action"
     },
     {
@@ -1879,7 +1894,7 @@
         27904,
         38896
       ],
-      "id": "b314ef40-5cba-4510-bb32-57e692390095",
+      "id": "454119b4-a949-4741-ab34-549b52f830cc",
       "name": "Build handoff derivacion"
     },
     {
@@ -1899,7 +1914,7 @@
         28128,
         38896
       ],
-      "id": "e39c114c-6f67-4cd6-98ac-fdddf29e2f9e",
+      "id": "78164057-171b-4e3c-a132-dcd28e8882ae",
       "name": "Send handoff patient",
       "credentials": {
         "httpHeaderAuth": {
@@ -1918,7 +1933,7 @@
         28352,
         38896
       ],
-      "id": "76d9bd8f-0f7d-43e1-9f18-1425ab2e8d08",
+      "id": "f88a2576-dada-4b87-813d-7cde6a01e5f4",
       "name": "Prep handoff note"
     },
     {
@@ -1938,7 +1953,7 @@
         28576,
         38896
       ],
-      "id": "312bff5b-e62a-4dad-8a15-daadf9397b24",
+      "id": "8d15803c-cfdf-4c71-b80f-bdf378045dd2",
       "name": "Send handoff note",
       "credentials": {
         "httpHeaderAuth": {
@@ -1959,7 +1974,7 @@
         28800,
         38896
       ],
-      "id": "c951c604-a456-4a7b-a4de-f9b64001ed42",
+      "id": "eb1c0844-96eb-4ce8-9a09-0d7b3b57a5eb",
       "name": "Save handoff state",
       "alwaysOutputData": true,
       "credentials": {
@@ -1972,7 +1987,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE conversation_state SET state = 'awaiting_correccion_datos' WHERE phone = '{{ $('Prepare Input').item.json.telefono }}';",
+        "query": "UPDATE conversation_state SET state = 'awaiting_correccion_datos', context = JSON_SET(COALESCE(context, JSON_OBJECT()), '$.is_correction', true) WHERE phone = '{{ $('Prepare Input').item.json.telefono }}';",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -1981,7 +1996,7 @@
         27904,
         39056
       ],
-      "id": "989a4bbb-3c65-4efc-b1b0-f116e3d25ad5",
+      "id": "51fa2aa9-fc3f-4ee9-a687-5285b60b72b1",
       "name": "Start awaiting_correccion",
       "alwaysOutputData": true,
       "credentials": {
@@ -2342,6 +2357,28 @@
       "main": [
         [
           {
+            "node": "Bind solicitud_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bind solicitud_id": {
+      "main": [
+        [
+          {
+            "node": "Set post_solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set post_solicitud": {
+      "main": [
+        [
+          {
             "node": "Prep private note",
             "type": "main",
             "index": 0
@@ -2376,17 +2413,6 @@
         [
           {
             "node": "Send recepcion",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Send recepcion": {
-      "main": [
-        [
-          {
-            "node": "Set post_solicitud",
             "type": "main",
             "index": 0
           }
