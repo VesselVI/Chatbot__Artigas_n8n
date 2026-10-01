@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
-# Delete solicitudes + bot state for one WhatsApp phone (e.g. a test handset).
+# Wipe bot test data for one WhatsApp phone (e.g. a test handset).
 # Does NOT touch other patients, doctors, hours, or clinic_settings.
 #
 # Usage (on the VPS, from the repo root):
 #   bash scripts/wipe-phone-tests.sh 3816224165
 #   bash scripts/wipe-phone-tests.sh 5493816224165 --yes
+#   bash scripts/wipe-phone-tests.sh 3816224165 --reset-reminder
+#
+# Default: DELETE matching turno_solicitudes + conversation_state.
+# --reset-reminder: keep solicitudes, SET reminder_sent_at = NULL, clear
+#   conversation_state (for Recordatorio smoke re-runs on a confirmado).
 #
 # Matches phone / telefono_contacto with LIKE '%<digits>%'.
 set -euo pipefail
@@ -13,12 +18,14 @@ cd "$(dirname "$0")/.."
 
 DIGITS_RAW="${1:-}"
 YES=0
+RESET_REMINDER=0
 for arg in "${@:2}"; do
   case "$arg" in
     -y|--yes) YES=1 ;;
+    --reset-reminder) RESET_REMINDER=1 ;;
     *)
       echo "Unknown option: $arg" >&2
-      echo "Usage: bash scripts/wipe-phone-tests.sh <phone-digits> [--yes]" >&2
+      echo "Usage: bash scripts/wipe-phone-tests.sh <phone-digits> [--yes] [--reset-reminder]" >&2
       exit 2
       ;;
   esac
@@ -26,8 +33,9 @@ done
 
 DIGITS="$(printf '%s' "$DIGITS_RAW" | tr -cd '0-9')"
 if [[ -z "$DIGITS" || ${#DIGITS} -lt 6 ]]; then
-  echo "Usage: bash scripts/wipe-phone-tests.sh <phone-digits> [--yes]" >&2
+  echo "Usage: bash scripts/wipe-phone-tests.sh <phone-digits> [--yes] [--reset-reminder]" >&2
   echo "Example: bash scripts/wipe-phone-tests.sh 3816224165" >&2
+  echo "         bash scripts/wipe-phone-tests.sh 3816224165 --reset-reminder" >&2
   exit 2
 fi
 
@@ -49,7 +57,7 @@ mysql_q() {
 
 echo "==> Matching rows for *${DIGITS}*"
 mysql_q "
-SELECT id, phone, telefono_contacto, nombre, created_at, status
+SELECT id, phone, telefono_contacto, nombre, created_at, status, reminder_sent_at
 FROM turno_solicitudes
 WHERE phone LIKE '%${DIGITS}%'
    OR telefono_contacto LIKE '%${DIGITS}%';
@@ -57,8 +65,16 @@ SELECT phone, state FROM conversation_state
 WHERE phone LIKE '%${DIGITS}%';
 "
 
+if [[ "$RESET_REMINDER" -eq 1 ]]; then
+  ACTION_PROMPT='Reset reminder_sent_at + clear conversation_state (keep solicitudes)? [y/N] '
+  ACTION_LABEL='Resetting reminder_sent_at + clearing state'
+else
+  ACTION_PROMPT='Delete these rows? [y/N] '
+  ACTION_LABEL='Deleting'
+fi
+
 if [[ "$YES" -ne 1 ]]; then
-  printf 'Delete these rows? [y/N] '
+  printf '%s' "$ACTION_PROMPT"
   read -r ans || true
   case "$ans" in
     y|Y|yes|YES) ;;
@@ -69,17 +85,30 @@ if [[ "$YES" -ne 1 ]]; then
   esac
 fi
 
-echo "==> Deleting"
-mysql_q "
+echo "==> ${ACTION_LABEL}"
+if [[ "$RESET_REMINDER" -eq 1 ]]; then
+  mysql_q "
+UPDATE turno_solicitudes
+SET reminder_sent_at = NULL
+WHERE phone LIKE '%${DIGITS}%'
+   OR telefono_contacto LIKE '%${DIGITS}%';
+DELETE FROM conversation_state
+WHERE phone LIKE '%${DIGITS}%';
+"
+else
+  mysql_q "
 DELETE FROM turno_solicitudes
 WHERE phone LIKE '%${DIGITS}%'
    OR telefono_contacto LIKE '%${DIGITS}%';
 DELETE FROM conversation_state
 WHERE phone LIKE '%${DIGITS}%';
 "
+fi
 
 echo "==> Left for this phone"
 mysql_q "
+SELECT id, status, reminder_sent_at FROM turno_solicitudes
+WHERE phone LIKE '%${DIGITS}%' OR telefono_contacto LIKE '%${DIGITS}%';
 SELECT COUNT(*) AS left_solicitudes FROM turno_solicitudes
 WHERE phone LIKE '%${DIGITS}%' OR telefono_contacto LIKE '%${DIGITS}%';
 SELECT COUNT(*) AS left_state FROM conversation_state
