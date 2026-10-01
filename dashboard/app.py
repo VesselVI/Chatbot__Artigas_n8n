@@ -62,10 +62,10 @@ from recordatorio_panel import (
 from respuesta_consulta import (
     RESPUESTA_TEMPLATE,
     assert_mark_contactado,
+    assert_mensaje_respuesta,
     assert_responder_consulta,
     can_mark_contactado,
     can_responder_consulta,
-    mensaje_respuesta_consulta,
 )
 
 DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
@@ -1178,14 +1178,17 @@ async def api_mark_confirmed_solicitud(request: Request, solicitud_id: int):
 @app.post("/api/solicitudes/{solicitud_id}/responder-consulta")
 @login_required
 async def api_responder_consulta(request: Request, solicitud_id: int):
-    """Respuesta a consulta: ack WhatsApp (free-form/utility) → Contactado."""
+    """Respuesta a consulta: free-form WhatsApp (CSW open) → Contactado."""
     try:
+        body = await request.json()
+        if not isinstance(body, dict):
+            body = {}
+        message = assert_mensaje_respuesta(body.get("mensaje"))
         existing = fetch_solicitud(solicitud_id)
         row = assert_responder_consulta(existing)
         tipo = normalize_tipo(row.get("tipo"))
         nombre = str(row.get("nombre") or "").strip()
         medico = str(row.get("medico") or "").strip()
-        message = mensaje_respuesta_consulta(nombre)
         fields = {
             "nombre": nombre,
             "medico": medico,
@@ -2090,7 +2093,7 @@ def _attempt_respuesta_consulta_send(
     nombre: str,
     message: str,
 ) -> dict[str, Any]:
-    """Free-form when CSW open; utility respuesta_consulta when closed. Never raises."""
+    """Free-form only (window gated upstream). Never raises."""
     try:
         result = send_respuesta_consulta(
             conversation_id,

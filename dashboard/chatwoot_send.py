@@ -236,26 +236,22 @@ def send_respuesta_consulta(
     opener: Callable[..., Any] | None = None,
 ) -> SendResult:
     """
-    Respuesta a consulta desde el panel — free-form inside CSW; utility when closed.
-    WABA: respuesta_consulta (es_AR), {{1}} = nombre.
+    Respuesta a consulta desde el panel — free-form only (CSW must be open).
+    Utility plantilla is not used here; closed window is rejected upstream.
     """
+    _ = nombre
+    _ = template_name
     open_win = is_customer_service_window_open(
         conversation_id, force=window_open, opener=opener
     )
-    if open_win:
-        try:
-            return send_freeform_message(
-                conversation_id, freeform_content, opener=opener
-            )
-        except ChatwootSendError as e:
-            if not e.window_closed:
-                raise
-    name = str(nombre or "").strip() or "paciente"
-    return send_utility_template(
-        conversation_id,
-        template_name=template_name or "respuesta_consulta",
-        body_params=[name],
-        opener=opener,
+    if not open_win:
+        raise ChatwootSendError(
+            "Ventana de 24 h cerrada.",
+            code="window_closed",
+            window_closed=True,
+        )
+    return send_freeform_message(
+        conversation_id, freeform_content, opener=opener
     )
 
 

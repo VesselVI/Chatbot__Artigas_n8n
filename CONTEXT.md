@@ -124,12 +124,12 @@ A human-needed question about prices or fees. Domain-distinct from Solicitud de 
 _Avoid_: Solicitud de estudio, FAQ answer
 
 **Respuesta a consulta desde el panel**:
-Row action on a pending solicitud with `tipo=estudio` or `tipo=pregunta`: sends a short patient ack (free-form inside Meta’s customer-service window; utility plantilla `respuesta_consulta` when that window is closed), then sets Contactado. Same plantilla and copy for both tipos. Re-send and Abrir Chat remain allowed after Contactado. No board-level control.
+Row action on a pending (or already Contactado) solicitud with `tipo=estudio` or `tipo=pregunta` **only while Meta’s ~24h customer-service window is still open** (heuristic: solicitud `created_at` within 24h). Opens a modal for a **free-form** quick answer typed by Secretaría; sends that text via Chatwoot and sets Contactado. Same behaviour for both tipos. If the window is closed, the **Responder consulta** button is hidden — use Abrir Chat / a utility plantilla from Chatwoot instead. No fixed ack copy; no utility fallback from this panel action. No board-level control.
 _Avoid_: Bienvenida, Saludo, Confirmar estudio, Menú de bienvenida (bot screen), Confirmación desde el panel
 
 **Mensaje de respuesta a consulta**:
-Patient-facing ack for Respuesta a consulta desde el panel — same wording whether free-form or utility: “Hola …, recibimos tu consulta. Te respondemos por este chat en breve.” (nombre only). Not the real estudio/precio answer; that stays free-form in Chatwoot after the window allows it.
-_Avoid_: Mensaje de confirmación, Menú de bienvenida, Texto de bienvenida (Settings)
+The free-form WhatsApp text Secretaría types in Respuesta a consulta desde el panel (estudio or pregunta). Sent only inside the 24h window. Not a fixed plantilla ack.
+_Avoid_: Mensaje de confirmación, Menú de bienvenida, Texto de bienvenida (Settings), utility `respuesta_consulta` (Chatwoot-only when window closed)
 
 **Contactado**:
 Solicitud status (`status=contactado`, badge **Contactado**) for `tipo=estudio` or `tipo=pregunta` after Secretaría starts the WhatsApp thread via Respuesta a consulta desde el panel or Abrir Chat. Means “thread opened / ack sent,” not that the consulta is finished. Never used for pending turnos (those stay pending until Confirmación desde el panel).

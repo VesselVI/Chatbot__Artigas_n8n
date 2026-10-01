@@ -106,28 +106,22 @@ def test_recordatorio_sends_numbered_body_params(monkeypatch):
     }
 
 
-def test_respuesta_consulta_utility_body_param(monkeypatch):
-    captured: dict[str, Any] = {}
-
-    def fake_open(req, timeout=30):
-        captured["payload"] = json.loads(req.data.decode("utf-8"))
-        return _FakeResp()
-
+def test_respuesta_consulta_rejects_when_window_forced_closed(monkeypatch):
     monkeypatch.setenv("CHATWOOT_HOST", "example.com")
     monkeypatch.setenv("CHATWOOT_API_TOKEN", "tok")
     monkeypatch.setenv("CHATWOOT_FORCE_WINDOW", "closed")
 
-    cw.send_respuesta_consulta(
-        "42",
-        nombre="Ana Pérez",
-        freeform_content="Hola Ana Pérez, recibimos tu consulta. Te respondemos por este chat en breve.",
-        opener=fake_open,
-    )
-    tp = captured["payload"]["template_params"]
-    assert tp["name"] == "respuesta_consulta"
-    assert tp["language"] == "es_AR"
-    assert tp["category"] == "UTILITY"
-    assert tp["processed_params"] == {"body": {"1": "Ana Pérez"}}
+    try:
+        cw.send_respuesta_consulta(
+            "42",
+            nombre="Ana Pérez",
+            freeform_content="El OCT sale 40 mil.",
+            opener=lambda *a, **k: _FakeResp(),
+        )
+        assert False, "expected ChatwootSendError"
+    except cw.ChatwootSendError as e:
+        assert e.window_closed is True
+        assert e.code == "window_closed"
 
 
 def test_respuesta_consulta_freeform_when_window_open(monkeypatch):
@@ -144,40 +138,41 @@ def test_respuesta_consulta_freeform_when_window_open(monkeypatch):
     result = cw.send_respuesta_consulta(
         "42",
         nombre="Ana Pérez",
-        freeform_content="Hola Ana Pérez, recibimos tu consulta. Te respondemos por este chat en breve.",
+        freeform_content="El OCT sale 40 mil pesos.",
         opener=fake_open,
     )
     assert result.channel == "freeform"
     assert "template_params" not in captured["payload"]
-    assert "recibimos tu consulta" in captured["payload"]["content"]
+    assert captured["payload"]["content"] == "El OCT sale 40 mil pesos."
 
 
-def test_respuesta_consulta_falls_back_on_window_closed_error(monkeypatch):
+def test_respuesta_consulta_does_not_fall_back_to_utility(monkeypatch):
     calls: list[dict[str, Any]] = []
 
     def fake_open(req, timeout=30):
         payload = json.loads(req.data.decode("utf-8"))
         calls.append(payload)
-        if "template_params" not in payload:
-            raise HTTPError(
-                req.full_url,
-                422,
-                "Unprocessable",
-                hdrs=None,
-                fp=BytesIO(b'{"error":"outside 24 hour window"}'),
-            )
-        return _FakeResp()
+        raise HTTPError(
+            req.full_url,
+            422,
+            "Unprocessable",
+            hdrs=None,
+            fp=BytesIO(b'{"error":"outside 24 hour window"}'),
+        )
 
     monkeypatch.setenv("CHATWOOT_HOST", "example.com")
     monkeypatch.setenv("CHATWOOT_API_TOKEN", "tok")
     monkeypatch.setenv("CHATWOOT_FORCE_WINDOW", "open")
 
-    result = cw.send_respuesta_consulta(
-        "42",
-        nombre="Luis",
-        freeform_content="Hola Luis, recibimos tu consulta. Te respondemos por este chat en breve.",
-        opener=fake_open,
-    )
-    assert result.channel == "utility"
-    assert len(calls) == 2
-    assert calls[1]["template_params"]["name"] == "respuesta_consulta"
+    try:
+        cw.send_respuesta_consulta(
+            "42",
+            nombre="Luis",
+            freeform_content="Respuesta rápida",
+            opener=fake_open,
+        )
+        assert False, "expected ChatwootSendError"
+    except cw.ChatwootSendError as e:
+        assert e.window_closed is True
+    assert len(calls) == 1
+    assert "template_params" not in calls[0]

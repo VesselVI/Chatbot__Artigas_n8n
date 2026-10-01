@@ -2331,8 +2331,9 @@
               <input type="hidden" id="respuesta-consulta-id">
               <p class="mb-2 text-muted small" id="respuesta-consulta-meta"></p>
               <div class="mb-0">
-                <div class="wa-preview-label">Vista previa</div>
-                <div class="wa-bubble" id="respuesta-consulta-preview" aria-live="polite"></div>
+                <label class="form-label" for="respuesta-consulta-mensaje">Respuesta al paciente</label>
+                <textarea class="form-control" id="respuesta-consulta-mensaje" rows="4" maxlength="4000" placeholder="Escribí la respuesta rápida…"></textarea>
+                <div class="form-text">Solo disponible mientras la ventana de 24 h de WhatsApp esté abierta.</div>
               </div>
             </div>
             <div class="modal-footer">
@@ -2978,11 +2979,6 @@
       return name;
     }
 
-    function mensajeRespuestaConsultaPreview(nombre) {
-      const name = displayNombrePaciente(nombre) || 'paciente';
-      return `Hola ${name}, recibimos tu consulta. Te respondemos por este chat en breve.`;
-    }
-
     function openRespuestaConsultaModal(b) {
       const alertEl = document.getElementById('respuesta-consulta-alert');
       if (alertEl) alertEl.innerHTML = '';
@@ -2992,14 +2988,15 @@
       const tel = String(b.telefono_contacto || b.phone || '').trim();
       const who = nombre || (tel ? tel : 'Sin nombre');
       document.getElementById('respuesta-consulta-meta').textContent = `${who} · ${tipo}`;
-      document.getElementById('respuesta-consulta-preview').textContent =
-        mensajeRespuestaConsultaPreview(b.nombre);
+      const mensajeEl = document.getElementById('respuesta-consulta-mensaje');
+      if (mensajeEl) mensajeEl.value = '';
       if (!respuestaConsultaModal) {
         respuestaConsultaModal = new bootstrap.Modal(
           document.getElementById('respuestaConsultaModal')
         );
       }
       respuestaConsultaModal.show();
+      if (mensajeEl) setTimeout(() => mensajeEl.focus(), 200);
     }
 
     
@@ -4348,7 +4345,14 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
       const btn = document.getElementById('respuesta-consulta-submit');
       const alertEl = document.getElementById('respuesta-consulta-alert');
       const id = document.getElementById('respuesta-consulta-id').value;
+      const mensaje = (document.getElementById('respuesta-consulta-mensaje')?.value || '').trim();
       if (!id) return;
+      if (!mensaje) {
+        if (alertEl) {
+          alertEl.innerHTML = '<div class="alert alert-warning py-2">Escribí la respuesta al paciente.</div>';
+        }
+        return;
+      }
       btn.disabled = true;
       if (alertEl) alertEl.innerHTML = '';
       try {
@@ -4357,7 +4361,7 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: '{}'
+            body: JSON.stringify({ mensaje })
           }
         );
         const data = await res.json().catch(() => ({}));

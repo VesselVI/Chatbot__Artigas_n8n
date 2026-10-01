@@ -421,12 +421,14 @@ Te esperamos unos minutos antes del horario. Si necesitás reprogramar o cancela
 
 Variable samples: `1` = `Ana Pérez`, `2` = `Adrian Artigas`, `3` = `29/09/2026 10:30`
 
-### Respuesta a consulta — panel (`respuesta_consulta`)
+### Respuesta a consulta — panel (free-form, 24h window)
+
+- Panel **Responder consulta** sends **free-form** text Secretaría types (estudio | pregunta). Shown only while the ~24h customer-service window is open (`created_at` within 24h). No utility send from the dashboard.
+- Optional Chatwoot-only plantilla if Secretaría needs outbound outside the window:
 
 - Name: `respuesta_consulta` (es_AR, UTILITY)
 - Header: optional / none (or short `CONSULTA RECIBIDA` if Meta requires a header)
-- Dashboard `body_params`: `{{1}}` = nombre
-- Row action on pending `tipo=estudio` / `tipo=solicitud` when the customer-service window is closed; same copy as free-form when the window is open.
+- `{{1}}` = nombre
 
 ```text
 Hola {{1}}, recibimos tu consulta. Te respondemos por este chat en breve.
@@ -435,6 +437,7 @@ Hola {{1}}, recibimos tu consulta. Te respondemos por este chat en breve.
 Variable sample: `1` = `Ana Pérez`  
 Footer: empty · Buttons: none
 
+**Do not** wire this plantilla into the dashboard Responder consulta action (ADR-0008).
 ### Reprogramación — panel (`confirmacion_reprogramacion`)
 
 - Name: `confirmacion_reprogramacion` (es_AR, UTILITY)

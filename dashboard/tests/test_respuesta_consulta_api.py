@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -18,11 +18,13 @@ os.environ.setdefault("CHATWOOT_HOST", "example.com")
 import app as dash_app  # noqa: E402
 from chatwoot_send import ChatwootSendError, SendResult
 
+_NOW = datetime.now().replace(microsecond=0)
+
 
 def _row(**kwargs) -> dict[str, Any]:
     base = {
         "id": 1,
-        "created_at": datetime(2026, 9, 20, 12, 0, 0),
+        "created_at": _NOW - timedelta(hours=2),
         "phone": "5491112345678",
         "nombre": "Ana Pérez",
         "dni": "30111222",
@@ -65,6 +67,12 @@ def store():
             _row(id=2, tipo="solicitud", nombre="Luis"),
             _row(id=3, tipo="turno", nombre="María", medico="Adrian Artigas"),
             _row(id=4, tipo="estudio", status="contactado", nombre="Ya contactado"),
+            _row(
+                id=5,
+                tipo="pregunta",
+                nombre="Vieja",
+                created_at=_NOW - timedelta(hours=30),
+            ),
         ]
     )
 
@@ -98,6 +106,7 @@ def test_list_exposes_can_responder_and_contactado_badge(client, store):
     assert by_id[3]["can_mark_contactado"] is False
     assert by_id[4]["status_badge"] == "Contactado"
     assert by_id[4]["can_responder_consulta"] is True
+    assert by_id[5]["can_responder_consulta"] is False
 
 
 def test_responder_consulta_persists_contactado_and_sends(client, store, monkeypatch):
@@ -105,13 +114,16 @@ def test_responder_consulta_persists_contactado_and_sends(client, store, monkeyp
 
     def fake_send(cid, **kwargs):
         captured["cid"] = cid
-        captured["nombre"] = kwargs["nombre"]
+        captured["nombre"] = kwargs.get("nombre")
         captured["content"] = kwargs["freeform_content"]
         return SendResult(channel="freeform", nota_omitted=False)
 
     monkeypatch.setattr(dash_app, "send_respuesta_consulta", fake_send)
 
-    res = client.post("/api/solicitudes/1/responder-consulta", json={})
+    res = client.post(
+        "/api/solicitudes/1/responder-consulta",
+        json={"mensaje": "El OCT sale 40 mil pesos."},
+    )
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["ok"] is True
@@ -120,12 +132,29 @@ def test_responder_consulta_persists_contactado_and_sends(client, store, monkeyp
     assert body["whatsapp_send_channel"] == "freeform"
     assert store.get(1)["status"] == "contactado"
     assert captured["cid"] == "42"
-    assert "recibimos tu consulta" in captured["content"]
-    assert captured["nombre"] == "Ana Pérez"
+    assert captured["content"] == "El OCT sale 40 mil pesos."
+
+
+def test_responder_consulta_rejects_empty_mensaje(client):
+    res = client.post("/api/solicitudes/1/responder-consulta", json={})
+    assert res.status_code == 400
+    assert res.json()["code"] == "empty_message"
+
+
+def test_responder_consulta_rejects_window_closed(client):
+    res = client.post(
+        "/api/solicitudes/5/responder-consulta",
+        json={"mensaje": "Respuesta tarde"},
+    )
+    assert res.status_code == 400
+    assert res.json()["code"] == "window_closed"
 
 
 def test_responder_consulta_rejects_turno(client):
-    res = client.post("/api/solicitudes/3/responder-consulta", json={})
+    res = client.post(
+        "/api/solicitudes/3/responder-consulta",
+        json={"mensaje": "hola"},
+    )
     assert res.status_code == 400
     assert res.json()["code"] == "ineligible_tipo"
 
@@ -134,9 +163,12 @@ def test_responder_consulta_allows_already_contactado(client, store, monkeypatch
     monkeypatch.setattr(
         dash_app,
         "send_respuesta_consulta",
-        lambda *a, **k: SendResult(channel="utility", nota_omitted=True),
+        lambda *a, **k: SendResult(channel="freeform", nota_omitted=False),
     )
-    res = client.post("/api/solicitudes/4/responder-consulta", json={})
+    res = client.post(
+        "/api/solicitudes/4/responder-consulta",
+        json={"mensaje": "Te confirmo el precio."},
+    )
     assert res.status_code == 200, res.text
     assert res.json()["status"] == "contactado"
     assert store.get(4)["status"] == "contactado"
@@ -170,7 +202,10 @@ def test_responder_consulta_send_failure_still_contactado(client, store, monkeyp
 
     monkeypatch.setattr(dash_app, "send_respuesta_consulta", fail)
 
-    res = client.post("/api/solicitudes/1/responder-consulta", json={})
+    res = client.post(
+        "/api/solicitudes/1/responder-consulta",
+        json={"mensaje": "Seguimos en contacto."},
+    )
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["status"] == "contactado"
