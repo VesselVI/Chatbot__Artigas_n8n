@@ -76,8 +76,16 @@ The clinic's public opening hours (FAQ, after-hours footer on patient messages).
 _Avoid_: Horario (alone), disponibilidad
 
 **Disponibilidad**:
-Which Turnos de agenda a médico has for a given week in the dashboard.
-_Avoid_: Horario de clínica, slots (in domain prose)
+Which Turnos de agenda a médico has for a given week in the dashboard (UI tab label **Horarios**). Deactivated by default: the bot must not answer doctor-hours questions from this data or from a Pregunta frecuente; those intents get a fixed patient message, a Pregunta row, and a private Chatwoot note (no team assign, bot stays active). Asking doctor-hours again in the same state re-sends that copy without a second Pregunta. When activated, doctor-hours answers may reference this tab’s info again.
+_Avoid_: Horario de clínica, Horarios (as the domain name for the data), slots (in domain prose)
+
+**Pregunta**:
+A human-needed inbound question queued for Secretaría (badge **Pregunta**, `tipo=pregunta`) — including doctor-hours when Disponibilidad is deactivated. The bot sends the ack/copy, writes a private Chatwoot note, and keeps running (not Bot en silencio, no Secretaría assign). Replaces the old `tipo=solicitud` secretaria-handoff bucket. Distinct from Solicitud de estudio / Consulta de precio and from a curated Pregunta frecuente the bot answers alone.
+_Avoid_: Solicitud (as the badge or tipo for this intent), FAQ answer, Consulta (alone), Derivación (for the doctor-hours-off path)
+
+**Pregunta frecuente**:
+A Secretaría-authored question/answer pair the bot may reply with verbatim when an LLM judge matches the inbound message to that pair. Only considered on the residual path after human-needed intents (cancelar, reprogramar, estudio/precio, doctor-hours-when-Disponibilidad-off, turno booking). Fires only in idle / menu_shown — not mid Pedido de datos. No Solicitud row and no Derivación on a hit. Doctor-hours topics are refused while Disponibilidad is deactivated (hours-off Pregunta path wins).
+_Avoid_: FAQ IA (the live LLM over clinic settings / disponibilidad), Horario de clínica
 
 **Horario preferido**:
 Deprecated in the booking process: the bot no longer asks the paciente for a preferred slot. Día/hora exist only after Confirmación desde el panel. Legacy DB column may still hold a placeholder until removed; do not treat it as a real appointment time.
@@ -89,7 +97,11 @@ _Avoid_: Horario preferido, Disponibilidad, Turno de agenda (those are doctor wi
 
 **Recordatorio automatico**:
 Utility WhatsApp plantilla `recordatorio_turno` sent ~24h before Día/hora del turno for Turnos confirmados that have a linked Chatwoot conversation. n8n Schedule (hourly) calls the dashboard cron endpoint; the dashboard selects due rows, sends via Chatwoot `template_params`, and sets `reminder_sent_at`. Quiet hours 8–20 local; text-only (no quick-reply buttons in v1). Only turnos that live in this system — never DrApp bulk.
-_Avoid_: Recordatorio (alone), reminder blast, CRM sync
+_Avoid_: Recordatorio (alone), Recordatorio desde el panel, reminder blast, CRM sync
+
+**Recordatorio desde el panel**:
+Clinic-initiated reminder notify from the dashboard via a board-level control only (no row action): same patient search / phone→conversation behaviour as Reprogramación desde el panel; modal prefilled from a Turno confirmado when one is selected (nombre, médico, Día/hora — all editable); always sends utility plantilla `recordatorio_turno`. Sends immediately even outside Recordatorio automatico quiet hours (warn Secretaría if outside 8–20). If only a phone with no matching row, send-only (no new solicitud). When a Turno confirmado is selected, sets `reminder_sent_at` so the cron does not double-send; if already reminded, Secretaría must confirm before re-send.
+_Avoid_: Recordatorio automatico, Recordatorio (alone), Reprogramación desde el panel
 
 **Cancelación de solicitud**:
 Aborting an in-progress booking flow before a completed new-appointment solicitud; may still leave a cancel-labelled solicitud with partial data for secretaries.
@@ -112,7 +124,7 @@ A human-needed question about prices or fees. Domain-distinct from Solicitud de 
 _Avoid_: Solicitud de estudio, FAQ answer
 
 **Respuesta a consulta desde el panel**:
-Row action on a pending solicitud with `tipo=estudio` or `tipo=solicitud`: sends a short patient ack (free-form inside Meta’s customer-service window; utility plantilla `respuesta_consulta` when that window is closed), then sets Contactado. Same plantilla and copy for both tipos. Re-send and Abrir Chat remain allowed after Contactado. No board-level control.
+Row action on a pending solicitud with `tipo=estudio` or `tipo=pregunta`: sends a short patient ack (free-form inside Meta’s customer-service window; utility plantilla `respuesta_consulta` when that window is closed), then sets Contactado. Same plantilla and copy for both tipos. Re-send and Abrir Chat remain allowed after Contactado. No board-level control.
 _Avoid_: Bienvenida, Saludo, Confirmar estudio, Menú de bienvenida (bot screen), Confirmación desde el panel
 
 **Mensaje de respuesta a consulta**:
@@ -120,7 +132,7 @@ Patient-facing ack for Respuesta a consulta desde el panel — same wording whet
 _Avoid_: Mensaje de confirmación, Menú de bienvenida, Texto de bienvenida (Settings)
 
 **Contactado**:
-Solicitud status (`status=contactado`, badge **Contactado**) for `tipo=estudio` or `tipo=solicitud` after Secretaría starts the WhatsApp thread via Respuesta a consulta desde el panel or Abrir Chat. Means “thread opened / ack sent,” not that the consulta is finished. Never used for pending turnos (those stay pending until Confirmación desde el panel).
+Solicitud status (`status=contactado`, badge **Contactado**) for `tipo=estudio` or `tipo=pregunta` after Secretaría starts the WhatsApp thread via Respuesta a consulta desde el panel or Abrir Chat. Means “thread opened / ack sent,” not that the consulta is finished. Never used for pending turnos (those stay pending until Confirmación desde el panel).
 _Avoid_: Confirmado, En curso, Avisada, contacted (in domain prose), Turno confirmado
 
 **Obra social**:

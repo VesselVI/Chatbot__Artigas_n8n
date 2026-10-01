@@ -548,6 +548,12 @@ for path in (
 
 app.add_api_route("/api/solicitudes/reprogramar", _ok_stub, methods=["POST"])
 app.add_api_route("/api/solicitudes/cancelar", _ok_stub, methods=["POST"])
+app.add_api_route("/api/solicitudes/recordar", _ok_stub, methods=["POST"])
+app.add_api_route(
+    "/api/solicitudes/{solicitud_id}/recordar", _ok_stub, methods=["POST"]
+)
+app.add_api_route("/api/disponibilidad-enabled", _ok_stub, methods=["POST"])
+app.add_api_route("/api/preguntas-frecuentes", _ok_stub, methods=["GET", "PUT"])
 
 
 if __name__ == "__main__":

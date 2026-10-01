@@ -660,7 +660,8 @@
       color: #b45309;
       border-color: #fde68a;
     }
-    .badge-solicitud {
+    .badge-solicitud,
+    .badge-pregunta {
       background: #faf5ff;
       color: #7e22ce;
       border-color: #e9d5ff;
@@ -1243,6 +1244,100 @@
       box-shadow: var(--focus-ring);
     }
 
+    .btn-board-recordar {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border: 1px solid #0e7490;
+      background: #0891b2;
+      color: #ffffff;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      cursor: pointer;
+      line-height: 1.2;
+      box-shadow: 0 1px 3px rgba(8, 145, 178, 0.25);
+      transition: all 0.15s ease;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-board-recordar:hover {
+        background: #0e7490;
+        border-color: #155e75;
+        color: #ffffff;
+        box-shadow: 0 4px 6px -1px rgba(8, 145, 178, 0.35);
+        transform: translateY(-1px);
+      }
+    }
+    .btn-board-recordar:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+    .faq-list { display: flex; flex-direction: column; gap: 1rem; }
+    .faq-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      background: #fff;
+    }
+    .faq-card label { font-size: 0.8rem; font-weight: 600; color: #4b5563; }
+    .faq-card textarea { min-height: 4.5rem; resize: vertical; }
+    .faq-card-actions { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+    .faq-add-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 1.75rem 0 5rem;
+    }
+    .btn-faq-add {
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 999px;
+      border: 2px dashed #94a3b8;
+      background: #f8fafc;
+      color: #0f172a;
+      font-size: 1.5rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .btn-faq-add:hover {
+        border-style: solid;
+        border-color: #0e7490;
+        background: #ecfeff;
+        color: #0e7490;
+        transform: scale(1.04);
+      }
+    }
+    .faq-add-tip {
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+    .btn-faq-guardar {
+      position: fixed;
+      right: 1.5rem;
+      bottom: 1.5rem;
+      z-index: 40;
+      appearance: none;
+      display: none;
+      align-items: center;
+      gap: 0.4rem;
+      border: 1px solid #0f766e;
+      background: #0d9488;
+      color: #fff;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      padding: 0.7rem 1.25rem;
+      border-radius: 999px;
+      box-shadow: 0 8px 20px rgba(13, 148, 136, 0.35);
+      cursor: pointer;
+    }
+    body.faq-pane-active .btn-faq-guardar { display: inline-flex; }
+
     .btn-cancelar-row {
       color: #fff;
       background: var(--danger);
@@ -1687,6 +1782,9 @@
       <button class="nav-link active" id="nav-solicitudes" data-pane="solicitudes-pane" type="button">
         <i class="bi bi-inbox"></i> Solicitudes
       </button>
+      <button class="nav-link" id="nav-faq" data-pane="faq-pane" type="button">
+        <i class="bi bi-question-circle"></i> Preguntas Frecuentes
+      </button>
       <button class="nav-link" id="nav-horarios" data-pane="availability-pane" type="button">
         <i class="bi bi-calendar3"></i> Horarios
       </button>
@@ -1745,12 +1843,46 @@
 
     <main class="pc-content" id="main-content">
 
+      <!-- PREGUNTAS FRECUENTES -->
+      <section class="pane d-none" id="faq-pane">
+        <div class="card card-da mb-3">
+          <div class="card-header">
+            <div class="card-title-group">
+              <i class="bi bi-question-circle text-primary" aria-hidden="true"></i>
+              <span>Preguntas Frecuentes</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="form-text mb-3">
+              El bot responde con el texto exacto de la respuesta cuando el filtro detecta esa pregunta.
+              No uses horarios de doctores acá si Disponibilidad está apagada — eso va a Secretaría.
+            </p>
+            <div id="faq-alert"></div>
+            <div id="faq-list" class="faq-list"></div>
+            <div class="faq-add-wrap">
+              <button type="button" class="btn-faq-add" id="faq-add-btn" title="Agregar otra pregunta" aria-label="Agregar otra pregunta">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i>
+              </button>
+              <span class="faq-add-tip" role="tooltip">Agregar otra pregunta</span>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn-faq-guardar" id="faq-guardar-btn">
+          <i class="bi bi-check2" aria-hidden="true"></i> Guardar
+        </button>
+      </section>
+
       <!-- HORARIOS -->
       <section class="pane d-none" id="availability-pane">
         <div class="card card-da mb-3">
           <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span>Semana</span>
-            <div class="week-nav">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="disponibilidad-enabled-toggle" aria-describedby="disponibilidad-toggle-help">
+                <label class="form-check-label" for="disponibilidad-enabled-toggle">Disponibilidad activa (bot)</label>
+              </div>
+              <div class="week-nav">
               <button type="button" class="btn" id="prev-week" aria-label="Semana anterior">
                 <i class="bi bi-chevron-left"></i> Semana anterior
               </button>
@@ -1762,6 +1894,10 @@
           </div>
           <div class="card-body">
             <div id="availability-alert"></div>
+            <p class="form-text mb-3" id="disponibilidad-toggle-help">
+              Apagado (recomendado): el bot no responde horarios de doctores; deriva a Secretaría como Pregunta.
+              Encendido: el bot puede usar esta grilla en FAQ.
+            </p>
 
             <label class="form-label fw-medium">Seleccioná día(s)</label>
             <div class="list-group mb-4" id="day-list">
@@ -1906,6 +2042,9 @@
               <span>Cola de solicitudes</span>
             </div>
             <div class="d-flex align-items-center gap-2 header-actions">
+              <button type="button" class="btn-board-recordar" id="board-recordar-btn">
+                <i class="bi bi-bell" aria-hidden="true"></i> Recordar turno
+              </button>
               <button type="button" class="btn-board-reprogramar" id="board-reprogramar-btn">
                 <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Reprogramar un turno
               </button>
@@ -1925,7 +2064,7 @@
               <span class="badge-tipo badge-cancelar">cancelar</span>
               <span class="badge-tipo badge-estudio">estudio</span>
               <span class="badge-tipo badge-reprogramar">reprogramar</span>
-              <span class="badge-tipo badge-solicitud">solicitud</span>
+              <span class="badge-tipo badge-pregunta">Pregunta</span>
             </span>
             <span class="legend-sep" aria-hidden="true"></span>
             <span class="legend-group">
@@ -2079,6 +2218,63 @@
         </div>
       </div>
 
+      <!-- Recordatorio desde el panel (ADR-0006) -->
+      <div class="modal fade" id="recordarModal" tabindex="-1" aria-labelledby="recordarModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="recordarModalLabel">Recordar turno</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <div id="recordar-alert"></div>
+              <input type="hidden" id="recordar-id">
+              <div class="mb-3" id="recordar-search-wrap">
+                <label class="form-label" for="recordar-patient-search">Buscar paciente</label>
+                <input
+                  type="search"
+                  class="form-control"
+                  id="recordar-patient-search"
+                  placeholder="Nombre o teléfono…"
+                  autocomplete="off"
+                  spellcheck="false"
+                >
+                <div class="patient-suggest" id="recordar-patient-suggest" role="listbox" hidden></div>
+                <div class="form-text">
+                  Elegí un turno confirmado, o un teléfono nuevo para abrir Chatwoot.
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="recordar-nombre">Nombre</label>
+                <input type="text" class="form-control" id="recordar-nombre" autocomplete="name">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="recordar-medico">Médico</label>
+                <input type="text" class="form-control" id="recordar-medico" autocomplete="off">
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-7">
+                  <label class="form-label" for="recordar-date">Día</label>
+                  <input type="date" class="form-control" id="recordar-date">
+                </div>
+                <div class="col-5">
+                  <label class="form-label" for="recordar-time">Hora</label>
+                  <input type="time" class="form-control" id="recordar-time" step="60">
+                </div>
+              </div>
+              <div class="mb-0">
+                <div class="wa-preview-label">Vista previa (plantilla recordatorio_turno)</div>
+                <div class="wa-bubble is-empty" id="recordar-wa-preview" aria-live="polite">Completá los campos…</div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cerrar</button>
+              <button type="button" class="btn btn-primary" id="recordar-submit">Enviar recordatorio</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Cancelación desde el panel modal (#12) -->
       <div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -2187,6 +2383,7 @@
 
     const paneTitles = {
       'availability-pane': ['Horarios', 'Disponibilidad semanal por médico'],
+      'faq-pane': ['Preguntas Frecuentes', 'Respuestas exactas del bot para consultas frecuentes'],
       'solicitudes-pane': ['Solicitudes de Turnos', 'Gestión clínica y pedidos entrantes del chatbot de WhatsApp'],
       'clinic-pane': ['Clínica', 'Dirección, horarios y obras sociales']
     };
@@ -2198,6 +2395,7 @@
     function setPane(paneId) {
       document.querySelectorAll('.pane').forEach(p => p.classList.add('d-none'));
       document.getElementById(paneId).classList.remove('d-none');
+      document.body.classList.toggle('faq-pane-active', paneId === 'faq-pane');
       const statsEl = document.getElementById('stats-section');
       if (statsEl) {
         statsEl.classList.toggle('d-none', paneId !== 'solicitudes-pane');
@@ -2233,6 +2431,10 @@
       }
       if (paneId === 'availability-pane') {
         loadAvailability();
+        loadDisponibilidadToggle();
+      }
+      if (paneId === 'faq-pane') {
+        loadPreguntasFrecuentes();
       }
     }
 
@@ -2394,6 +2596,146 @@
       }
     }
 
+    async function loadDisponibilidadToggle() {
+      const toggle = document.getElementById('disponibilidad-enabled-toggle');
+      if (!toggle) return;
+      try {
+        const res = await fetch('/api/clinic-settings');
+        if (!res.ok) throw new Error('fail');
+        const data = await res.json();
+        toggle.checked = !!data.disponibilidad_enabled;
+      } catch (err) {
+        console.error(err);
+        toggle.checked = false;
+      }
+    }
+
+    document.getElementById('disponibilidad-enabled-toggle')?.addEventListener('change', async (ev) => {
+      const toggle = ev.target;
+      const enabled = !!toggle.checked;
+      const alertEl = document.getElementById('availability-alert');
+      try {
+        const res = await fetch('/api/disponibilidad-enabled', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'No se pudo guardar el toggle');
+        if (alertEl) {
+          alertEl.innerHTML = enabled
+            ? '<div class="alert alert-success py-2 mb-0">Disponibilidad activa: el bot puede responder horarios de doctores.</div>'
+            : '<div class="alert alert-warning py-2 mb-0">Disponibilidad apagada: horarios de doctores van a Secretaría (Pregunta).</div>';
+        }
+      } catch (err) {
+        toggle.checked = !enabled;
+        if (alertEl) {
+          alertEl.innerHTML = `<div class="alert alert-danger py-2 mb-0">${escapeHtml(err.message || 'Error')}</div>`;
+        }
+      }
+    });
+
+    let faqDraft = [{ pregunta: '', respuesta: '' }];
+
+    function renderFaqList() {
+      const list = document.getElementById('faq-list');
+      if (!list) return;
+      if (!faqDraft.length) faqDraft = [{ pregunta: '', respuesta: '' }];
+      list.innerHTML = faqDraft.map((row, idx) => `
+        <div class="faq-card" data-faq-idx="${idx}">
+          <div class="mb-2">
+            <label for="faq-q-${idx}">Pregunta</label>
+            <input type="text" class="form-control faq-pregunta" id="faq-q-${idx}" value="${escapeHtml(row.pregunta)}" placeholder="Ej. ¿Dónde queda la clínica?">
+          </div>
+          <div>
+            <label for="faq-a-${idx}">Respuesta (texto exacto del bot)</label>
+            <textarea class="form-control faq-respuesta" id="faq-a-${idx}" placeholder="Respuesta que el paciente verá…">${escapeHtml(row.respuesta)}</textarea>
+          </div>
+          <div class="faq-card-actions">
+            <button type="button" class="btn btn-sm btn-outline-danger faq-remove" data-faq-remove="${idx}" ${faqDraft.length <= 1 ? 'disabled' : ''}>Quitar</button>
+          </div>
+        </div>
+      `).join('');
+      list.querySelectorAll('.faq-pregunta').forEach((el) => {
+        el.addEventListener('input', () => {
+          const i = Number(el.closest('.faq-card').dataset.faqIdx);
+          faqDraft[i].pregunta = el.value;
+        });
+      });
+      list.querySelectorAll('.faq-respuesta').forEach((el) => {
+        el.addEventListener('input', () => {
+          const i = Number(el.closest('.faq-card').dataset.faqIdx);
+          faqDraft[i].respuesta = el.value;
+        });
+      });
+      list.querySelectorAll('[data-faq-remove]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const i = Number(btn.getAttribute('data-faq-remove'));
+          if (faqDraft.length <= 1) return;
+          faqDraft.splice(i, 1);
+          renderFaqList();
+        });
+      });
+    }
+
+    async function loadPreguntasFrecuentes() {
+      const alertEl = document.getElementById('faq-alert');
+      try {
+        const res = await fetch('/api/preguntas-frecuentes');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'No se pudo cargar');
+        const rows = data.preguntas || [];
+        faqDraft = rows.length
+          ? rows.map((r) => ({ pregunta: r.pregunta || '', respuesta: r.respuesta || '' }))
+          : [{ pregunta: '', respuesta: '' }];
+        if (data.missing_table && alertEl) {
+          alertEl.innerHTML = '<div class="alert alert-warning py-2">Falta correr mysql/migrate_preguntas_frecuentes.sql en el VPS.</div>';
+        } else if (alertEl) {
+          alertEl.innerHTML = '';
+        }
+        renderFaqList();
+      } catch (err) {
+        if (alertEl) {
+          alertEl.innerHTML = `<div class="alert alert-danger py-2">${escapeHtml(err.message || 'Error')}</div>`;
+        }
+        faqDraft = [{ pregunta: '', respuesta: '' }];
+        renderFaqList();
+      }
+    }
+
+    document.getElementById('faq-add-btn')?.addEventListener('click', () => {
+      faqDraft.push({ pregunta: '', respuesta: '' });
+      renderFaqList();
+      const cards = document.querySelectorAll('#faq-list .faq-card');
+      const last = cards[cards.length - 1];
+      last?.querySelector('.faq-pregunta')?.focus();
+    });
+
+    document.getElementById('faq-guardar-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('faq-guardar-btn');
+      const alertEl = document.getElementById('faq-alert');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/preguntas-frecuentes', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ preguntas: faqDraft }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'No se pudo guardar');
+        if (alertEl) {
+          alertEl.innerHTML = `<div class="alert alert-success py-2">Guardado (${data.count || 0} pregunta${(data.count || 0) === 1 ? '' : 's'}).</div>`;
+        }
+        await loadPreguntasFrecuentes();
+      } catch (err) {
+        if (alertEl) {
+          alertEl.innerHTML = `<div class="alert alert-danger py-2">${escapeHtml(err.message || 'Error')}</div>`;
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
     document.getElementById('prev-week').addEventListener('click', () => {
       weekStart.setDate(weekStart.getDate() - 7);
       loadAvailability();
@@ -2500,14 +2842,17 @@
 
     function tipoBadge(tipo) {
       const t = tipo || 'turno';
+      const normalized = t === 'solicitud' ? 'pregunta' : t;
       const cls = {
         turno: 'badge-turno',
         cancelar: 'badge-cancelar',
         estudio: 'badge-estudio',
         reprogramar: 'badge-reprogramar',
-        solicitud: 'badge-solicitud'
-      }[t] || 'badge-pendiente';
-      return `<span class="badge-tipo ${cls}">${escapeHtml(t)}</span>`;
+        pregunta: 'badge-pregunta',
+        solicitud: 'badge-pregunta'
+      }[normalized] || 'badge-pendiente';
+      const label = normalized === 'pregunta' ? 'Pregunta' : normalized;
+      return `<span class="badge-tipo ${cls}">${escapeHtml(label)}</span>`;
     }
 
     function statusBadge(b) {
@@ -2615,9 +2960,11 @@
 
     let confirmModal;
     let cancelModal;
+    let recordarModal;
     let respuestaConsultaModal;
     let confirmDraft = null;
     let cancelDraft = null;
+    let recordarDraft = null;
     let solicitudesCache = [];
     let solicitudesGroups = [];
 
@@ -3474,11 +3821,341 @@ function openConfirmModal(b, { edit, reprogram, searchFirst, markConfirmed } = {
       loadSolicitudes();
       loadStats();
     });
+    document.getElementById('board-recordar-btn')?.addEventListener('click', () => {
+      openRecordarModal();
+    });
     document.getElementById('board-reprogramar-btn')?.addEventListener('click', () => {
       openConfirmModal(null, { reprogram: true, searchFirst: true });
     });
     document.getElementById('board-cancelar-btn')?.addEventListener('click', () => {
       openCancelModal(null, { searchFirst: true });
+    });
+
+    function updateRecordarPreview() {
+      const preview = document.getElementById('recordar-wa-preview');
+      if (!preview) return;
+      const nombre = (document.getElementById('recordar-nombre').value || '').trim() || '—';
+      const medico = (document.getElementById('recordar-medico').value || '').trim() || '—';
+      const date = document.getElementById('recordar-date').value;
+      const time = document.getElementById('recordar-time').value;
+      if (!date || !time) {
+        preview.textContent = 'Completá los campos…';
+        preview.classList.add('is-empty');
+        return;
+      }
+      const diaHora = `${formatDisplayDate(date)} ${time}`;
+      preview.textContent = [
+        'Recordatorio de turno',
+        '',
+        `Nombre: ${nombre}`,
+        `Día y hora: ${diaHora}`,
+        `Médico: ${medico}`,
+      ].join('\n');
+      preview.classList.remove('is-empty');
+    }
+
+    function syncRecordarSubmitEnabled() {
+      const btn = document.getElementById('recordar-submit');
+      if (!btn) return;
+      const nombre = (document.getElementById('recordar-nombre').value || '').trim();
+      const medico = (document.getElementById('recordar-medico').value || '').trim();
+      const date = document.getElementById('recordar-date').value;
+      const time = document.getElementById('recordar-time').value;
+      const id = (document.getElementById('recordar-id').value || '').trim();
+      const cold = !!(recordarDraft && recordarDraft._coldPhone);
+      btn.disabled = !(nombre && medico && date && time && (id || cold));
+    }
+
+    function fillRecordarSchedule(b) {
+      const raw = String((b && (b.appointment_at || b.appointment_date)) || '');
+      let date = '';
+      let time = '';
+      if (raw) {
+        const normalized = raw.replace(' ', 'T');
+        date = normalized.slice(0, 10);
+        if (normalized.length >= 16) time = normalized.slice(11, 16);
+      }
+      if (!date) {
+        const t = new Date();
+        t.setDate(t.getDate() + 1);
+        date = t.toISOString().slice(0, 10);
+      }
+      if (!time) time = '10:30';
+      document.getElementById('recordar-date').value = date;
+      document.getElementById('recordar-time').value = time;
+    }
+
+    function openRecordarModal() {
+      recordarDraft = { _coldPhone: null, _confirmResend: false };
+      document.getElementById('recordarModalLabel').textContent = 'Recordar turno';
+      document.getElementById('recordar-id').value = '';
+      document.getElementById('recordar-nombre').value = '';
+      document.getElementById('recordar-medico').value = '';
+      document.getElementById('recordar-date').value = '';
+      document.getElementById('recordar-time').value = '';
+      const searchInput = document.getElementById('recordar-patient-search');
+      const suggest = document.getElementById('recordar-patient-suggest');
+      if (searchInput) searchInput.value = '';
+      if (suggest) {
+        suggest.innerHTML = '';
+        suggest.hidden = true;
+      }
+      document.getElementById('recordar-alert').innerHTML = '';
+      const hour = new Date().getHours();
+      if (hour < 8 || hour >= 20) {
+        document.getElementById('recordar-alert').innerHTML =
+          '<div class="alert alert-warning py-2">Fuera del horario habitual de recordatorios (8–20). Podés enviar igual.</div>';
+      }
+      updateRecordarPreview();
+      syncRecordarSubmitEnabled();
+      if (!recordarModal) {
+        recordarModal = new bootstrap.Modal(document.getElementById('recordarModal'));
+      }
+      recordarModal.show();
+      if (searchInput) setTimeout(() => searchInput.focus(), 200);
+    }
+
+    function bindRecordarFromHit(hit) {
+      if (!hit || !hit.id) return;
+      const tel = hit.telefono_contacto || hit.phone || '';
+      const phoneDigits = digitsOnly(tel);
+      const updateExisting = hit.can_recordatorio === true;
+      if (!updateExisting && phoneDigits.length < 8) {
+        document.getElementById('recordar-alert').innerHTML =
+          '<div class="alert alert-warning py-2">Esa solicitud no admite recordatorio y no tiene teléfono. Escribí un teléfono nuevo.</div>';
+        return;
+      }
+      recordarDraft = Object.assign({}, hit, {
+        _coldPhone: updateExisting ? null : phoneDigits,
+        _confirmResend: false,
+      });
+      document.getElementById('recordar-id').value = updateExisting ? hit.id : '';
+      document.getElementById('recordar-nombre').value =
+        (hit.nombre && hit.nombre !== '-') ? hit.nombre : '';
+      document.getElementById('recordar-medico').value =
+        (hit.medico && hit.medico !== '-') ? hit.medico : '';
+      fillRecordarSchedule(updateExisting ? hit : {});
+      const suggest = document.getElementById('recordar-patient-suggest');
+      if (suggest) {
+        suggest.innerHTML = '';
+        suggest.hidden = true;
+      }
+      const searchInput = document.getElementById('recordar-patient-search');
+      if (searchInput) {
+        searchInput.value = `${hit.nombre || ''} · ${tel}`.trim();
+      }
+      let alertHtml = '';
+      if (!updateExisting) {
+        alertHtml =
+          '<div class="alert alert-info py-2">Se enviará el recordatorio sin modificar esa solicitud (solo plantilla).</div>';
+      } else if (hit.reminder_sent) {
+        alertHtml =
+          '<div class="alert alert-warning py-2">Ya tiene recordatorio enviado. Al enviar te pediremos confirmación para reenviar.</div>';
+      }
+      document.getElementById('recordar-alert').innerHTML = alertHtml;
+      updateRecordarPreview();
+      syncRecordarSubmitEnabled();
+    }
+
+    function bindRecordarColdPhone(phoneRaw) {
+      const digits = digitsOnly(phoneRaw);
+      if (digits.length < 8) return;
+      recordarDraft = { _coldPhone: digits, _confirmResend: false };
+      document.getElementById('recordar-id').value = '';
+      const searchInput = document.getElementById('recordar-patient-search');
+      if (searchInput) searchInput.value = phoneRaw.trim();
+      const suggest = document.getElementById('recordar-patient-suggest');
+      if (suggest) {
+        suggest.innerHTML = '';
+        suggest.hidden = true;
+      }
+      document.getElementById('recordar-alert').innerHTML =
+        '<div class="alert alert-info py-2">Teléfono nuevo: se abrirá conversación en Chatwoot al enviar.</div>';
+      syncRecordarSubmitEnabled();
+    }
+
+    let recordarSearchTimer = null;
+    async function runRecordarPatientSearch(q) {
+      const suggest = document.getElementById('recordar-patient-suggest');
+      if (!suggest) return;
+      const query = (q || '').trim();
+      if (query.length < 2) {
+        suggest.innerHTML = '';
+        suggest.hidden = true;
+        return;
+      }
+      try {
+        const res = await fetch(
+          '/api/solicitudes/search?q=' + encodeURIComponent(query) + '&_=' + Date.now(),
+          { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }
+        );
+        if (!res.ok) throw new Error('search failed');
+        const data = await res.json();
+        const items = data.solicitudes || [];
+        if (!items.length) {
+          if (looksLikePhoneQuery(query)) {
+            const safe = escapeHtml(query.trim());
+            suggest.innerHTML =
+              `<button type="button" class="patient-suggest-item" id="recordar-cold-phone-pick" role="option">` +
+              `<span class="patient-suggest-name">Usar teléfono ${safe}</span>` +
+              `<span class="patient-suggest-meta">Abrir conversación en Chatwoot</span>` +
+              `</button>`;
+            suggest.hidden = false;
+            document.getElementById('recordar-cold-phone-pick')?.addEventListener('click', () => {
+              bindRecordarColdPhone(query);
+            });
+            return;
+          }
+          suggest.innerHTML =
+            '<div class="patient-suggest-meta" style="padding:0.55rem 0.75rem">Sin coincidencias.</div>';
+          suggest.hidden = false;
+          return;
+        }
+        suggest.innerHTML = items
+          .map((s) => {
+            const tel = escapeHtml(s.telefono_contacto || s.phone || '');
+            const nombre = escapeHtml(s.nombre || 'Sin nombre');
+            const meta = escapeHtml(
+              `${s.tipo || ''} · ${s.status_badge || s.status || ''} · ${tel}`
+            );
+            return (
+              `<button type="button" class="patient-suggest-item" data-recordar-hit="${s.id}" role="option">` +
+              `<span class="patient-suggest-name">${nombre}</span>` +
+              `<span class="patient-suggest-meta">${meta}</span>` +
+              `</button>`
+            );
+          })
+          .join('');
+        suggest.hidden = false;
+        suggest.querySelectorAll('[data-recordar-hit]').forEach((el) => {
+          el.addEventListener('click', () => {
+            const id = Number(el.getAttribute('data-recordar-hit'));
+            const hit = (data.solicitudes || []).find((x) => x.id === id);
+            if (hit) bindRecordarFromHit(hit);
+          });
+        });
+        if (looksLikePhoneQuery(query)) {
+          const safe = escapeHtml(query.trim());
+          const cold = document.createElement('button');
+          cold.type = 'button';
+          cold.className = 'patient-suggest-item';
+          cold.id = 'recordar-cold-phone-pick';
+          cold.setAttribute('role', 'option');
+          cold.innerHTML =
+            `<span class="patient-suggest-name">Usar teléfono ${safe}</span>` +
+            `<span class="patient-suggest-meta">Abrir conversación en Chatwoot (sin vincular fila)</span>`;
+          cold.addEventListener('click', () => bindRecordarColdPhone(query));
+          suggest.appendChild(cold);
+        }
+      } catch (err) {
+        suggest.innerHTML =
+          '<div class="patient-suggest-meta" style="padding:0.55rem 0.75rem">No se pudo buscar.</div>';
+        suggest.hidden = false;
+      }
+    }
+
+    document.getElementById('recordar-patient-search')?.addEventListener('input', (ev) => {
+      if (recordarDraft) {
+        document.getElementById('recordar-id').value = '';
+        recordarDraft._coldPhone = null;
+        recordarDraft._confirmResend = false;
+      }
+      clearTimeout(recordarSearchTimer);
+      recordarSearchTimer = setTimeout(() => runRecordarPatientSearch(ev.target.value), 220);
+    });
+    ['recordar-nombre', 'recordar-medico', 'recordar-date', 'recordar-time'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => {
+        updateRecordarPreview();
+        syncRecordarSubmitEnabled();
+      });
+    });
+
+    document.getElementById('recordar-submit')?.addEventListener('click', async () => {
+      const btn = document.getElementById('recordar-submit');
+      const alertEl = document.getElementById('recordar-alert');
+      btn.disabled = true;
+      try {
+        const nombre = (document.getElementById('recordar-nombre').value || '').trim();
+        const medico = (document.getElementById('recordar-medico').value || '').trim();
+        const date = document.getElementById('recordar-date').value;
+        const time = document.getElementById('recordar-time').value;
+        if (!nombre || !medico) throw new Error('Completá nombre y médico.');
+        if (!date || !time) throw new Error('Elegí día y hora del turno.');
+        const payload = {
+          nombre,
+          medico,
+          appointment_at: `${date}T${time}`,
+        };
+        const boundId = (document.getElementById('recordar-id').value || '').trim();
+        if (boundId) {
+          payload.solicitud_id = Number(boundId);
+          if (recordarDraft && recordarDraft._confirmResend) {
+            payload.confirm_resend = true;
+          } else if (recordarDraft && recordarDraft.reminder_sent && !recordarDraft._confirmResend) {
+            const ok = window.confirm(
+              'Ya se envió un recordatorio a este paciente. ¿Reenviar?'
+            );
+            if (!ok) {
+              syncRecordarSubmitEnabled();
+              return;
+            }
+            payload.confirm_resend = true;
+          }
+        } else if (recordarDraft && recordarDraft._coldPhone) {
+          payload.phone = recordarDraft._coldPhone;
+        } else {
+          throw new Error('Buscá y elegí un paciente, o un teléfono nuevo.');
+        }
+        let url = '/api/solicitudes/recordar';
+        if (boundId && !recordarDraft?._coldPhone) {
+          url = '/api/solicitudes/' + encodeURIComponent(boundId) + '/recordar';
+        }
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 409 && data.code === 'already_reminded') {
+          const ok = window.confirm(data.error || '¿Reenviar recordatorio?');
+          if (!ok) {
+            syncRecordarSubmitEnabled();
+            return;
+          }
+          payload.confirm_resend = true;
+          const res2 = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data2 = await res2.json().catch(() => ({}));
+          if (!res2.ok) throw new Error(data2.error || 'No se pudo enviar');
+          if (data2.whatsapp_warning) {
+            alertEl.innerHTML = `<div class="alert alert-warning py-2">${escapeHtml(data2.whatsapp_warning)}</div>`;
+          }
+          if (data2.whatsapp_send_status === 'failed') {
+            alertEl.innerHTML = `<div class="alert alert-danger py-2">Fallo al enviar: ${escapeHtml(data2.whatsapp_warning || 'error')}</div>`;
+          } else if (recordarModal) {
+            recordarModal.hide();
+          }
+          await loadSolicitudes();
+          return;
+        }
+        if (!res.ok) throw new Error(data.error || 'No se pudo enviar el recordatorio');
+        if (data.whatsapp_warning) {
+          alertEl.innerHTML = `<div class="alert alert-warning py-2">${escapeHtml(data.whatsapp_warning)}</div>`;
+        }
+        if (data.whatsapp_send_status === 'failed') {
+          alertEl.innerHTML = `<div class="alert alert-danger py-2">Fallo al enviar: ${escapeHtml(data.whatsapp_warning || 'error')}</div>`;
+        } else if (recordarModal) {
+          recordarModal.hide();
+        }
+        await loadSolicitudes();
+      } catch (err) {
+        alertEl.innerHTML = `<div class="alert alert-danger py-2">${escapeHtml(err.message || 'Error')}</div>`;
+      } finally {
+        syncRecordarSubmitEnabled();
+      }
     });
 
     function updateCancelPreview() {

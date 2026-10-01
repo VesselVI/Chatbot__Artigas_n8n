@@ -50,6 +50,15 @@ from reprogramacion import (
     validate_reprogram_payload,
 )
 from recordatorio import body_params_for_row, select_due
+from recordatorio_panel import (
+    REMINDER_PANEL_CHANNEL,
+    REMINDER_TEMPLATE as RECORDATORIO_PANEL_TEMPLATE,
+    assert_remindable_row,
+    can_recordatorio_panel,
+    outside_quiet_hours,
+    row_already_reminded,
+    validate_recordatorio_payload,
+)
 from respuesta_consulta import (
     RESPUESTA_TEMPLATE,
     assert_mark_contactado,
@@ -595,20 +604,33 @@ def list_reminder_candidates() -> list[dict[str, Any]]:
         conn.close()
 
 
-def mark_reminder_sent(solicitud_id: int, sent_at: datetime) -> None:
+def mark_reminder_sent(
+    solicitud_id: int, sent_at: datetime, *, force: bool = False
+) -> None:
+    """Set reminder_sent_at. force=True overwrites (Recordatorio desde el panel re-send)."""
     conn = get_db()
     try:
         cur = conn.cursor(dictionary=True)
         if not _column_exists(cur, "turno_solicitudes", "reminder_sent_at"):
             return
-        cur.execute(
-            """
-            UPDATE turno_solicitudes
-            SET reminder_sent_at = %s
-            WHERE id = %s AND reminder_sent_at IS NULL
-            """,
-            (sent_at, solicitud_id),
-        )
+        if force:
+            cur.execute(
+                """
+                UPDATE turno_solicitudes
+                SET reminder_sent_at = %s
+                WHERE id = %s
+                """,
+                (sent_at, solicitud_id),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE turno_solicitudes
+                SET reminder_sent_at = %s
+                WHERE id = %s AND reminder_sent_at IS NULL
+                """,
+                (sent_at, solicitud_id),
+            )
         conn.commit()
     finally:
         conn.close()
@@ -901,6 +923,7 @@ def serialize_solicitud(r: dict[str, Any]) -> dict[str, Any]:
         "can_mark_confirmed": can_mark_confirmed(r),
         "can_reprogramar": can_reprogram(r),
         "can_cancelar": can_cancel(r),
+        "can_recordatorio": can_recordatorio_panel(r),
         "can_responder_consulta": can_responder_consulta(r),
         "can_mark_contactado": can_mark_contactado(r),
         "can_reenviar": (
@@ -1596,6 +1619,198 @@ def _execute_cancelacion(body: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+@app.post("/api/solicitudes/recordar")
+@login_required
+async def api_recordar_cold_or_selected(request: Request):
+    """Board Recordatorio desde el panel (ADR-0006)."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Cuerpo inválido.", "code": "invalid_body"},
+            status_code=400,
+        )
+    if not isinstance(body, dict):
+        return JSONResponse(
+            {"ok": False, "error": "Cuerpo inválido.", "code": "invalid_body"},
+            status_code=400,
+        )
+    try:
+        return _execute_recordatorio_panel(body)
+    except ConfirmError as e:
+        status = 404 if e.code == "not_found" else 400
+        if e.code == "already_reminded":
+            status = 409
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code},
+            status_code=status,
+        )
+    except ChatwootSendError as e:
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code or "ensure_failed"},
+            status_code=400,
+        )
+
+
+@app.post("/api/solicitudes/{solicitud_id}/recordar")
+@login_required
+async def api_recordar_solicitud(request: Request, solicitud_id: int):
+    """Recordatorio desde el panel on an existing Turno confirmado."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Cuerpo inválido.", "code": "invalid_body"},
+            status_code=400,
+        )
+    if not isinstance(body, dict):
+        body = {}
+    body = {**body, "solicitud_id": solicitud_id}
+    try:
+        return _execute_recordatorio_panel(body)
+    except ConfirmError as e:
+        status = 404 if e.code == "not_found" else 400
+        if e.code == "already_reminded":
+            status = 409
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code},
+            status_code=status,
+        )
+    except ChatwootSendError as e:
+        return JSONResponse(
+            {"ok": False, "error": str(e), "code": e.code or "ensure_failed"},
+            status_code=400,
+        )
+
+
+def _execute_recordatorio_panel(body: dict[str, Any]) -> dict[str, Any]:
+    """
+    Ensure conversation → plantilla recordatorio_turno → optional row reminder_sent_at.
+    Cold phone: send-only (no new solicitud). Selected row: update send + reminder flags.
+    """
+    payload = validate_recordatorio_payload(body)
+    raw_sid = body.get("solicitud_id")
+    solicitud_id = int(raw_sid) if raw_sid not in (None, "", 0, "0") else None
+    conversation_id: str | None = None
+    phone = ""
+    row: dict[str, Any] | None = None
+    clock = datetime.now()
+
+    if solicitud_id is not None:
+        existing = fetch_solicitud(solicitud_id)
+        row = assert_remindable_row(existing)
+        if row_already_reminded(row) and not payload["confirm_resend"]:
+            raise ConfirmError(
+                "Ya se envió un recordatorio. Confirmá para reenviar.",
+                code="already_reminded",
+            )
+        phone = normalize_phone_e164(
+            body.get("phone") or row.get("telefono_contacto") or row.get("phone")
+        ) or normalize_phone_e164(row.get("phone"))
+        conversation_id = str(row.get("conversation_id") or "").strip() or None
+        if not payload["nombre"] or payload["nombre"] == "-":
+            payload["nombre"] = str(row.get("nombre") or "").strip()
+        if not payload["medico"]:
+            payload["medico"] = str(row.get("medico") or "").strip()
+        if payload["appointment_at"] is None and row.get("appointment_at"):
+            payload["appointment_at"] = row.get("appointment_at")
+    else:
+        phone = normalize_phone_e164(body.get("phone") or body.get("telefono"))
+        if len(phone) < 8:
+            raise ConfirmError(
+                "Falta un teléfono válido para abrir la conversación.",
+                code="missing_phone",
+            )
+
+    if not conversation_id:
+        ensured = ensure_whatsapp_conversation(
+            phone=phone,
+            nombre=payload["nombre"],
+        )
+        conversation_id = str(ensured["conversation_id"])
+
+    if payload["dia_hora_display"]:
+        dia_hora = payload["dia_hora_display"]
+    else:
+        dia_hora = format_dia_hora_display(
+            payload["appointment_at"], por_orden_de_llegada=False
+        )
+
+    send_outcome = _attempt_recordatorio_send(
+        conversation_id,
+        nombre=payload["nombre"],
+        medico=payload["medico"],
+        dia_hora_display=dia_hora,
+    )
+
+    if solicitud_id is not None and row is not None:
+        save_fields: dict[str, Any] = {
+            "nombre": str(row.get("nombre") or payload["nombre"]),
+            "medico": str(row.get("medico") or payload["medico"]),
+            "status": CONFIRMED_STATUS,
+            "conversation_id": conversation_id,
+            "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+            "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+            "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+        }
+        save_solicitud_confirmacion(solicitud_id, save_fields)
+        if send_outcome["whatsapp_send_status"] == "sent":
+            mark_reminder_sent(
+                solicitud_id,
+                clock,
+                force=row_already_reminded(row) or payload["confirm_resend"],
+            )
+
+    note = (
+        "Recordatorio desde el panel — "
+        f"{payload['nombre']} / {payload['medico']} / {dia_hora}. "
+        f"WhatsApp: {send_outcome['whatsapp_send_status']}."
+    )
+    try:
+        send_private_note(conversation_id, note)
+    except ChatwootSendError as e:
+        if not send_outcome.get("whatsapp_warning"):
+            send_outcome["whatsapp_warning"] = f"Nota privada: {e}"
+
+    quiet_warn = None
+    if outside_quiet_hours(clock):
+        quiet_warn = (
+            "Fuera del horario habitual de recordatorios (8–20). "
+            "El mensaje se envió igual."
+        )
+        if send_outcome.get("whatsapp_warning"):
+            send_outcome["whatsapp_warning"] = (
+                f"{quiet_warn} {send_outcome['whatsapp_warning']}"
+            )
+        else:
+            send_outcome["whatsapp_warning"] = quiet_warn
+
+    preview = (
+        f"Plantilla {RECORDATORIO_PANEL_TEMPLATE}\n"
+        f"Nombre: {payload['nombre']}\n"
+        f"Día y hora: {dia_hora}\n"
+        f"Médico: {payload['medico']}"
+    )
+    return {
+        "ok": True,
+        "id": solicitud_id,
+        "created": False,
+        "cold": solicitud_id is None,
+        "nombre": payload["nombre"],
+        "medico": payload["medico"],
+        "dia_hora_display": dia_hora,
+        "phone": phone or None,
+        "conversation_id": conversation_id,
+        "whatsapp_sent": send_outcome["whatsapp_send_status"] == "sent",
+        "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+        "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+        "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+        "whatsapp_warning": send_outcome.get("whatsapp_warning"),
+        "outside_quiet_hours": outside_quiet_hours(clock),
+        "message_preview": preview,
+    }
+
+
 @app.post("/api/solicitudes/{solicitud_id}/reenviar")
 @login_required
 async def api_reenviar_solicitud(request: Request, solicitud_id: int):
@@ -1632,6 +1847,64 @@ async def api_reenviar_solicitud(request: Request, solicitud_id: int):
     por_orden = bool(int(row.get("por_orden_de_llegada") or 0))
     appointment_at = row.get("appointment_at")
     conversation_id = str(row.get("conversation_id") or "").strip() or None
+    send_channel = str(row.get("whatsapp_send_channel") or "").strip().lower()
+
+    if send_channel == REMINDER_PANEL_CHANNEL:
+        if not conversation_id:
+            phone = normalize_phone_e164(row.get("telefono_contacto") or row.get("phone"))
+            try:
+                ensured = ensure_whatsapp_conversation(phone=phone, nombre=nombre)
+                conversation_id = str(ensured["conversation_id"])
+            except ChatwootSendError as e:
+                return JSONResponse(
+                    {"ok": False, "error": str(e), "code": e.code or "ensure_failed"},
+                    status_code=400,
+                )
+        params = body_params_for_row(row)
+        send_outcome = _attempt_recordatorio_send(
+            conversation_id,
+            nombre=params[0],
+            dia_hora_display=params[1],
+            medico=params[2],
+        )
+        save_solicitud_confirmacion(
+            solicitud_id,
+            {
+                "nombre": nombre,
+                "medico": medico,
+                "status": CONFIRMED_STATUS,
+                "conversation_id": conversation_id,
+                "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+                "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+                "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+            },
+        )
+        if send_outcome["whatsapp_send_status"] == "sent":
+            mark_reminder_sent(solicitud_id, datetime.now(), force=True)
+        try:
+            send_private_note(
+                conversation_id,
+                "Recordatorio desde el panel (reenvío) — "
+                f"{params[0]} / {params[2]} / {params[1]}. "
+                f"WhatsApp: {send_outcome['whatsapp_send_status']}.",
+            )
+        except ChatwootSendError:
+            pass
+        return {
+            "ok": True,
+            "id": solicitud_id,
+            "whatsapp_sent": send_outcome["whatsapp_send_status"] == "sent",
+            "whatsapp_send_status": send_outcome["whatsapp_send_status"],
+            "whatsapp_send_channel": send_outcome["whatsapp_send_channel"],
+            "whatsapp_nota_omitted": send_outcome["whatsapp_nota_omitted"],
+            "whatsapp_warning": send_outcome.get("whatsapp_warning"),
+            "message_preview": (
+                f"Plantilla {RECORDATORIO_PANEL_TEMPLATE}\n"
+                f"Nombre: {params[0]}\n"
+                f"Día y hora: {params[1]}\n"
+                f"Médico: {params[2]}"
+            ),
+        }
 
     if status == CANCELLED_STATUS or tipo == "cancelar":
         if not conversation_id:
@@ -1902,14 +2175,52 @@ def _attempt_cancel_send(
         }
 
 
+def _attempt_recordatorio_send(
+    conversation_id: Any,
+    *,
+    nombre: str,
+    medico: str,
+    dia_hora_display: str,
+) -> dict[str, Any]:
+    """Always utility plantilla recordatorio_turno (ADR-0006)."""
+    try:
+        result = send_recordatorio(
+            conversation_id,
+            nombre=nombre,
+            medico=medico,
+            dia_hora_display=dia_hora_display,
+            template_name=RECORDATORIO_PANEL_TEMPLATE,
+        )
+        return {
+            "whatsapp_send_status": "sent",
+            "whatsapp_send_channel": REMINDER_PANEL_CHANNEL,
+            "whatsapp_nota_omitted": result.nota_omitted,
+            "whatsapp_warning": None,
+        }
+    except ChatwootSendError as e:
+        return {
+            "whatsapp_send_status": "failed",
+            "whatsapp_send_channel": REMINDER_PANEL_CHANNEL,
+            "whatsapp_nota_omitted": False,
+            "whatsapp_warning": str(e),
+        }
+
+
 @app.get("/api/clinic-settings")
 @login_required
 async def api_clinic_settings(request: Request):
     conn = get_db()
     try:
         cur = conn.cursor(dictionary=True)
+        has_disp = _column_exists(cur, "clinic_settings", "disponibilidad_enabled")
+        disp_sql = (
+            "disponibilidad_enabled" if has_disp else "0 AS disponibilidad_enabled"
+        )
         cur.execute(
-            "SELECT address, clinic_hours, obras_sociales, welcome_text FROM clinic_settings WHERE id = 1"
+            f"""
+            SELECT address, clinic_hours, obras_sociales, welcome_text, {disp_sql}
+            FROM clinic_settings WHERE id = 1
+            """
         )
         row = cur.fetchone()
     finally:
@@ -1920,6 +2231,7 @@ async def api_clinic_settings(request: Request):
     if isinstance(obras, str):
         obras = json.loads(obras)
     row["obras_sociales"] = obras
+    row["disponibilidad_enabled"] = bool(int(row.get("disponibilidad_enabled") or 0))
     return row
 
 
@@ -1933,22 +2245,193 @@ async def api_save_clinic_settings(request: Request):
     obras = body.get("obras_sociales", [])
     if isinstance(obras, str):
         obras = [x.strip() for x in obras.split("\n") if x.strip()]
+    disponibilidad_enabled = body.get("disponibilidad_enabled")
 
     conn = get_db()
     try:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            UPDATE clinic_settings
-            SET address = %s,
-                clinic_hours = %s,
-                welcome_text = %s,
-                obras_sociales = CAST(%s AS JSON)
-            WHERE id = 1
-            """,
-            (address, clinic_hours, welcome_text, json.dumps(obras, ensure_ascii=False)),
-        )
+        cur = conn.cursor(dictionary=True)
+        has_disp = _column_exists(cur, "clinic_settings", "disponibilidad_enabled")
+        if has_disp and disponibilidad_enabled is not None:
+            cur.execute(
+                """
+                UPDATE clinic_settings
+                SET address = %s,
+                    clinic_hours = %s,
+                    welcome_text = %s,
+                    obras_sociales = CAST(%s AS JSON),
+                    disponibilidad_enabled = %s
+                WHERE id = 1
+                """,
+                (
+                    address,
+                    clinic_hours,
+                    welcome_text,
+                    json.dumps(obras, ensure_ascii=False),
+                    1 if disponibilidad_enabled in (True, 1, "1", "true", "on") else 0,
+                ),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE clinic_settings
+                SET address = %s,
+                    clinic_hours = %s,
+                    welcome_text = %s,
+                    obras_sociales = CAST(%s AS JSON)
+                WHERE id = 1
+                """,
+                (address, clinic_hours, welcome_text, json.dumps(obras, ensure_ascii=False)),
+            )
         conn.commit()
     finally:
         conn.close()
     return {"ok": True}
+
+
+@app.post("/api/disponibilidad-enabled")
+@login_required
+async def api_set_disponibilidad_enabled(request: Request):
+    """Toggle bot use of Horarios/Disponibilidad (ADR-0007). Default off."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Cuerpo inválido.", "code": "invalid_body"},
+            status_code=400,
+        )
+    enabled = bool(
+        body.get("enabled") in (True, 1, "1", "true", "on")
+        or body.get("disponibilidad_enabled") in (True, 1, "1", "true", "on")
+    )
+    conn = get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        if not _column_exists(cur, "clinic_settings", "disponibilidad_enabled"):
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": "Falta migrate_disponibilidad_enabled.sql",
+                    "code": "missing_column",
+                },
+                status_code=503,
+            )
+        cur.execute(
+            "UPDATE clinic_settings SET disponibilidad_enabled = %s WHERE id = 1",
+            (1 if enabled else 0,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True, "disponibilidad_enabled": enabled}
+
+
+def _table_exists(cur, table: str) -> bool:
+    cur.execute(
+        """
+        SELECT COUNT(*) AS c FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s
+        """,
+        (table,),
+    )
+    row = cur.fetchone() or {}
+    return int(row.get("c") or 0) > 0
+
+
+@app.get("/api/preguntas-frecuentes")
+@login_required
+async def api_list_preguntas_frecuentes(request: Request):
+    conn = get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        if not _table_exists(cur, "preguntas_frecuentes"):
+            return {"preguntas": [], "missing_table": True}
+        cur.execute(
+            """
+            SELECT id, pregunta, respuesta, sort_order
+            FROM preguntas_frecuentes
+            ORDER BY sort_order ASC, id ASC
+            """
+        )
+        rows = list(cur.fetchall() or [])
+    finally:
+        conn.close()
+    return {
+        "preguntas": [
+            {
+                "id": r["id"],
+                "pregunta": r.get("pregunta") or "",
+                "respuesta": r.get("respuesta") or "",
+                "sort_order": int(r.get("sort_order") or 0),
+            }
+            for r in rows
+        ]
+    }
+
+
+@app.put("/api/preguntas-frecuentes")
+@login_required
+async def api_save_preguntas_frecuentes(request: Request):
+    """Replace whole list (ADR curated FAQ editor — whole-list Guardar)."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Cuerpo inválido.", "code": "invalid_body"},
+            status_code=400,
+        )
+    items = body.get("preguntas") if isinstance(body, dict) else None
+    if not isinstance(items, list):
+        return JSONResponse(
+            {"ok": False, "error": "Falta la lista de preguntas.", "code": "invalid_body"},
+            status_code=400,
+        )
+    cleaned: list[dict[str, Any]] = []
+    for i, raw in enumerate(items):
+        if not isinstance(raw, dict):
+            continue
+        pregunta = str(raw.get("pregunta") or "").strip()
+        respuesta = str(raw.get("respuesta") or "").strip()
+        if not pregunta and not respuesta:
+            continue
+        if not pregunta or not respuesta:
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": f"La fila {i + 1} necesita pregunta y respuesta.",
+                    "code": "incomplete_row",
+                },
+                status_code=400,
+            )
+        cleaned.append(
+            {
+                "pregunta": pregunta[:500],
+                "respuesta": respuesta[:4000],
+                "sort_order": i,
+            }
+        )
+
+    conn = get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        if not _table_exists(cur, "preguntas_frecuentes"):
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": "Falta migrate_preguntas_frecuentes.sql",
+                    "code": "missing_table",
+                },
+                status_code=503,
+            )
+        cur.execute("DELETE FROM preguntas_frecuentes")
+        for row in cleaned:
+            cur.execute(
+                """
+                INSERT INTO preguntas_frecuentes (pregunta, respuesta, sort_order)
+                VALUES (%s, %s, %s)
+                """,
+                (row["pregunta"], row["respuesta"], row["sort_order"]),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True, "count": len(cleaned)}

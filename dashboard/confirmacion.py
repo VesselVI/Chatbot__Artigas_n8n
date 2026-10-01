@@ -24,7 +24,10 @@ class ConfirmError(ValueError):
 
 def normalize_tipo(value: Any) -> str:
     tipo = str(value or "turno").strip().lower()
-    if tipo not in ("turno", "cancelar", "estudio", "reprogramar", "solicitud"):
+    # Legacy alias: pre-ADR-0007 secretaria handoff rows.
+    if tipo == "solicitud":
+        return "pregunta"
+    if tipo not in ("turno", "cancelar", "estudio", "reprogramar", "pregunta"):
         return "turno"
     return tipo
 

@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS clinic_settings (
   clinic_hours VARCHAR(255) NOT NULL DEFAULT 'Lunes a Viernes de 8hs a 12hs y de 16hs a 20hs',
   obras_sociales JSON NOT NULL,
   welcome_text VARCHAR(500) NOT NULL DEFAULT '¡Hola! Bienvenido/a a la Clínica Oftalmológica Artigas. ¿En qué te puedo ayudar?',
+  disponibilidad_enabled TINYINT(1) NOT NULL DEFAULT 0,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -57,10 +58,12 @@ CREATE TABLE IF NOT EXISTS turno_solicitudes (
   reminder_sent_at DATETIME NULL DEFAULT NULL,
   status VARCHAR(40) NOT NULL DEFAULT 'pending',
   conversation_id VARCHAR(64) DEFAULT NULL,
-  tipo ENUM('turno','cancelar','estudio','reprogramar','solicitud') NOT NULL DEFAULT 'turno'
+  tipo ENUM('turno','cancelar','estudio','reprogramar','pregunta') NOT NULL DEFAULT 'turno'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- Existing VPS DBs: run mysql/migrate_solicitudes_tipo.sql (init.sql is only applied on first MySQL volume).
 -- Recordatorio: run mysql/migrate_recordatorio.sql on existing volumes.
+-- Disponibilidad toggle: mysql/migrate_disponibilidad_enabled.sql
+-- Pregunta tipo (replaces solicitud): mysql/migrate_tipo_pregunta.sql
 
 INSERT INTO clinic_settings (id, address, clinic_hours, obras_sociales, welcome_text) VALUES (
   1,
@@ -79,6 +82,15 @@ INSERT INTO clinic_settings (id, address, clinic_hours, obras_sociales, welcome_
   ),
   '¡Hola! Bienvenido/a a la Clínica Oftalmológica Artigas. ¿En qué te puedo ayudar?'
 ) ON DUPLICATE KEY UPDATE id = id;
+
+CREATE TABLE IF NOT EXISTS preguntas_frecuentes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  pregunta VARCHAR(500) NOT NULL,
+  respuesta TEXT NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Existing VPS: mysql/migrate_preguntas_frecuentes.sql
 
 INSERT INTO doctors (name, active, sort_order) VALUES
   ('Adrian Artigas', 1, 1),

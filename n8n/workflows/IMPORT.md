@@ -162,6 +162,24 @@ Re-importing **04** can change its workflow id and break **Call FAQ 04** on live
 
 The Gemini credential can stay unused in n8n; it is no longer referenced.
 
+### ADR-0007 — Disponibilidad off → Pregunta (paste, do not full-reimport 01/04)
+
+After `mysql/migrate_disponibilidad_enabled.sql` + `mysql/migrate_tipo_pregunta.sql`:
+
+1. **01 — paste / add from repo** (`n8n/workflows/01-entry-router.json`):
+   - **Get State** query (LEFT JOIN + `disponibilidad_enabled`)
+   - **Merge Context** — passes `disponibilidad_enabled`
+   - **Decide Route** — `isDoctorHoursIntent` + route `pregunta_horarios` when toggle off
+   - **Route Switch** rule `pregunta_horarios` → **Build pregunta horarios** → Send → Prep → Insert → note → **Set pregunta horarios ack** (no team assign; bot stays active)
+   - **Prep estudio solicitud** — `solicitud_secretaria` now inserts `tipo='pregunta'`
+   - **Sync pending prompt** — clears `pregunta_horarios_ack` on unrelated routes
+2. **04 — paste** (`n8n/workflows/04-faq-ia.json`):
+   - **Load clinic_settings** includes `disponibilidad_enabled`
+   - **Load preguntas frecuentes** (new) → **Build system prompt**
+   - **Build system prompt** omits weekly doctor hours when toggle off; includes curated FAQ pairs (exact answer on match); hours FAQ refused while Disponibilidad off
+3. Local check: `node scripts/test-decide-route.js`
+4. Dashboard: Horarios tab toggle **Disponibilidad activa (bot)** (default off); tab **Preguntas Frecuentes** + `mysql/migrate_preguntas_frecuentes.sql`.
+
 ### Media and study handoff (paste + add nodes)
 
 Open the repo file `n8n/workflows/01-entry-router.json` (or open each Code node in a text editor) and the live **01 - Entry Router**.

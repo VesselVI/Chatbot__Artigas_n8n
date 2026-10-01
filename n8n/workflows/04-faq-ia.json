@@ -32,7 +32,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT address, clinic_hours, obras_sociales, welcome_text FROM clinic_settings WHERE id = 1 LIMIT 1;",
+        "query": "SELECT address, clinic_hours, obras_sociales, welcome_text, COALESCE(disponibilidad_enabled, 0) AS disponibilidad_enabled FROM clinic_settings WHERE id = 1 LIMIT 1;",
         "options": {}
       },
       "type": "n8n-nodes-base.mySql",
@@ -96,7 +96,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const trig = $('When Executed by Another Workflow').first().json;\nconst settings = $('Load clinic_settings').first().json;\nconst doctors = $('Load doctors').all().map(i => i.json).filter(d => d.name);\nconst avail = $('Load week availability').all().map(i => i.json).filter(a => a.doctor_name);\nconst dayNames = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];\n\nfunction fmtTime(t) {\n  if (!t) return '';\n  const s = String(t);\n  return s.length >= 5 ? s.slice(0, 5) : s;\n}\n\nconst byDoc = {};\nfor (const a of avail) {\n  if (!byDoc[a.doctor_name]) byDoc[a.doctor_name] = [];\n  const day = Number(a.day);\n  byDoc[a.doctor_name].push(`${dayNames[day] || day} ${fmtTime(a.start_time)}-${fmtTime(a.end_time)}`);\n}\n\nlet obras = settings.obras_sociales;\nif (typeof obras === 'string') {\n  try { obras = JSON.parse(obras); } catch (e) { obras = [obras]; }\n}\nif (!Array.isArray(obras)) obras = [];\n\nconst medicosLines = doctors.map(d => {\n  const hours = byDoc[d.name];\n  if (hours && hours.length) return ` - ${d.name}: ${hours.join(', ')}.`;\n  return ` - ${d.name}: (sin horarios cargados esta semana).`;\n}).join('\\n');\n\nconst system = `Sos la asistente del Centro Oftalmologico Artigas. Respondé SOLO usando la siguiente información. Si la pregunta no se puede responder con esto, decí que no contas con esa informacion pero lo vas a averiguar para hacerle saber.\n\nUbicación (donde queda):\n - ${settings.address || 'Avenida Nicolas Avellaneda 347'}.\nHorarios (a que hora abre y cierra la clinica):\n - ${settings.clinic_hours || ''}.\n\nMédicos y horarios (semana actual):\n${medicosLines || ' - (sin médicos activos)'}\n\nObras sociales aceptadas:\n${obras.map(o => ` - ${o}.`).join('\\n')}\n\n## Reglas de ORO:\n - No vas a contestar nada que no este relacionado los medicos, los horarios de los medicos, Ubicacion, Horario de la clinica u obras sociales aceptadas.\n - Vas a mantener un tono agradable y amistoso, sin perder el profesionalismo.\n - Solo vas a poner \"hola!\" en el primer mensaje que te llegue en el día.`;\n\nreturn [{\n  json: {\n    telefono: trig.telefono,\n    texto: trig.texto,\n    conversation_id: trig.conversation_id,\n    account_id: trig.account_id,\n    system_prompt: system\n  }\n}];"
+        "jsCode": "const trig = $('When Executed by Another Workflow').first().json;\nconst settings = $('Load clinic_settings').first().json;\nconst doctors = $('Load doctors').all().map(i => i.json).filter(d => d.name);\nconst avail = $('Load week availability').all().map(i => i.json).filter(a => a.doctor_name);\nlet faqs = [];\ntry {\n  faqs = $('Load preguntas frecuentes').all().map(i => i.json)\n    .filter(r => r && r.pregunta && r.respuesta);\n} catch (e) { faqs = []; }\nconst dayNames = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];\n\nfunction fmtTime(t) {\n  if (!t) return '';\n  const s = String(t);\n  return s.length >= 5 ? s.slice(0, 5) : s;\n}\n\nconst byDoc = {};\nfor (const a of avail) {\n  if (!byDoc[a.doctor_name]) byDoc[a.doctor_name] = [];\n  const day = Number(a.day);\n  byDoc[a.doctor_name].push(`${dayNames[day] || day} ${fmtTime(a.start_time)}-${fmtTime(a.end_time)}`);\n}\n\nlet obras = settings.obras_sociales;\nif (typeof obras === 'string') {\n  try { obras = JSON.parse(obras); } catch (e) { obras = [obras]; }\n}\nif (!Array.isArray(obras)) obras = [];\n\nconst dispOn = [1, '1', true, 'true'].includes(settings.disponibilidad_enabled)\n  || Number(settings.disponibilidad_enabled) === 1;\n\nconst medicosLines = doctors.map(d => {\n  const hours = byDoc[d.name];\n  if (hours && hours.length) return ` - ${d.name}: ${hours.join(', ')}.`;\n  return ` - ${d.name}: (sin horarios cargados esta semana).`;\n}).join('\\n');\n\nconst medicosBlock = dispOn\n  ? `Médicos y horarios (semana actual):\\n${medicosLines || ' - (sin médicos activos)'}`\n  : `Médicos activos (SIN horarios individuales — no inventes ni digas a qué hora atiende cada uno):\\n${doctors.map(d => ' - ' + d.name + '.').join('\\n') || ' - (sin médicos activos)'}\\nSi preguntan horarios de un doctor, respondé EXACTAMENTE: Le comunicaremos con una secretaria para darle a saber los horarios de los doctores`;\n\n\nconst faqBlock = faqs.length\n  ? (`Preguntas frecuentes (si el mensaje del paciente coincide con UNA de estas preguntas — mismo tema, paráfrasis cercana — respondé SOLO con la respuesta asociada, texto exacto, sin agregar nada:\\\\n`\n    + faqs.map((f, i) => `### FAQ ${i + 1}\\\\nPregunta: ${f.pregunta}\\\\nRespuesta exacta: ${f.respuesta}`).join('\\\\n\\\\n')\n    + (dispOn ? '' : '\\\\n\\\\nIMPORTANTE: si la FAQ es sobre horarios de un médico/doctor y arriba dice que no hay horarios individuales, IGNORÁ esa FAQ y respondé exactamente: Le comunicaremos con una secretaria para darle a saber los horarios de los doctores'))\n  : '';\n\nconst system = `Sos la asistente del Centro Oftalmologico Artigas. Respondé SOLO usando la siguiente información. Si la pregunta no se puede responder con esto, decí que no contas con esa informacion pero lo vas a averiguar para hacerle saber.\n\nUbicación (donde queda):\n - ${settings.address || 'Avenida Nicolas Avellaneda 347'}.\nHorarios (a que hora abre y cierra la clinica):\n - ${settings.clinic_hours || ''}.\n\n${medicosBlock}\n\n${faqBlock}\n\nObras sociales aceptadas:\n${obras.map(o => ` - ${o}.`).join('\\n')}\n\n## Reglas de ORO:\n - No vas a contestar nada que no este relacionado los medicos, los horarios de los medicos (solo si están disponibles arriba), Ubicacion, Horario de la clinica u obras sociales aceptadas.\n - Si arriba dice que NO hay horarios individuales, NUNCA inventes días ni horas de un médico.\n - Si hay Preguntas frecuentes y el mensaje coincide con una, respondé SOLO esa Respuesta exacta.\n - Vas a mantener un tono agradable y amistoso, sin perder el profesionalismo.\n - Solo vas a poner \"hola!\" en el primer mensaje que te llegue en el día.`;\n\nreturn [{\n  json: {\n    telefono: trig.telefono,\n    texto: trig.texto,\n    conversation_id: trig.conversation_id,\n    account_id: trig.account_id,\n    system_prompt: system\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -200,6 +200,28 @@
       },
       "notesInFlow": true,
       "notes": "Credential 'Chatwoot API' = Header Auth, header name api_access_token. Or set CHATWOOT_HOST/DOMAIN in n8n env."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, pregunta, respuesta, sort_order FROM preguntas_frecuentes ORDER BY sort_order ASC, id ASC LIMIT 100;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        420,
+        240
+      ],
+      "id": "22eb81b9-81d5-4f35-a94a-ace21c12b904",
+      "name": "Load preguntas frecuentes",
+      "credentials": {
+        "mySql": {
+          "id": "MYSQL_CRED",
+          "name": "MySQL account"
+        }
+      },
+      "alwaysOutputData": true
     }
   ],
   "connections": {
@@ -240,7 +262,7 @@
       "main": [
         [
           {
-            "node": "Build system prompt",
+            "node": "Load preguntas frecuentes",
             "type": "main",
             "index": 0
           }
@@ -285,6 +307,17 @@
         [
           {
             "node": "Send Chatwoot FAQ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load preguntas frecuentes": {
+      "main": [
+        [
+          {
+            "node": "Build system prompt",
             "type": "main",
             "index": 0
           }

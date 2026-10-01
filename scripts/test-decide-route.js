@@ -167,6 +167,30 @@ const tests = [
     expect: (r) => r.route === 'estudio_handoff',
   },
   {
+    name: 'doctor hours when disponibilidad off → pregunta_horarios',
+    input: base({
+      texto: 'a que hora atiende el dr artigas',
+      estado: 'menu_shown',
+      disponibilidad_enabled: 0,
+    }),
+    expect: (r) =>
+      r.route === 'pregunta_horarios' && r.handoff_reason === 'pregunta_horarios',
+  },
+  {
+    name: 'doctor hours when disponibilidad on → not pregunta_horarios (faq path)',
+    input: base({
+      texto: 'a que hora atiende el dr artigas',
+      estado: 'menu_shown',
+      disponibilidad_enabled: 1,
+    }),
+    expect: (r) => r.route === 'faq',
+  },
+  {
+    name: 'clinic horarios keyword still route=horarios',
+    input: base({ texto: 'horarios', estado: 'menu_shown', disponibilidad_enabled: 0 }),
+    expect: (r) => r.route === 'horarios',
+  },
+  {
     name: 'hablar con doctor routes to estudio_handoff not faq',
     input: base({ texto: 'kiero hablar con el doctor artigas', estado: 'menu_shown' }),
     expect: (r) =>
@@ -224,6 +248,55 @@ const tests = [
       estado: 'idle',
       boton_id: 'corregir_datos',
       context: { solicitud_id: 1, correction_count: 0 },
+    }),
+    expect: (r) => r.route === 'booking',
+  },
+  {
+    // Live 2026-08-31: Corregir after Recepción opened welcome — context lacked solicitud_id
+    // (LAST_INSERT_ID lost across MySQL pool). Router fails closed to welcome.
+    name: 'idle corregir_datos without solicitud_id routes welcome (fail-closed)',
+    input: base({
+      estado: 'idle',
+      boton_id: 'corregir_datos',
+      context: {},
+    }),
+    expect: (r) => r.route === 'welcome',
+  },
+  {
+    name: 'idle corregir_datos with solicitud_id 0 routes welcome (fail-closed)',
+    input: base({
+      estado: 'idle',
+      boton_id: 'corregir_datos',
+      context: { solicitud_id: 0, correction_count: 0 },
+    }),
+    expect: (r) => r.route === 'welcome',
+  },
+  {
+    // Live 2026-08-31: Cancelar on Pedido after Corregir → "Falta…" instead of cancel confirm
+    name: 'awaiting_pedido cancelar_turno_pedido routes cancel_ask',
+    input: base({
+      estado: 'awaiting_pedido_datos',
+      boton_id: 'cancelar_turno_pedido',
+      texto: 'Cancelar turno',
+    }),
+    expect: (r) => r.route === 'cancel_ask',
+  },
+  {
+    name: 'awaiting_correccion cancelar_turno_pedido routes cancel_ask',
+    input: base({
+      estado: 'awaiting_correccion_datos',
+      boton_id: 'cancelar_turno_pedido',
+      texto: 'Cancelar turno',
+      context: { solicitud_id: 1 },
+    }),
+    expect: (r) => r.route === 'cancel_ask',
+  },
+  {
+    name: 'awaiting_pedido normal blob still routes booking',
+    input: base({
+      estado: 'awaiting_pedido_datos',
+      texto: 'Juan Perez 30111222 OSDE Adrian Artigas',
+      boton_id: '',
     }),
     expect: (r) => r.route === 'booking',
   },

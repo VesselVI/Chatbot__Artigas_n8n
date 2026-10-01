@@ -11,7 +11,7 @@ from confirmacion import (
     normalize_tipo,
 )
 
-RESPUESTA_CONSULTA_TIPOS = frozenset({"estudio", "solicitud"})
+RESPUESTA_CONSULTA_TIPOS = frozenset({"estudio", "pregunta"})
 RESPUESTA_TEMPLATE = "respuesta_consulta"
 
 # Statuses that still allow Responder consulta / Abrir Chat → Contactado.

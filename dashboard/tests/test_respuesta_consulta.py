@@ -12,6 +12,7 @@ from respuesta_consulta import (
 
 def test_status_badge_contactado():
     assert status_badge_label("contactado", "estudio") == "Contactado"
+    assert status_badge_label("contactado", "pregunta") == "Contactado"
     assert status_badge_label("contactado", "solicitud") == "Contactado"
     assert status_badge_label("contactado", "turno") == "Contactado"
 
@@ -28,12 +29,16 @@ def test_mensaje_respuesta_consulta_fallback_nombre():
     assert "recibimos tu consulta" in mensaje_respuesta_consulta("  ")
 
 
-def test_can_responder_estudio_and_solicitud_pending():
+def test_can_responder_estudio_and_pregunta_pending():
     assert can_responder_consulta(
         {"id": 1, "tipo": "estudio", "status": "pending", "conversation_id": "42"}
     )
     assert can_responder_consulta(
-        {"id": 2, "tipo": "solicitud", "status": "pending", "conversation_id": "42"}
+        {"id": 2, "tipo": "pregunta", "status": "pending", "conversation_id": "42"}
+    )
+    # Legacy DB value still maps via normalize_tipo
+    assert can_responder_consulta(
+        {"id": 3, "tipo": "solicitud", "status": "pending", "conversation_id": "42"}
     )
 
 
