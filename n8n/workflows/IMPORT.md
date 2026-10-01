@@ -120,11 +120,11 @@ docker compose up -d n8n
 - Bot **skips** replies when a **human** is assigned (`conversation.meta.assignee.type === 'user'` or `assignee_id` without bot) **or** `conversation.team_id` / team handoff is set. It does **not** assign on the media or estudio warning itself — only after **Hablar secretaria**.
 - Booking (lean **Pedido de datos**): `idle/menu_shown` → optional menú (horario + ubicación + **Sacar un turno** only) → **one** ask for nombre + DNI + obra + médico → parse → **Recepción de solicitud** (datos + **Corregir datos**); obra/médico lists only if unclear. No confirm wizard, no teléfono step. Complete blob in one message (`quiero turno Juan…`) skips menú and Pedido. Second **Corregir datos** → Derivación.
 - **Cancelar turno (mid-booking)** / keywords `cancelar|salir|menu|menú` → confirm → sí inserts `turno_solicitudes` with `tipo=cancelar` (data filled so far) then clears + welcome / no restores + re-asks.
-- **Solicitud de cancelación (NL intent):** frases como `quiero cancelar un turno`, `no voy a poder ir a la consulta`, `cancelar turno` (y variantes) disparan `cancelar_prompt` (Sí/No). Si responde **Sí**, el bot pide **nombre completo + DNI** en un solo mensaje y genera:
+- **Solicitud de cancelación (NL intent):** frases explícitas como `quiero cancelar un turno`, `cancelar turno`, `dar de baja el turno` (y variantes) disparan `cancelar_prompt` (Sí/No). Si responde **Sí**, el bot pide **nombre completo + DNI** en un solo mensaje y genera:
   - mensaje al paciente: `Su turno ha sido cancelado.`
   - **private note** para Secretaría con nombre, DNI y texto del paciente
   - fila en `turno_solicitudes` con `tipo=cancelar`
-- **Solicitud de reprogramación (NL intent):** frases como `quiero reprogramar un turno`, `necesito un turno para otro día`, `quiero cambiar el horario de mi turno` (y variantes) disparan `reprogramar_prompt` (Sí/No). Si responde **Sí**, pide **nombre completo + DNI** en un solo mensaje y genera:
+- **Solicitud de reprogramación (NL intent):** frases como `quiero reprogramar un turno`, `necesito un turno para otro día`, `quiero cambiar el horario de mi turno`, y **no poder asistir/ir** (`No podré asistir a la consulta`, `no voy a poder ir`, `no puedo asistir al turno`, etc.) disparan `reprogramar_prompt` (Sí/No). Si responde **Sí**, pide **nombre completo + DNI** en un solo mensaje y genera:
   - mensaje al paciente de confirmación de solicitud
   - **private note** para Secretaría con nombre, DNI y texto del paciente
   - fila en `turno_solicitudes` con `tipo=reprogramar`
@@ -365,7 +365,7 @@ Use a conversation that is **not** already assigned to an agent or team.
 7. From the estudio prompt, type **sacar un turno** (or tap that welcome button). Expect booking, not assign. Typed **quiero un turno con el dr artigas** must still start booking.
 8. Confirm a booking → dashboard badge `turno` (DNI column filled). Confirm **Sí, cancelar** mid-booking → badge `cancelar`. Outside clinic hours, the short **Turno solicitado** ack includes the after-hours footer.
 9. Secretaries with assignment notifications enabled should see the new team conversation.
-10. Type `quiero cancelar un turno` (or `no voy a poder ir a la consulta`) in an unassigned chat. Expect **¿Quiere cancelar su turno?** with `Sí/No`. Tap `Sí` and send one message with nombre + DNI (e.g. `Juan Pérez 30111222`). Expect patient confirmation, private note to Secretaría, and dashboard badge `cancelar`.
+10. Type `quiero cancelar un turno` in an unassigned chat. Expect **¿Quiere cancelar su turno?** with `Sí/No`. Tap `Sí` and send one message with nombre + DNI (e.g. `Juan Pérez 30111222`). Expect patient confirmation, private note to Secretaría, and dashboard badge `cancelar`. For cannot-attend copy (`No podré asistir a la consulta`, `no voy a poder ir`), expect **¿Quiere reprogramar su turno?** instead (badge `reprogramar` after Sí + nombre/DNI).
 11. Type `quiero reprogramar un turno` (or `quiero cambiar el horario de mi turno`). Expect **¿Quiere reprogramar su turno?** with `Sí/No`. Tap `Sí` and send nombre + DNI in one message. Expect private note and dashboard badge `reprogramar` (orange/warning).
 12. Tap **Horarios** / ask FAQ about hours — expect **8hs a 12hs** and **16hs a 20hs**.
 ## Chatwoot templates (secretary use)

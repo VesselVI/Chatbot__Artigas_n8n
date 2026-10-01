@@ -130,6 +130,39 @@ const tests = [
     expect: (r) => r.route === 'reprogramar_prompt',
   },
   {
+    name: 'no podré asistir a la consulta offers reprogramar (not booking/faq)',
+    input: base({
+      texto: 'Buen día. No podré asistir a la consulta. X motivos de salud.',
+      estado: 'idle',
+    }),
+    expect: (r) => r.route === 'reprogramar_prompt',
+  },
+  {
+    name: 'no puedo asistir al turno offers reprogramar (not booking)',
+    input: base({ texto: 'no puedo asistir al turno', estado: 'menu_shown' }),
+    expect: (r) => r.route === 'reprogramar_prompt',
+  },
+  {
+    name: 'no voy a poder ir a la consulta offers reprogramar',
+    input: base({ texto: 'no voy a poder ir a la consulta', estado: 'idle' }),
+    expect: (r) => r.route === 'reprogramar_prompt',
+  },
+  {
+    name: 'explicit cancel still routes to cancelar_prompt',
+    input: base({ texto: 'quiero cancelar mi turno', estado: 'idle' }),
+    expect: (r) => r.route === 'cancelar_prompt',
+  },
+  {
+    name: 'regex reprogramar wins over AI cancelar on cannot-attend',
+    input: base({
+      texto: 'No podré asistir a la consulta',
+      estado: 'menu_shown',
+      ai_intent: 'cancelar',
+      ai_confidence: 0.95,
+    }),
+    expect: (r) => r.route === 'reprogramar_prompt',
+  },
+  {
     name: 'horario text mid-booking stays on booking (not reprogramar)',
     input: base({
       estado: 'awaiting_dia_hora',
