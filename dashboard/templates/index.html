@@ -2330,6 +2330,10 @@
               <div id="respuesta-consulta-alert"></div>
               <input type="hidden" id="respuesta-consulta-id">
               <p class="mb-2 text-muted small" id="respuesta-consulta-meta"></p>
+              <div class="mb-3" id="respuesta-consulta-detalle-wrap">
+                <div class="wa-preview-label">Detalle</div>
+                <div class="wa-bubble" id="respuesta-consulta-detalle" aria-live="polite"></div>
+              </div>
               <div class="mb-0">
                 <label class="form-label" for="respuesta-consulta-mensaje">Respuesta al paciente</label>
                 <textarea class="form-control" id="respuesta-consulta-mensaje" rows="4" maxlength="4000" placeholder="Escribí la respuesta rápida…"></textarea>
@@ -2988,6 +2992,15 @@
       const tel = String(b.telefono_contacto || b.phone || '').trim();
       const who = nombre || (tel ? tel : 'Sin nombre');
       document.getElementById('respuesta-consulta-meta').textContent = `${who} · ${tipo}`;
+      const detalleRaw = String(b.detalle || b.horario_preferido || '').trim();
+      const detalleText = (detalleRaw && detalleRaw !== '-') ? detalleRaw : '';
+      const detalleEl = document.getElementById('respuesta-consulta-detalle');
+      const detalleWrap = document.getElementById('respuesta-consulta-detalle-wrap');
+      if (detalleEl) {
+        detalleEl.textContent = detalleText || 'Sin detalle';
+        detalleEl.classList.toggle('is-empty', !detalleText);
+      }
+      if (detalleWrap) detalleWrap.hidden = false;
       const mensajeEl = document.getElementById('respuesta-consulta-mensaje');
       if (mensajeEl) mensajeEl.value = '';
       if (!respuestaConsultaModal) {
